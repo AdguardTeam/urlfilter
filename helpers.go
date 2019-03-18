@@ -1,6 +1,8 @@
 package urlfilter
 
-import "strings"
+import (
+	"strings"
+)
 
 // splitWithEscapeCharacter splits string by the specified separator if it is not escaped
 func splitWithEscapeCharacter(str string, sep byte, escapeCharacter byte, preserveAllTokens bool) []string {

@@ -161,3 +161,55 @@ func TestContentType(t *testing.T) {
 	assert.Nil(t, err)
 	assert.True(t, f.Match(r))
 }
+
+func TestDomainRestrictions(t *testing.T) {
+	// Just one permitted domain
+	f, err := NewFilterRule("||example.org^$domain=example.org")
+	r := NewRequest("https://example.org/", "", TypeScript)
+	assert.Nil(t, err)
+	assert.False(t, f.Match(r))
+
+	r = NewRequest("https://example.org/", "https://example.org/", TypeScript)
+	assert.Nil(t, err)
+	assert.True(t, f.Match(r))
+
+	r = NewRequest("https://example.org/", "https://subdomain.example.org/", TypeScript)
+	assert.Nil(t, err)
+	assert.True(t, f.Match(r))
+
+	// One permitted, subdomain restricted
+	f, err = NewFilterRule("||example.org^$domain=example.org|~subdomain.example.org")
+	r = NewRequest("https://example.org/", "", TypeScript)
+	assert.Nil(t, err)
+	assert.False(t, f.Match(r))
+
+	r = NewRequest("https://example.org/", "https://example.org/", TypeScript)
+	assert.Nil(t, err)
+	assert.True(t, f.Match(r))
+
+	r = NewRequest("https://example.org/", "https://subdomain.example.org/", TypeScript)
+	assert.Nil(t, err)
+	assert.False(t, f.Match(r))
+
+	// One restricted
+	f, err = NewFilterRule("||example.org^$domain=~example.org")
+	r = NewRequest("https://example.org/", "", TypeScript)
+	assert.Nil(t, err)
+	assert.True(t, f.Match(r))
+
+	r = NewRequest("https://example.org/", "https://example.org/", TypeScript)
+	assert.Nil(t, err)
+	assert.False(t, f.Match(r))
+
+	r = NewRequest("https://example.org/", "https://subdomain.example.org/", TypeScript)
+	assert.Nil(t, err)
+	assert.False(t, f.Match(r))
+}
+
+func TestInvalidDomainRestrictions(t *testing.T) {
+	_, err := NewFilterRule("||example.org^$domain=")
+	assert.NotNil(t, err)
+
+	_, err = NewFilterRule("||example.org^$domain=|example.com")
+	assert.NotNil(t, err)
+}

@@ -1,6 +1,7 @@
 package urlfilter
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -49,10 +50,18 @@ const (
 	// Blocking
 	OptionPopup // $popup
 
-	// TypeOther
+	// Other
 	OptionCsp     // $csp
 	OptionReplace // $replace
 	OptionCookie  // $cookie
+
+	// Blacklist-only options
+	OptionBlacklistOnly = OptionPopup | OptionEmpty | OptionMp4
+
+	// Whitelist-only options
+	OptionWhitelistOnly = OptionElemhide | OptionGenericblock | OptionGenerichide |
+		OptionJsinject | OptionUrlblock | OptionContent | OptionExtension |
+		OptionStealth
 )
 
 // FilterRule is a basic filtering rule
@@ -60,6 +69,9 @@ const (
 type FilterRule struct {
 	RuleText  string // RuleText is the original rule text
 	Whitelist bool   // true if this is an exception rule
+
+	permittedDomains  []string // a list of permitted domains from the $domain modifier
+	restrictedDomains []string // a list of restricted domains from the $domain modifier
 
 	enabledOptions  FilterRuleOption // Flag with all enabled rule options
 	disabledOptions FilterRuleOption // Flag with all disabled rule options
@@ -100,11 +112,11 @@ func NewFilterRule(ruleText string) (*FilterRule, error) {
 
 // Match checks if this filtering rule matches the specified request
 func (f *FilterRule) Match(r *Request) bool {
-	if f.isOptionEnabled(OptionThirdParty) && !r.ThirdParty {
+	if f.IsOptionEnabled(OptionThirdParty) && !r.ThirdParty {
 		return false
 	}
 
-	if f.isOptionDisabled(OptionThirdParty) && r.ThirdParty {
+	if f.IsOptionDisabled(OptionThirdParty) && r.ThirdParty {
 		return false
 	}
 
@@ -112,7 +124,21 @@ func (f *FilterRule) Match(r *Request) bool {
 		return false
 	}
 
+	if !f.matchDomain(r.SourceHostname) {
+		return false
+	}
+
 	return f.matchPattern(r)
+}
+
+// IsOptionEnabled returns true if the specified option is enabled
+func (f *FilterRule) IsOptionEnabled(option FilterRuleOption) bool {
+	return (f.enabledOptions & option) == option
+}
+
+// IsOptionDisabled returns true if the specified option is disabled
+func (f *FilterRule) IsOptionDisabled(option FilterRuleOption) bool {
+	return (f.disabledOptions & option) == option
 }
 
 // matchPattern uses the regex pattern to match the request URL
@@ -125,7 +151,7 @@ func (f *FilterRule) matchPattern(r *Request) bool {
 		}
 
 		pattern := patternToRegexp(f.pattern)
-		if !f.isOptionEnabled(OptionMatchCase) {
+		if !f.IsOptionEnabled(OptionMatchCase) {
 			pattern = "(?i)" + pattern
 		}
 
@@ -139,6 +165,31 @@ func (f *FilterRule) matchPattern(r *Request) bool {
 	}
 	f.Unlock()
 	return f.regex.MatchString(r.URL)
+}
+
+// matchDomain checks if the specified filtering rule is allowed on this domain
+func (f *FilterRule) matchDomain(domain string) bool {
+	if len(f.permittedDomains) == 0 && len(f.restrictedDomains) == 0 {
+		return true
+	}
+
+	if len(f.restrictedDomains) > 0 {
+		if isDomainOrSubdomainOfAny(domain, f.restrictedDomains) {
+			// Domain or host is restricted
+			// i.e. $domain=~example.org
+			return false
+		}
+	}
+
+	if len(f.permittedDomains) > 0 {
+		if !isDomainOrSubdomainOfAny(domain, f.permittedDomains) {
+			// Domain is not among permitted
+			// i.e. $domain=example.org and we're checking example.com
+			return false
+		}
+	}
+
+	return true
 }
 
 // matchRequestType checks if the specified request type matches the rule properties
@@ -167,20 +218,16 @@ func (f *FilterRule) setRequestType(requestType RequestType, permitted bool) {
 	}
 }
 
-// isOptionEnabled returns true if the specified option is enabled
-func (f *FilterRule) isOptionEnabled(option FilterRuleOption) bool {
-	return (f.enabledOptions & option) == option
-}
-
-// isOptionDisabled returns true if the specified option is disabled
-func (f *FilterRule) isOptionDisabled(option FilterRuleOption) bool {
-	return (f.disabledOptions & option) == option
-}
-
 // enableOption enables or disables the specified option
 // it can return error if this option cannot be used with this type of rules
 func (f *FilterRule) setOptionEnabled(option FilterRuleOption, enabled bool) error {
-	// TODO: Add whitelist/blacklist check
+	if f.Whitelist && (option&OptionBlacklistOnly) == option {
+		return fmt.Errorf("modifier cannot be used in a whitelist rule: %v", option)
+	}
+
+	if !f.Whitelist && (option&OptionWhitelistOnly) == option {
+		return fmt.Errorf("modifier cannot be used in a blacklist rule: %v", option)
+	}
 
 	if enabled {
 		f.enabledOptions |= option
@@ -215,6 +262,16 @@ func (f *FilterRule) loadOptions(options string) error {
 		}
 	}
 
+	// Rules of these types can be applied to documents only
+	// $jsinject, $elemhide, $urlblock, $genericblock, $generichide and $content for whitelist rules.
+	// $popup - for url blocking
+	if f.IsOptionEnabled(OptionJsinject) || f.IsOptionEnabled(OptionElemhide) ||
+		f.IsOptionEnabled(OptionContent) || f.IsOptionEnabled(OptionUrlblock) ||
+		f.IsOptionEnabled(OptionGenericblock) || f.IsOptionEnabled(OptionGenerichide) ||
+		f.IsOptionEnabled(OptionExtension) || f.IsOptionEnabled(OptionPopup) {
+		f.permittedRequestTypes = TypeDocument
+	}
+
 	return nil
 }
 
@@ -231,6 +288,56 @@ func (f *FilterRule) loadOption(name string, value string) error {
 		return f.setOptionEnabled(OptionMatchCase, true)
 	case "~match-case":
 		return f.setOptionEnabled(OptionMatchCase, false)
+	case "domain":
+		return f.loadDomains(value)
+
+	// Document-level whitelist rules
+	case "elemhide":
+		return f.setOptionEnabled(OptionElemhide, true)
+	case "generichide":
+		return f.setOptionEnabled(OptionGenerichide, true)
+	case "genericblock":
+		return f.setOptionEnabled(OptionGenericblock, true)
+	case "jsinject":
+		return f.setOptionEnabled(OptionJsinject, true)
+	case "urlblock":
+		return f.setOptionEnabled(OptionUrlblock, true)
+	case "content":
+		return f.setOptionEnabled(OptionContent, true)
+
+	// $extension can be also removed
+	case "extension":
+		return f.setOptionEnabled(OptionExtension, true)
+	case "~extension":
+		// $document must be specified before ~extension
+		// TODO: Depends on options order, this is not good
+		f.enabledOptions = f.enabledOptions ^ OptionExtension
+		return nil
+
+	// $document
+	case "document":
+		err := f.setOptionEnabled(OptionElemhide, true)
+		// Ignore others
+		_ = f.setOptionEnabled(OptionJsinject, true)
+		_ = f.setOptionEnabled(OptionUrlblock, true)
+		_ = f.setOptionEnabled(OptionContent, true)
+		_ = f.setOptionEnabled(OptionExtension, true)
+		return err
+
+	// Stealth mode
+	case "stealth":
+		return f.setOptionEnabled(OptionStealth, true)
+
+	// $popup blocking options
+	case "popup":
+		return f.setOptionEnabled(OptionPopup, true)
+
+	// $empty and $mp4
+	// TODO: Deprecate in favor of $redirect
+	case "empty":
+		return f.setOptionEnabled(OptionEmpty, true)
+	case "mp4":
+		return f.setOptionEnabled(OptionMp4, true)
 
 	// Content type options
 	case "script":
@@ -302,6 +409,52 @@ func (f *FilterRule) loadOption(name string, value string) error {
 	}
 
 	return fmt.Errorf("unknown filter modifier: %s=%s", name, value)
+}
+
+// loadDomains loads $domain modifier contents
+func (f *FilterRule) loadDomains(domains string) error {
+	if domains == "" {
+		return errors.New("empty $domain modifier")
+	}
+
+	var permittedDomains []string
+	var restrictedDomains []string
+
+	list := strings.Split(domains, "|")
+	for i := 0; i < len(list); i++ {
+		d := list[i]
+		restricted := false
+		if strings.HasPrefix(d, "~") {
+			restricted = true
+			d = d[1:]
+		}
+
+		if strings.TrimSpace(d) == "" {
+			return fmt.Errorf("empty domain specified: %s", domains)
+		}
+
+		if restricted {
+			restrictedDomains = append(restrictedDomains, d)
+		} else {
+			permittedDomains = append(permittedDomains, d)
+		}
+	}
+
+	f.permittedDomains = permittedDomains
+	f.restrictedDomains = restrictedDomains
+	return nil
+}
+
+// isDomainOrSubdomainOfAny checks if "domain" is domain or subdomain or any of the "domains"
+func isDomainOrSubdomainOfAny(domain string, domains []string) bool {
+	for _, d := range domains {
+		if domain == d ||
+			(strings.HasSuffix(domain, d) &&
+				strings.HasSuffix(domain, "."+d)) {
+			return true
+		}
+	}
+	return false
 }
 
 // parseRuleText splits the rule text in multiple parts:
