@@ -61,6 +61,10 @@ func patternToRegexp(pattern string) string {
 		return RegexAnyCharacter
 	}
 
+	if strings.HasPrefix(pattern, "/") && strings.HasSuffix(pattern, "/") {
+		return pattern[1 : len(pattern)-1]
+	}
+
 	// Escape special characters except of * | ^
 	regex := reSpecialCharacters.ReplaceAllString(pattern, "\\$0")
 

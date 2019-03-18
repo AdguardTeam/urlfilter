@@ -57,17 +57,22 @@ func TestParseRuleText(t *testing.T) {
 }
 
 func TestSimpleBasicRules(t *testing.T) {
-	// Basic matching rule
+	// Simple matching rule
 	f, err := NewFilterRule("||example.org^")
 	r := NewRequest("https://example.org/", "", TypeOther)
 	assert.Nil(t, err)
 	assert.True(t, f.Match(r))
 
-	// Regex rule
+	// Simple regex rule
 	f, err = NewFilterRule("/example\\.org/")
 	r = NewRequest("https://example.org/", "", TypeOther)
 	assert.Nil(t, err)
 	assert.True(t, f.Match(r))
+}
+
+func TestUnknownModifier(t *testing.T) {
+	_, err := NewFilterRule("||example.org^$unknown")
+	assert.NotNil(t, err)
 }
 
 func TestMatchCase(t *testing.T) {
