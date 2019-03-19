@@ -46,9 +46,10 @@ type Request struct {
 	RequestType RequestType // request type
 	ThirdParty  bool        // true if request is third-party
 
-	URL      string // Request URL
-	Hostname string // Request hostname
-	Domain   string // Request domain (eTLD+1)
+	URL          string // Request URL
+	URLLowerCase string // Request URL in lower case
+	Hostname     string // Request hostname
+	Domain       string // Request domain (eTLD+1)
 
 	SourceURL      string // Source URL
 	SourceHostname string // Source hostname
@@ -60,8 +61,9 @@ func NewRequest(url string, sourceURL string, requestType RequestType) *Request 
 	r := Request{
 		RequestType: requestType,
 
-		URL:      url,
-		Hostname: extractHostname(url),
+		URL:          url,
+		URLLowerCase: strings.ToLower(url),
+		Hostname:     extractHostname(url),
 
 		SourceURL:      sourceURL,
 		SourceHostname: extractHostname(sourceURL),

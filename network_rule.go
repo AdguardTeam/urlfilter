@@ -17,17 +17,22 @@ const (
 )
 
 var (
-	reEscapedOptionsDelimiter, _ = regexp.Compile(regexp.QuoteMeta("\\$"))
+	reEscapedOptionsDelimiter = regexp.MustCompile(regexp.QuoteMeta("\\$"))
+	reRegexpBrackets1         = regexp.MustCompile("([^\\\\])\\(.*[^\\\\]\\)")
+	reRegexpBrackets2         = regexp.MustCompile("([^\\\\])\\{.*[^\\\\]\\}")
+	reRegexpBrackets3         = regexp.MustCompile("([^\\\\])\\[.*[^\\\\]\\]")
+	reRegexpEscapedCharacters = regexp.MustCompile("([^\\\\])\\[a-zA-Z]")
+	reRegexpSpecialCharacters = regexp.MustCompile("[\\\\^$*+?.()|[\\]{}]")
 )
 
-// FilterRuleOption is the enumeration of various rule options
+// NetworkRuleOption is the enumeration of various rule options
 // In order to save memory, we store some options as a flag
-type FilterRuleOption uint
+type NetworkRuleOption uint
 
-// FilterRuleOption enumeration
+// NetworkRuleOption enumeration
 const (
-	OptionThirdParty FilterRuleOption = 1 << iota // $third-party modifier
-	OptionMatchCase                               // $match-case modifier
+	OptionThirdParty NetworkRuleOption = 1 << iota // $third-party modifier
+	OptionMatchCase                                // $match-case modifier
 
 	// Whitelist rules modifiers
 	// Each of them can disable part of the functionality
@@ -64,17 +69,19 @@ const (
 		OptionStealth
 )
 
-// FilterRule is a basic filtering rule
+// NetworkRule is a basic filtering rule
 // https://kb.adguard.com/en/general/how-to-create-your-own-ad-filters#basic-rules
-type FilterRule struct {
-	RuleText  string // RuleText is the original rule text
-	Whitelist bool   // true if this is an exception rule
+type NetworkRule struct {
+	RuleText     string // RuleText is the original rule text
+	Whitelist    bool   // true if this is an exception rule
+	FilterListID int    // Filter list identifier
+	Shortcut     string // the longest substring of the rule pattern with no special characters
 
 	permittedDomains  []string // a list of permitted domains from the $domain modifier
 	restrictedDomains []string // a list of restricted domains from the $domain modifier
 
-	enabledOptions  FilterRuleOption // Flag with all enabled rule options
-	disabledOptions FilterRuleOption // Flag with all disabled rule options
+	enabledOptions  NetworkRuleOption // Flag with all enabled rule options
+	disabledOptions NetworkRuleOption // Flag with all disabled rule options
 
 	permittedRequestTypes  RequestType // Flag with all permitted request types. 0 means ALL.
 	restrictedRequestTypes RequestType // Flag with all restricted request types. 0 means NONE.
@@ -86,32 +93,54 @@ type FilterRule struct {
 	sync.Mutex
 }
 
-// NewFilterRule parses the rule text and returns a filter rule
-func NewFilterRule(ruleText string) (*FilterRule, error) {
+// NewNetworkRule parses the rule text and returns a filter rule
+func NewNetworkRule(ruleText string, filterListID int) (*NetworkRule, error) {
+	// split rule into pattern and options
 	pattern, options, whitelist, err := parseRuleText(ruleText)
 
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO: Parse options
-
-	rule := FilterRule{
-		RuleText:  ruleText,
-		Whitelist: whitelist,
-		pattern:   pattern,
+	rule := NetworkRule{
+		RuleText:     ruleText,
+		Whitelist:    whitelist,
+		FilterListID: filterListID,
+		pattern:      pattern,
 	}
 
+	// parse options
 	err = rule.loadOptions(options)
 	if err != nil {
 		return nil, err
 	}
 
+	rule.loadShortcut()
 	return &rule, nil
 }
 
+// Text returns the original rule text
+// Implements the `Rule` interface
+func (f *NetworkRule) Text() string {
+	return f.RuleText
+}
+
+// GetFilterListID returns ID of the filter list this rule belongs to
+func (f *NetworkRule) GetFilterListID() int {
+	return f.FilterListID
+}
+
+// String returns original rule text
+func (f *NetworkRule) String() string {
+	return f.RuleText
+}
+
 // Match checks if this filtering rule matches the specified request
-func (f *FilterRule) Match(r *Request) bool {
+func (f *NetworkRule) Match(r *Request) bool {
+	if !f.matchShortcut(r) {
+		return false
+	}
+
 	if f.IsOptionEnabled(OptionThirdParty) && !r.ThirdParty {
 		return false
 	}
@@ -132,17 +161,17 @@ func (f *FilterRule) Match(r *Request) bool {
 }
 
 // IsOptionEnabled returns true if the specified option is enabled
-func (f *FilterRule) IsOptionEnabled(option FilterRuleOption) bool {
+func (f *NetworkRule) IsOptionEnabled(option NetworkRuleOption) bool {
 	return (f.enabledOptions & option) == option
 }
 
 // IsOptionDisabled returns true if the specified option is disabled
-func (f *FilterRule) IsOptionDisabled(option FilterRuleOption) bool {
+func (f *NetworkRule) IsOptionDisabled(option NetworkRuleOption) bool {
 	return (f.disabledOptions & option) == option
 }
 
 // matchPattern uses the regex pattern to match the request URL
-func (f *FilterRule) matchPattern(r *Request) bool {
+func (f *NetworkRule) matchPattern(r *Request) bool {
 	f.Lock()
 	if f.regex == nil {
 		if f.invalid {
@@ -167,8 +196,13 @@ func (f *FilterRule) matchPattern(r *Request) bool {
 	return f.regex.MatchString(r.URL)
 }
 
+// matchShortcut simply checks if shortcut is a substring of the URL
+func (f *NetworkRule) matchShortcut(r *Request) bool {
+	return strings.Index(r.URLLowerCase, f.Shortcut) != -1
+}
+
 // matchDomain checks if the specified filtering rule is allowed on this domain
-func (f *FilterRule) matchDomain(domain string) bool {
+func (f *NetworkRule) matchDomain(domain string) bool {
 	if len(f.permittedDomains) == 0 && len(f.restrictedDomains) == 0 {
 		return true
 	}
@@ -193,7 +227,7 @@ func (f *FilterRule) matchDomain(domain string) bool {
 }
 
 // matchRequestType checks if the specified request type matches the rule properties
-func (f *FilterRule) matchRequestType(requestType RequestType) bool {
+func (f *NetworkRule) matchRequestType(requestType RequestType) bool {
 	if f.permittedRequestTypes != 0 {
 		if (f.permittedRequestTypes & requestType) != requestType {
 			return false
@@ -210,7 +244,7 @@ func (f *FilterRule) matchRequestType(requestType RequestType) bool {
 }
 
 // setRequestType permits or forbids the specified request type
-func (f *FilterRule) setRequestType(requestType RequestType, permitted bool) {
+func (f *NetworkRule) setRequestType(requestType RequestType, permitted bool) {
 	if permitted {
 		f.permittedRequestTypes |= requestType
 	} else {
@@ -220,7 +254,7 @@ func (f *FilterRule) setRequestType(requestType RequestType, permitted bool) {
 
 // enableOption enables or disables the specified option
 // it can return error if this option cannot be used with this type of rules
-func (f *FilterRule) setOptionEnabled(option FilterRuleOption, enabled bool) error {
+func (f *NetworkRule) setOptionEnabled(option NetworkRuleOption, enabled bool) error {
 	if f.Whitelist && (option&OptionBlacklistOnly) == option {
 		return fmt.Errorf("modifier cannot be used in a whitelist rule: %v", option)
 	}
@@ -240,7 +274,7 @@ func (f *FilterRule) setOptionEnabled(option FilterRuleOption, enabled bool) err
 
 // loadOptions loads all the filtering rule options
 // read the details on each here: https://kb.adguard.com/en/general/how-to-create-your-own-ad-filters#basic-rules
-func (f *FilterRule) loadOptions(options string) error {
+func (f *NetworkRule) loadOptions(options string) error {
 	if options == "" {
 		return nil
 	}
@@ -277,7 +311,7 @@ func (f *FilterRule) loadOptions(options string) error {
 
 // loadOption loads specified option with its value (optional)
 // nolint:gocyclo
-func (f *FilterRule) loadOption(name string, value string) error {
+func (f *NetworkRule) loadOption(name string, value string) error {
 	switch name {
 	// General options
 	case "third-party", "~first-party":
@@ -412,7 +446,7 @@ func (f *FilterRule) loadOption(name string, value string) error {
 }
 
 // loadDomains loads $domain modifier contents
-func (f *FilterRule) loadDomains(domains string) error {
+func (f *NetworkRule) loadDomains(domains string) error {
 	if domains == "" {
 		return errors.New("empty $domain modifier")
 	}
@@ -443,6 +477,82 @@ func (f *FilterRule) loadDomains(domains string) error {
 	f.permittedDomains = permittedDomains
 	f.restrictedDomains = restrictedDomains
 	return nil
+}
+
+// loadShortcut extracts a shortcut from the pattern.
+// shortcut is the longest substring of the pattern that does not contain
+// any special characters
+func (f *NetworkRule) loadShortcut() {
+	var shortcut string
+	if strings.HasPrefix(f.pattern, maskRegexRule) &&
+		strings.HasSuffix(f.pattern, maskRegexRule) {
+		shortcut = findRegexpShortcut(f.pattern)
+	} else {
+		shortcut = findShortcut(f.pattern)
+	}
+
+	// shortcut needs to be at least longer than 1 character
+	if len(shortcut) > 1 {
+		f.Shortcut = shortcut
+	}
+}
+
+// findShortcut searches for the longest substring of the pattern that
+// does not contain any special characters: *,^,|.
+func findShortcut(pattern string) string {
+	longest := ""
+	parts := strings.FieldsFunc(pattern, func(r rune) bool {
+		switch r {
+		case '*', '^', '|':
+			return true
+		}
+		return false
+	})
+	for _, part := range parts {
+		if len(part) > len(longest) {
+			longest = part
+		}
+	}
+	return strings.ToLower(longest)
+}
+
+// findRegexpShortcut searches for a shortcut inside of a regexp pattern.
+// Shortcut in this case is a longest string with no REGEX special characters
+// Also, we discard complicated regexps right away.
+func findRegexpShortcut(pattern string) string {
+	// strip backslashes
+	pattern = pattern[1 : len(pattern)-1]
+
+	if strings.Index(pattern, "?") != -1 {
+		// Do not mess with complex expressions which use lookahead
+		// And with those using ? special character: https://github.com/AdguardTeam/AdguardBrowserExtension/issues/978
+		return ""
+	}
+
+	// placeholder for a special character
+	specialCharacter := "..."
+
+	// (Dirty) prepend specialCharacter for the following replace calls to work properly
+	pattern = specialCharacter + pattern
+
+	//// Strip all types of brackets
+	pattern = reRegexpBrackets1.ReplaceAllString(pattern, "$1"+specialCharacter)
+	pattern = reRegexpBrackets2.ReplaceAllString(pattern, "$1"+specialCharacter)
+	pattern = reRegexpBrackets3.ReplaceAllString(pattern, "$1"+specialCharacter)
+
+	// Strip some escaped characters
+	pattern = reRegexpEscapedCharacters.ReplaceAllString(pattern, "$1"+specialCharacter)
+
+	// Split by special characters
+	parts := reRegexpSpecialCharacters.Split(pattern, -1)
+	longest := ""
+	for _, part := range parts {
+		if len(part) > len(longest) {
+			longest = part
+		}
+	}
+
+	return strings.ToLower(longest)
 }
 
 // isDomainOrSubdomainOfAny checks if "domain" is domain or subdomain or any of the "domains"

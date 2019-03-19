@@ -56,27 +56,44 @@ func TestParseRuleText(t *testing.T) {
 	assert.Nil(t, err)
 }
 
+func TestFindShortcut(t *testing.T) {
+	shortcut := findShortcut("||example.org^")
+	assert.Equal(t, "example.org", shortcut)
+
+	shortcut = findShortcut("|https://*examp")
+	assert.Equal(t, "https://", shortcut)
+
+	shortcut = findRegexpShortcut("/example/")
+	assert.Equal(t, "example", shortcut)
+
+	shortcut = findRegexpShortcut("/^http:\\/\\/example/")
+	assert.Equal(t, "/example", shortcut)
+
+	shortcut = findRegexpShortcut("/^http:\\/\\/[a-z]+\\.example/")
+	assert.Equal(t, "example", shortcut)
+}
+
 func TestSimpleBasicRules(t *testing.T) {
 	// Simple matching rule
-	f, err := NewFilterRule("||example.org^")
+	f, err := NewNetworkRule("||example.org^", 0)
 	r := NewRequest("https://example.org/", "", TypeOther)
 	assert.Nil(t, err)
 	assert.True(t, f.Match(r))
 
 	// Simple regex rule
-	f, err = NewFilterRule("/example\\.org/")
+	f, err = NewNetworkRule("/example\\.org/", 0)
 	r = NewRequest("https://example.org/", "", TypeOther)
 	assert.Nil(t, err)
 	assert.True(t, f.Match(r))
 }
 
 func TestUnknownModifier(t *testing.T) {
-	_, err := NewFilterRule("||example.org^$unknown")
+	_, err := NewNetworkRule("||example.org^$unknown", 0)
 	assert.NotNil(t, err)
 }
 
 func TestMatchCase(t *testing.T) {
-	f, err := NewFilterRule("||example.org^$match-case")
+	f, err := NewNetworkRule("||example.org^$match-case", 0)
 	r := NewRequest("https://example.org/", "", TypeOther)
 	assert.Nil(t, err)
 	assert.True(t, f.Match(r))
@@ -87,7 +104,7 @@ func TestMatchCase(t *testing.T) {
 }
 
 func TestThirdParty(t *testing.T) {
-	f, err := NewFilterRule("||example.org^$third-party")
+	f, err := NewNetworkRule("||example.org^$third-party", 0)
 
 	// First-party 1
 	r := NewRequest("https://example.org/", "", TypeOther)
@@ -104,7 +121,7 @@ func TestThirdParty(t *testing.T) {
 	assert.Nil(t, err)
 	assert.True(t, f.Match(r))
 
-	f, err = NewFilterRule("||example.org^$first-party")
+	f, err = NewNetworkRule("||example.org^$first-party", 0)
 
 	// First-party 1
 	r = NewRequest("https://example.org/", "", TypeOther)
@@ -124,7 +141,7 @@ func TestThirdParty(t *testing.T) {
 
 func TestContentType(t *testing.T) {
 	// $script
-	f, err := NewFilterRule("||example.org^$script")
+	f, err := NewNetworkRule("||example.org^$script", 0)
 	r := NewRequest("https://example.org/", "", TypeScript)
 	assert.Nil(t, err)
 	assert.True(t, f.Match(r))
@@ -134,7 +151,7 @@ func TestContentType(t *testing.T) {
 	assert.False(t, f.Match(r))
 
 	// $script and $stylesheet
-	f, err = NewFilterRule("||example.org^$script,stylesheet")
+	f, err = NewNetworkRule("||example.org^$script,stylesheet", 0)
 	r = NewRequest("https://example.org/", "", TypeScript)
 	assert.Nil(t, err)
 	assert.True(t, f.Match(r))
@@ -148,7 +165,7 @@ func TestContentType(t *testing.T) {
 	assert.False(t, f.Match(r))
 
 	// Everything except $script and $stylesheet
-	f, err = NewFilterRule("@@||example.org^$~script,~stylesheet")
+	f, err = NewNetworkRule("@@||example.org^$~script,~stylesheet", 0)
 	r = NewRequest("https://example.org/", "", TypeScript)
 	assert.Nil(t, err)
 	assert.False(t, f.Match(r))
@@ -164,7 +181,7 @@ func TestContentType(t *testing.T) {
 
 func TestDomainRestrictions(t *testing.T) {
 	// Just one permitted domain
-	f, err := NewFilterRule("||example.org^$domain=example.org")
+	f, err := NewNetworkRule("||example.org^$domain=example.org", 0)
 	r := NewRequest("https://example.org/", "", TypeScript)
 	assert.Nil(t, err)
 	assert.False(t, f.Match(r))
@@ -178,7 +195,7 @@ func TestDomainRestrictions(t *testing.T) {
 	assert.True(t, f.Match(r))
 
 	// One permitted, subdomain restricted
-	f, err = NewFilterRule("||example.org^$domain=example.org|~subdomain.example.org")
+	f, err = NewNetworkRule("||example.org^$domain=example.org|~subdomain.example.org", 0)
 	r = NewRequest("https://example.org/", "", TypeScript)
 	assert.Nil(t, err)
 	assert.False(t, f.Match(r))
@@ -192,7 +209,7 @@ func TestDomainRestrictions(t *testing.T) {
 	assert.False(t, f.Match(r))
 
 	// One restricted
-	f, err = NewFilterRule("||example.org^$domain=~example.org")
+	f, err = NewNetworkRule("||example.org^$domain=~example.org", 0)
 	r = NewRequest("https://example.org/", "", TypeScript)
 	assert.Nil(t, err)
 	assert.True(t, f.Match(r))
@@ -207,9 +224,9 @@ func TestDomainRestrictions(t *testing.T) {
 }
 
 func TestInvalidDomainRestrictions(t *testing.T) {
-	_, err := NewFilterRule("||example.org^$domain=")
+	_, err := NewNetworkRule("||example.org^$domain=", 0)
 	assert.NotNil(t, err)
 
-	_, err = NewFilterRule("||example.org^$domain=|example.com")
+	_, err = NewNetworkRule("||example.org^$domain=|example.com", 0)
 	assert.NotNil(t, err)
 }

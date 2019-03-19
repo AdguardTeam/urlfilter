@@ -1,3 +1,5 @@
 .DS_Store
-/.vscode
-/.idea
+.vscode
+.idea
+test/easylist.txt
+test/requests.json

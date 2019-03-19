@@ -7,7 +7,8 @@ You can learn more about AdGuard filtering rules syntax from [this article](http
 #### TODO:
 
 * [ ] Basic filtering rules
-    * [ ] Core syntax
+    * [X] Core syntax
+    * [ ] Basic engine
     * [ ] $important
 * [ ] Benchmark basic rules matching
 * [ ] CSS rules
