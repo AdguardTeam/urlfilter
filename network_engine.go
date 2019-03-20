@@ -11,6 +11,7 @@ const (
 
 // NetworkEngine is the engine that supports quick search over network rules
 type NetworkEngine struct {
+	domainsLookupTable   map[uint32][]*NetworkRule
 	shortcutsLookupTable map[uint32][]*NetworkRule
 	shortcutsHistogram   map[uint32]int
 	otherRules           []*NetworkRule
@@ -19,6 +20,7 @@ type NetworkEngine struct {
 // NewNetworkEngine builds an instance of the network engine
 func NewNetworkEngine(rules []*NetworkRule) *NetworkEngine {
 	engine := NetworkEngine{
+		domainsLookupTable:   map[uint32][]*NetworkRule{},
 		shortcutsLookupTable: map[uint32][]*NetworkRule{},
 		shortcutsHistogram:   map[uint32]int{},
 	}
@@ -56,6 +58,10 @@ func (n *NetworkEngine) MatchAll(r *Request) []*NetworkRule {
 	// First check by shortcuts
 	result := n.matchShortcutsLookupTable(r)
 
+	for _, rule := range n.matchDomainsLookupTable(r) {
+		result = append(result, rule)
+	}
+
 	// Now check other rules
 	for i := range n.otherRules {
 		rule := n.otherRules[i]
@@ -70,11 +76,9 @@ func (n *NetworkEngine) MatchAll(r *Request) []*NetworkRule {
 // matchShortcutsLookupTable finds all matching rules from the shortcuts lookup table
 func (n *NetworkEngine) matchShortcutsLookupTable(r *Request) []*NetworkRule {
 	var result []*NetworkRule
-
 	for i := 0; i <= len(r.URLLowerCase)-shortcutLength; i++ {
 		hash := djb2HashBetween(r.URLLowerCase, i, i+shortcutLength)
-		rules, ok := n.shortcutsLookupTable[hash]
-		if ok {
+		if rules, ok := n.shortcutsLookupTable[hash]; ok {
 			for i := range rules {
 				rule := rules[i]
 				if rule.Match(r) {
@@ -87,11 +91,55 @@ func (n *NetworkEngine) matchShortcutsLookupTable(r *Request) []*NetworkRule {
 	return result
 }
 
+// matchDomainsLookupTable finds all matching rules from the domains lookup table
+func (n *NetworkEngine) matchDomainsLookupTable(r *Request) []*NetworkRule {
+	var result []*NetworkRule
+
+	if r.SourceHostname == "" {
+		return result
+	}
+
+	domains := getSubdomains(r.SourceHostname)
+	for _, domain := range domains {
+		hash := djb2Hash(domain)
+		if rules, ok := n.domainsLookupTable[hash]; ok {
+			for i := range rules {
+				rule := rules[i]
+				if rule.Match(r) {
+					result = append(result, rule)
+				}
+			}
+		}
+	}
+	return result
+}
+
 // addRule adds rule to the network engine
 func (n *NetworkEngine) addRule(f *NetworkRule) {
 	if !n.addRuleToShortcutsTable(f) {
-		n.otherRules = append(n.otherRules, f)
+		if !n.addRuleToDomainsTable(f) {
+			n.otherRules = append(n.otherRules, f)
+		}
 	}
+}
+
+// addRuleToDomainsTable tries to add the rule to the domains lookup table.
+// returns true if it was added (the domain
+func (n *NetworkEngine) addRuleToDomainsTable(f *NetworkRule) bool {
+	if len(f.permittedDomains) == 0 {
+		return false
+	}
+
+	for _, domain := range f.permittedDomains {
+		hash := djb2Hash(domain)
+
+		// Add the rule to the lookup table
+		rules, _ := n.domainsLookupTable[hash]
+		rules = append(rules, f)
+		n.domainsLookupTable[hash] = rules
+	}
+
+	return true
 }
 
 // addRuleToShortcutsTable tries to add the rule to the shortcuts table.
@@ -139,7 +187,7 @@ func getRuleShortcuts(f *NetworkRule) []string {
 	}
 
 	var shortcuts []string
-	for i := 0; i < len(f.Shortcut)-shortcutLength; i++ {
+	for i := 0; i <= len(f.Shortcut)-shortcutLength; i++ {
 		shortcut := f.Shortcut[i : i+shortcutLength]
 		shortcuts = append(shortcuts, shortcut)
 	}

@@ -44,3 +44,19 @@ func splitWithEscapeCharacter(str string, sep byte, escapeCharacter byte, preser
 
 	return parts
 }
+
+// getSubdomains splits the specified hostname and returns all subdomains (including the hostname itself)
+func getSubdomains(hostname string) []string {
+	parts := strings.Split(hostname, ".")
+	var subdomains []string
+	var domain = ""
+	for i := len(parts) - 1; i >= 0; i-- {
+		if domain == "" {
+			domain = parts[i]
+		} else {
+			domain = parts[i] + "." + domain
+		}
+		subdomains = append(subdomains, domain)
+	}
+	return subdomains
+}

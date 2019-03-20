@@ -6,16 +6,19 @@ You can learn more about AdGuard filtering rules syntax from [this article](http
 
 #### TODO:
 
-* [ ] Basic filtering rules
-    * [X] Core syntax
-    * [ ] Basic engine
-    * [ ] $important
-* [ ] Benchmark basic rules matching
+* [X] Basic filtering rules
+    * [X] Core blocking syntax
+    * [X] Basic engine
+* [X] Benchmark basic rules matching
+* [ ] Hosts matching rules
+    * [ ] /etc/hosts matching
+    * [ ] memory optimizations?  
 * [ ] CSS rules
     * [ ] Proper CSS rules validation
 * [ ] Advanced modifiers part 1
     * [ ] $csp
     * [ ] $badfilter
+    * [ ] $important
 * [ ] ExtCSS rules
 * [ ] Scriptlet rules
 * [ ] JS rules

@@ -33,6 +33,7 @@ type NetworkRuleOption uint
 const (
 	OptionThirdParty NetworkRuleOption = 1 << iota // $third-party modifier
 	OptionMatchCase                                // $match-case modifier
+	OptionImportant                                // $important modifier
 
 	// Whitelist rules modifiers
 	// Each of them can disable part of the functionality

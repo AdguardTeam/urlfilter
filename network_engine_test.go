@@ -22,6 +22,7 @@ const (
 )
 
 type testRequest struct {
+	Line        string
 	URL         string `json:"url"`
 	FrameUrl    string `json:"frameUrl"`
 	RequestType string `json:"cpt"`
@@ -42,7 +43,9 @@ func TestBenchNetworkEngine(t *testing.T) {
 	log.Printf("Elapsed on parsing rules: %v", time.Since(startParse))
 
 	totalMatches := 0
-	elapsed := time.Duration(0)
+	totalElapsed := time.Duration(0)
+	minElapsedMatch := time.Hour
+	maxElapsedMatch := time.Duration(0)
 
 	for i, req := range requests {
 		if i != 0 && i%10000 == 0 {
@@ -51,9 +54,16 @@ func TestBenchNetworkEngine(t *testing.T) {
 
 		r := NewRequest(req.URL, req.FrameUrl, getRequestType(req.RequestType))
 
-		start := time.Now()
+		startMatch := time.Now()
 		ok, rule := engine.Match(r)
-		elapsed += time.Since(start)
+		elapsedMatch := time.Since(startMatch)
+		totalElapsed += elapsedMatch
+		if elapsedMatch > maxElapsedMatch {
+			maxElapsedMatch = elapsedMatch
+		}
+		if elapsedMatch < minElapsedMatch {
+			minElapsedMatch = elapsedMatch
+		}
 
 		if ok && !rule.Whitelist {
 			totalMatches++
@@ -61,35 +71,34 @@ func TestBenchNetworkEngine(t *testing.T) {
 	}
 
 	log.Printf("Total matches: %d", totalMatches)
-	log.Printf("Total elapsed: %v", elapsed)
-	log.Printf("Average per request: %v", time.Duration(int64(elapsed)/int64(len(requests))))
+	log.Printf("Total elapsed: %v", totalElapsed)
+	log.Printf("Average per request: %v", time.Duration(int64(totalElapsed)/int64(len(requests))))
+	log.Printf("Max per request: %v", maxElapsedMatch)
+	log.Printf("Min per request: %v", minElapsedMatch)
 }
 
 // getRequestType converts string value from requests.json to RequestType
+// This maps puppeteer types to WebRequest types
 func getRequestType(t string) RequestType {
 	switch t {
-	case "main_frame":
-		return TypeDocument
-	case "sub_frame":
+	case "document":
+		// Consider document requests as sub_document. This is because the request
+		// dataset does not contain sub_frame or main_frame but only 'document'.
 		return TypeSubdocument
+	case "stylesheet":
+		return TypeStylesheet
 	case "font":
 		return TypeFont
-	case "image", "imageset":
+	case "image":
 		return TypeImage
 	case "media":
 		return TypeMedia
-	case "object":
-		return TypeObject
-	case "object_subrequest":
-		return TypeObjectSubrequest
 	case "script":
 		return TypeScript
-	case "stylesheet":
-		return TypeStylesheet
+	case "xhr", "fetch":
+		return TypeXmlhttprequest
 	case "websocket":
 		return TypeWebsocket
-	case "xmlhttprequest":
-		return TypeXmlhttprequest
 	default:
 		return TypeOther
 	}
@@ -166,7 +175,8 @@ func loadRequests(t *testing.T) []testRequest {
 		if line != "" {
 			var req testRequest
 			err := json.Unmarshal([]byte(line), &req)
-			if err == nil && isSupportedURL(req.URL) {
+			if err == nil && isSupportedURL(req.URL) && isSupportedURL(req.FrameUrl) {
+				req.Line = line
 				requests = append(requests, req)
 			}
 		}

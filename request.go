@@ -70,13 +70,17 @@ func NewRequest(url string, sourceURL string, requestType RequestType) *Request 
 	}
 
 	domain, err := publicsuffix.EffectiveTLDPlusOne(r.Hostname)
-	if err == nil {
+	if err == nil && domain != "" {
 		r.Domain = domain
+	} else {
+		r.Domain = r.Hostname
 	}
 
 	sourceDomain, err := publicsuffix.EffectiveTLDPlusOne(r.SourceHostname)
-	if err == nil {
+	if err == nil && sourceDomain != "" {
 		r.SourceDomain = sourceDomain
+	} else {
+		r.SourceDomain = r.SourceHostname
 	}
 
 	if r.SourceDomain != "" && r.SourceDomain != r.Domain {
