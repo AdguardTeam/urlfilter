@@ -19,10 +19,10 @@ You can learn more about AdGuard filtering rules syntax from [this article](http
 * [X] Hosts matching rules
     * [X] /etc/hosts matching
     * [ ] memory optimizations?
-* [ ] Advanced modifiers part 1
-    * [ ] $badfilter
-    * [ ] $important
 * [ ] Basic filtering engine implementation
+    * [ ] Advanced modifiers part 1
+        * [ ] $important
+        * [ ] $badfilter
     * [ ] mitm proxy example
 * [ ] CSS rules
     * [ ] Proper CSS rules validation
