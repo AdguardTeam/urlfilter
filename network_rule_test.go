@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestParseRuleText(t *testing.T) {
+func TestParseNetworkRuleText(t *testing.T) {
 	pattern, options, whitelist, err := parseRuleText("||example.org^")
 	assert.Equal(t, "||example.org^", pattern)
 	assert.Equal(t, "", options)

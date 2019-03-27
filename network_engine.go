@@ -35,21 +35,21 @@ func NewNetworkEngine(rules []*NetworkRule) *NetworkEngine {
 
 // Match searches over all filtering rules loaded to the engine
 // It returns true if a match was found alongside the matching rule
-func (n *NetworkEngine) Match(r *Request) (bool, *NetworkRule) {
+func (n *NetworkEngine) Match(r *Request) (*NetworkRule, bool) {
 	rules := n.MatchAll(r)
 
 	if len(rules) == 0 {
-		return false, nil
+		return nil, false
 	}
 
 	for i := range rules {
 		rule := rules[i]
 		if rule.Whitelist {
-			return true, rule
+			return rule, true
 		}
 	}
 
-	return true, rules[0]
+	return rules[0], true
 }
 
 // MatchAll finds all rules matching the specified request regardless of the rule types
@@ -77,7 +77,7 @@ func (n *NetworkEngine) MatchAll(r *Request) []*NetworkRule {
 func (n *NetworkEngine) matchShortcutsLookupTable(r *Request) []*NetworkRule {
 	var result []*NetworkRule
 	for i := 0; i <= len(r.URLLowerCase)-shortcutLength; i++ {
-		hash := djb2HashBetween(r.URLLowerCase, i, i+shortcutLength)
+		hash := fastHashBetween(r.URLLowerCase, i, i+shortcutLength)
 		if rules, ok := n.shortcutsLookupTable[hash]; ok {
 			for i := range rules {
 				rule := rules[i]
@@ -101,7 +101,7 @@ func (n *NetworkEngine) matchDomainsLookupTable(r *Request) []*NetworkRule {
 
 	domains := getSubdomains(r.SourceHostname)
 	for _, domain := range domains {
-		hash := djb2Hash(domain)
+		hash := fastHash(domain)
 		if rules, ok := n.domainsLookupTable[hash]; ok {
 			for i := range rules {
 				rule := rules[i]
@@ -118,7 +118,9 @@ func (n *NetworkEngine) matchDomainsLookupTable(r *Request) []*NetworkRule {
 func (n *NetworkEngine) addRule(f *NetworkRule) {
 	if !n.addRuleToShortcutsTable(f) {
 		if !n.addRuleToDomainsTable(f) {
-			n.otherRules = append(n.otherRules, f)
+			if !containsRule(n.otherRules, f) {
+				n.otherRules = append(n.otherRules, f)
+			}
 		}
 	}
 }
@@ -131,12 +133,15 @@ func (n *NetworkEngine) addRuleToDomainsTable(f *NetworkRule) bool {
 	}
 
 	for _, domain := range f.permittedDomains {
-		hash := djb2Hash(domain)
+		hash := fastHash(domain)
 
 		// Add the rule to the lookup table
 		rules, _ := n.domainsLookupTable[hash]
-		rules = append(rules, f)
-		n.domainsLookupTable[hash] = rules
+
+		if !containsRule(rules, f) {
+			rules = append(rules, f)
+			n.domainsLookupTable[hash] = rules
+		}
 	}
 
 	return true
@@ -154,7 +159,7 @@ func (n *NetworkEngine) addRuleToShortcutsTable(f *NetworkRule) bool {
 	var shortcutHash uint32
 	var minCount = math.MaxInt32
 	for _, shortcutToCheck := range shortcuts {
-		hash := djb2Hash(shortcutToCheck)
+		hash := fastHash(shortcutToCheck)
 		count, ok := n.shortcutsHistogram[hash]
 		if !ok {
 			count = 0
@@ -170,8 +175,11 @@ func (n *NetworkEngine) addRuleToShortcutsTable(f *NetworkRule) bool {
 
 	// Add the rule to the lookup table
 	rules, _ := n.shortcutsLookupTable[shortcutHash]
-	rules = append(rules, f)
-	n.shortcutsLookupTable[shortcutHash] = rules
+
+	if !containsRule(rules, f) {
+		rules = append(rules, f)
+		n.shortcutsLookupTable[shortcutHash] = rules
+	}
 
 	return true
 }
@@ -221,7 +229,7 @@ func isAnyURLShortcut(f *NetworkRule) bool {
 }
 
 // djb2 hash algorithm
-func djb2HashBetween(str string, begin int, end int) uint32 {
+func fastHashBetween(str string, begin int, end int) uint32 {
 	hash := uint32(5381)
 	for i := begin; i < end; i++ {
 		hash = (hash * 33) ^ uint32(str[i])
@@ -230,9 +238,25 @@ func djb2HashBetween(str string, begin int, end int) uint32 {
 }
 
 // djb2 hash algorithm
-func djb2Hash(str string) uint32 {
+func fastHash(str string) uint32 {
 	if str == "" {
 		return 0
 	}
-	return djb2HashBetween(str, 0, len(str))
+	return fastHashBetween(str, 0, len(str))
+}
+
+// helper function that checks if the specified rule is already in the array
+func containsRule(rules []*NetworkRule, r *NetworkRule) bool {
+	if rules == nil {
+		return false
+	}
+
+	for _, rule := range rules {
+		// Already added
+		if rule.RuleText == r.RuleText {
+			return true
+		}
+	}
+
+	return false
 }

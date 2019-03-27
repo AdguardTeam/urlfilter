@@ -10,13 +10,12 @@ You can learn more about AdGuard filtering rules syntax from [this article](http
     * [X] Core blocking syntax
     * [X] Basic engine
 * [X] Benchmark basic rules matching
-* [ ] Hosts matching rules
-    * [ ] /etc/hosts matching
-    * [ ] memory optimizations?  
+* [X] Hosts matching rules
+    * [X] /etc/hosts matching
+    * [ ] memory optimizations?
 * [ ] CSS rules
     * [ ] Proper CSS rules validation
 * [ ] Advanced modifiers part 1
-    * [ ] $csp
     * [ ] $badfilter
     * [ ] $important
 * [ ] ExtCSS rules
@@ -25,4 +24,5 @@ You can learn more about AdGuard filtering rules syntax from [this article](http
 * [ ] HTML filtering rules
 * [ ] Advanced modifiers part 2
     * [ ] $replace
+    * [ ] $csp
     * [ ] $cookie

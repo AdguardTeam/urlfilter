@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/shirou/gopsutil/process"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -28,19 +29,33 @@ type testRequest struct {
 	RequestType string `json:"cpt"`
 }
 
-func TestLoadNetworkEngine(t *testing.T) {
-	engine := buildNetworkEngine(t)
-	assert.NotNil(t, engine)
+func TestEmptyNetworkEngine(t *testing.T) {
+	engine := NewNetworkEngine(make([]*NetworkRule, 0))
+	r := NewRequest("http://example.org/", "", TypeOther)
+	rule, ok := engine.Match(r)
+	assert.False(t, ok)
+	assert.Nil(t, rule)
 }
 
 func TestBenchNetworkEngine(t *testing.T) {
-	requests := loadRequests(t)
-	assert.True(t, len(requests) > 0)
+	testRequests := loadRequests(t)
+	assert.True(t, len(testRequests) > 0)
+	var requests []*Request
+	for _, req := range testRequests {
+		r := NewRequest(req.URL, req.FrameUrl, getRequestType(req.RequestType))
+		requests = append(requests, r)
+	}
+
+	start := getRSS()
+	log.Printf("RSS before loading rules - %d kB\n", start/1024)
 
 	startParse := time.Now()
 	engine := buildNetworkEngine(t)
 	assert.NotNil(t, engine)
 	log.Printf("Elapsed on parsing rules: %v", time.Since(startParse))
+
+	afterLoad := getRSS()
+	log.Printf("RSS after loading rules - %d kB (%d kB diff)\n", afterLoad/1024, (afterLoad-start)/1024)
 
 	totalMatches := 0
 	totalElapsed := time.Duration(0)
@@ -52,10 +67,8 @@ func TestBenchNetworkEngine(t *testing.T) {
 			log.Printf("Processed %d requests", i)
 		}
 
-		r := NewRequest(req.URL, req.FrameUrl, getRequestType(req.RequestType))
-
 		startMatch := time.Now()
-		ok, rule := engine.Match(r)
+		rule, ok := engine.Match(req)
 		elapsedMatch := time.Since(startMatch)
 		totalElapsed += elapsedMatch
 		if elapsedMatch > maxElapsedMatch {
@@ -75,6 +88,9 @@ func TestBenchNetworkEngine(t *testing.T) {
 	log.Printf("Average per request: %v", time.Duration(int64(totalElapsed)/int64(len(requests))))
 	log.Printf("Max per request: %v", maxElapsedMatch)
 	log.Printf("Min per request: %v", minElapsedMatch)
+
+	afterMatch := getRSS()
+	log.Printf("RSS after matching - %d kB (%d kB diff)\n", afterMatch/1024, (afterMatch-afterLoad)/1024)
 }
 
 // getRequestType converts string value from requests.json to RequestType
@@ -129,14 +145,7 @@ func buildNetworkEngine(t *testing.T) *NetworkEngine {
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 
-		if line != "" &&
-			!strings.HasPrefix(line, "!") &&
-			strings.Index(line, "##") == -1 &&
-			strings.Index(line, "#@#") == -1 &&
-			strings.Index(line, "#%#") == -1 &&
-			strings.Index(line, "#?#") == -1 &&
-			strings.Index(line, "#$#") == -1 &&
-			strings.Index(line, "$$") == -1 {
+		if line != "" && !isCosmetic(line) && !isComment(line) {
 
 			rule, err := NewNetworkRule(line, 0)
 			if err == nil {
@@ -247,4 +256,16 @@ func unzip(src, dest string) error {
 	}
 
 	return nil
+}
+
+func getRSS() uint64 {
+	proc, err := process.NewProcess(int32(os.Getpid()))
+	if err != nil {
+		panic(err)
+	}
+	minfo, err := proc.MemoryInfo()
+	if err != nil {
+		panic(err)
+	}
+	return minfo.RSS
 }

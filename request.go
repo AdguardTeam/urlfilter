@@ -56,7 +56,7 @@ type Request struct {
 	SourceDomain   string // Source domain (eTLD+1)
 }
 
-// NewRequest creates a new instance of "Request"
+// NewRequest creates a new instance of "Request" and populates it's fields
 func NewRequest(url string, sourceURL string, requestType RequestType) *Request {
 	r := Request{
 		RequestType: requestType,
@@ -85,6 +85,27 @@ func NewRequest(url string, sourceURL string, requestType RequestType) *Request 
 
 	if r.SourceDomain != "" && r.SourceDomain != r.Domain {
 		r.ThirdParty = true
+	}
+
+	return &r
+}
+
+// NewRequestForHostname creates a new instance of "Request" for matching hostname.
+// It uses "http://" as a protocol and TypeDocument as a request type.
+func NewRequestForHostname(hostname string) *Request {
+	r := Request{
+		RequestType:  TypeDocument,
+		URL:          "http://" + hostname,
+		URLLowerCase: "http://" + hostname,
+		Hostname:     hostname,
+		ThirdParty:   false,
+	}
+
+	domain, err := publicsuffix.EffectiveTLDPlusOne(r.Hostname)
+	if err == nil && domain != "" {
+		r.Domain = domain
+	} else {
+		r.Domain = r.Hostname
 	}
 
 	return &r
