@@ -1,3 +1,9 @@
+[![Build Status](https://travis-ci.org/AdguardTeam/urlfilter.svg?branch=master)](https://travis-ci.org/AdguardTeam/urlfilter)
+[![Code Coverage](https://img.shields.io/codecov/c/github/AdguardTeam/urlfilter/master.svg)](https://codecov.io/github/AdguardTeam/urlfilter?branch=master)
+[![Go Report Card](https://goreportcard.com/badge/github.com/AdguardTeam/urlfilter)](https://goreportcard.com/report/AdguardTeam/urlfilter)
+[![GolangCI](https://golangci.com/badges/github.com/AdguardTeam/urlfilter.svg)](https://golangci.com/r/github.com/AdguardTeam/urlfilter)
+[![Go Doc](https://godoc.org/github.com/AdguardTeam/urlfilter?status.svg)](https://godoc.org/github.com/AdguardTeam/urlfilter)
+
 # AdGuard content blocking library
 
 Pure GO library that implements AdGuard filtering rules syntax.
@@ -13,11 +19,13 @@ You can learn more about AdGuard filtering rules syntax from [this article](http
 * [X] Hosts matching rules
     * [X] /etc/hosts matching
     * [ ] memory optimizations?
-* [ ] CSS rules
-    * [ ] Proper CSS rules validation
 * [ ] Advanced modifiers part 1
     * [ ] $badfilter
     * [ ] $important
+* [ ] Basic filtering engine implementation
+    * [ ] mitm proxy example
+* [ ] CSS rules
+    * [ ] Proper CSS rules validation
 * [ ] ExtCSS rules
 * [ ] Scriptlet rules
 * [ ] JS rules
