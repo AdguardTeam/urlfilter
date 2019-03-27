@@ -1,6 +1,5 @@
 .DS_Store
 .vscode
 .idea
-test/easylist.txt
 test/requests.json
 test/requests2.json
