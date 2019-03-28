@@ -126,13 +126,6 @@ func isSupportedURL(url string) bool {
 }
 
 func buildNetworkEngine(t *testing.T) *NetworkEngine {
-	if _, err := os.Stat(filterPath); os.IsNotExist(err) {
-		err = unzip(filterPath+".zip", testResourcesDir)
-		if err != nil {
-			t.Fatalf("cannot unzip %s.zip", filterPath)
-		}
-	}
-
 	file, err := os.Open(filterPath)
 	if err != nil {
 		t.Fatalf("cannot load %s: %s", filterPath, err)
