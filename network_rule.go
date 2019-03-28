@@ -324,7 +324,10 @@ func (f *NetworkRule) loadOption(name string, value string) error {
 	case "~match-case":
 		return f.setOptionEnabled(OptionMatchCase, false)
 	case "domain":
-		return f.loadDomains(value)
+		permitted, restricted, err := loadDomains(value, "|")
+		f.permittedDomains = permitted
+		f.restrictedDomains = restricted
+		return err
 
 	// Document-level whitelist rules
 	case "elemhide":
