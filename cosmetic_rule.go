@@ -151,6 +151,38 @@ func (f *CosmeticRule) String() string {
 	return f.RuleText
 }
 
+// IsGeneric returns true if rule can be considered generic (is not limited to a specific domain)
+func (f *CosmeticRule) IsGeneric() bool {
+	return len(f.permittedDomains) == 0
+}
+
+// Match returns true if this rule can be used on the specified hostname
+func (f *CosmeticRule) Match(hostname string) bool {
+	// TODO: Improve hosts matching, start using a better approach (token-based maps)
+
+	if len(f.permittedDomains) == 0 && len(f.restrictedDomains) == 0 {
+		return true
+	}
+
+	if len(f.restrictedDomains) > 0 {
+		if isDomainOrSubdomainOfAny(hostname, f.restrictedDomains) {
+			// Domain or host is restricted
+			// i.e. $domain=~example.org
+			return false
+		}
+	}
+
+	if len(f.permittedDomains) > 0 {
+		if !isDomainOrSubdomainOfAny(hostname, f.permittedDomains) {
+			// Domain is not among permitted
+			// i.e. $domain=example.org and we're checking example.com
+			return false
+		}
+	}
+
+	return true
+}
+
 // isCosmetic checks if this is a cosmetic filtering rule
 func isCosmetic(line string) bool {
 	index, _ := findCosmeticRuleMarker(line)
@@ -177,14 +209,6 @@ func findCosmeticRuleMarker(ruleText string) (int, string) {
 	return -1, ""
 }
 
-/**
- * Checks if the specified string starts with a substr at the specified index
- *
- * @param str        String to check
- * @param startIndex Index to start checking from
- * @param substr     Substring to check
- * @return boolean true if it does start
- */
 // startsAtIndexWith checks if the specified string starts with a substr at the specified index
 // str is the string to check
 // startIndex is the index to start checking from

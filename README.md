@@ -19,16 +19,18 @@ You can learn more about AdGuard filtering rules syntax from [this article](http
 * [X] Hosts matching rules
     * [X] /etc/hosts matching
     * [ ] memory optimizations?
+* [ ] Cosmetic rules
+    * [X] Basic element hiding and CSS rules
+        * [ ] Proper CSS rules validation
+    * [ ] ExtCSS rules
+    * [ ] Scriptlet rules
+    * [ ] JS rules
 * [ ] Basic filtering engine implementation
+    * [ ] Handling cosmetic modifiers $elemhide, $generichide, $jsinject
     * [ ] Advanced modifiers part 1
         * [ ] $important
         * [ ] $badfilter
     * [ ] mitm proxy example
-* [ ] CSS rules
-    * [ ] Proper CSS rules validation
-* [ ] ExtCSS rules
-* [ ] Scriptlet rules
-* [ ] JS rules
 * [ ] HTML filtering rules
 * [ ] Advanced modifiers part 2
     * [ ] $replace
