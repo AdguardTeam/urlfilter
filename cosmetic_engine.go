@@ -29,24 +29,76 @@ func NewCosmeticEngine(rules []*CosmeticRule) *CosmeticEngine {
 	return &engine
 }
 
+// StylesResult contains either element hiding or CSS rules
+type StylesResult struct {
+	Generic        []string `json:"generic"`
+	Specific       []string `json:"specific"`
+	GenericExtCSS  []string `json:"genericExtCss"`
+	SpecificExtCSS []string `json:"specificExtCss"`
+}
+
+func (s *StylesResult) append(r *CosmeticRule) {
+	if r.IsGeneric() {
+		if r.ExtendedCSS {
+			s.GenericExtCSS = append(s.GenericExtCSS, r.Content)
+		} else {
+			s.Generic = append(s.Generic, r.Content)
+		}
+	} else {
+		if r.ExtendedCSS {
+			s.SpecificExtCSS = append(s.SpecificExtCSS, r.Content)
+		} else {
+			s.Specific = append(s.Specific, r.Content)
+		}
+	}
+}
+
+// ScriptsResult contains scripts to be executed on a page
+type ScriptsResult struct {
+	Generic  []string `json:"generic"`
+	Specific []string `json:"specific"`
+}
+
 // CosmeticResult represents all scripts and styles that needs to be injected into the page
 type CosmeticResult struct {
-	StylesSpecific       []string // Styles specific to the hostname
-	StylesGeneric        []string // Styles combined of generic cosmetic rules
-	StylesSpecificExtCSS []string // ExtCSS styles specific to the hostname
-	StylesGenericExtCSS  []string // ExtCSS styles combined of generic rules
-	Scripts              []string // Scripts to inject
+	ElementHiding StylesResult  `json:"elementHiding"`
+	CSS           StylesResult  `json:"css"`
+	JS            ScriptsResult `json:"js"`
 }
 
 // Match builds scripts and styles that needs to be injected into the specified page
 // hostname is the page hostname
 // includeCSS defines if we should inject any CSS and element hiding rules (see $elemhide)
-// includeGenericCSS defines if we should inject generic CSS and element hiding rules (see $generichide)
 // includeJS defines if we should inject JS into the page (see $jsinject)
-func (e *CosmeticEngine) Match(hostname string, includeCSS bool, includeGenericCSS bool, includeJS bool) *CosmeticResult {
-	r := &CosmeticResult{}
+// includeGeneric defines if we should inject generic CSS, JS and element hiding rules (see $generichide)
+// TODO: Additionally, we should provide a method that writes result to an io.Writer
+func (e *CosmeticEngine) Match(hostname string, includeCSS bool, includeJS bool, includeGeneric bool) *CosmeticResult {
+	r := &CosmeticResult{
+		ElementHiding: StylesResult{},
+		CSS:           StylesResult{},
+		JS:            ScriptsResult{},
+	}
 
-	// TODO: Build result
+	if includeCSS {
+		c := e.lookupTables[CosmeticElementHiding]
+		if includeGeneric {
+			for _, rule := range c.genericRules {
+				if !c.isWhitelisted(hostname, rule) && rule.Match(hostname) {
+					r.ElementHiding.append(rule)
+				}
+			}
+		}
+
+		rules := c.findByHostname(hostname)
+		if len(rules) > 0 {
+			for _, rule := range rules {
+				r.ElementHiding.append(rule)
+			}
+		}
+	}
+
+	// TODO: Implement CosmeticCSS and CosmeticJS
+
 	return r
 }
 
@@ -87,14 +139,37 @@ func (c *cosmeticLookupTable) addRule(f *CosmeticRule) {
 	}
 }
 
-// buildResult adds data to the cosmetic result instance
-func (c *cosmeticLookupTable) buildResult(hostname string, r *CosmeticResult) {
-	// TODO: Implement
-}
-
 // findByHostname looks for matching domain-specific rules
+// Returns nil if nothing found
 func (c *cosmeticLookupTable) findByHostname(hostname string) []*CosmeticRule {
 	var rules []*CosmeticRule
-	// TODO: Implement
+
+	rulesByHostname, found := c.byHostname[hostname]
+	if !found {
+		return rules
+	}
+
+	for _, rule := range rulesByHostname {
+		if !c.isWhitelisted(hostname, rule) {
+			rules = append(rules, rule)
+		}
+	}
+
 	return rules
+}
+
+// isWhitelisted checks if this cosmetic rule is whitelisted on the specified hostname
+func (c *cosmeticLookupTable) isWhitelisted(hostname string, f *CosmeticRule) bool {
+	list, found := c.whitelist[f.Content]
+	if !found {
+		return false
+	}
+
+	for _, rule := range list {
+		if rule.Match(hostname) {
+			return true
+		}
+	}
+
+	return false
 }

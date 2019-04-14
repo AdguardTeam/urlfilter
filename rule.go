@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"strings"
+
+	"github.com/asaskevich/govalidator"
 )
 
 // Rule is a base interface for all filtering rules
@@ -145,8 +147,8 @@ func loadDomains(domains string, sep string) (permittedDomains []string, restric
 			d = d[1:]
 		}
 
-		if strings.TrimSpace(d) == "" {
-			err = fmt.Errorf("empty domain specified: %s", domains)
+		if !govalidator.IsDNSName(d) {
+			err = fmt.Errorf("invalid domain specified: %s", domains)
 			return
 		}
 
