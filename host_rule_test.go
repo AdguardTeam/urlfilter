@@ -53,6 +53,10 @@ func TestParseHostRuleText(t *testing.T) {
 	rule, err = NewHostRule("||example.org", 1)
 	assert.NotNil(t, err)
 	assert.Nil(t, rule)
+
+	rule, err = NewHostRule("", 1)
+	assert.NotNil(t, err)
+	assert.Nil(t, rule)
 }
 
 func TestHostRuleMatch(t *testing.T) {

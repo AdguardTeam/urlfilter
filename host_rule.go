@@ -42,7 +42,7 @@ func NewHostRule(ruleText string, filterListID int) (*HostRule, error) {
 				hostnames = append(hostnames, part)
 			}
 		}
-	} else if govalidator.IsDNSName(parts[0]) {
+	} else if len(parts) == 1 && govalidator.IsDNSName(parts[0]) {
 		hostnames = append(hostnames, parts[0])
 		ip = net.IPv4(0, 0, 0, 0)
 	} else {
