@@ -64,5 +64,10 @@ func buildNetworkEngine() *urlfilter.NetworkEngine {
 		}
 	}
 
-	return urlfilter.NewNetworkEngine(rules)
+	rulesStorage, err := urlfilter.NewRuleStorage("")
+	if err != nil {
+		panic(err)
+	}
+
+	return urlfilter.NewNetworkEngine(rules, rulesStorage)
 }
