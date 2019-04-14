@@ -9,13 +9,13 @@ import (
 	"sync"
 )
 
-// RuleStorage uses rules serialization/deserialization to store them in a single byte array or file.
+// RulesStorage uses rules serialization/deserialization to store them in a single byte array or file.
 // The idea is to store rules in a minimized serialized form and deserialize them on-demand only.
 // This will allow us to minimize amount of RAM used by the filtering engine.
 // Please note that we keep all retrieved rules in memory because we consider that only a tiny part
 // of all loaded rules will be used.
 // TODO: Consider using LRU cache instead of map
-type RuleStorage struct {
+type RulesStorage struct {
 	buffer         io.ReadWriteSeeker // buffer with serialized rules
 	bufferedWriter *bufio.Writer      // buffered writer is used to speed up writing to a file
 	currentIndex   int64              // current index in the buffer
@@ -29,7 +29,7 @@ type RuleStorage struct {
 // NewRuleStorage creates a new rules storage
 // If filePath is not empty, we will create a temporary file on the disk and store
 // serialized rules there. Otherwise, we will store everything in memory.
-func NewRuleStorage(filePath string) (*RuleStorage, error) {
+func NewRuleStorage(filePath string) (*RulesStorage, error) {
 	var buffer io.ReadWriteSeeker
 
 	if filePath != "" {
@@ -42,7 +42,7 @@ func NewRuleStorage(filePath string) (*RuleStorage, error) {
 		buffer = newMemFile()
 	}
 
-	s := &RuleStorage{
+	s := &RulesStorage{
 		buffer:         buffer,
 		bufferedWriter: bufio.NewWriter(buffer),
 		cache:          map[int64]Rule{},
@@ -54,7 +54,7 @@ func NewRuleStorage(filePath string) (*RuleStorage, error) {
 // Close closes the rule storage and frees underlying resources
 // This is important in the case of a file-based storage:
 // The file will be closed and deleted.
-func (s *RuleStorage) Close() error {
+func (s *RulesStorage) Close() error {
 	s.Lock()
 	defer s.Unlock()
 
@@ -72,7 +72,7 @@ func (s *RuleStorage) Close() error {
 }
 
 // Store saves rule to the rule storage and returns the index of the rule
-func (s *RuleStorage) Store(rule Rule) (int64, error) {
+func (s *RulesStorage) Store(rule Rule) (int64, error) {
 	s.Lock()
 	defer s.Unlock()
 
@@ -99,7 +99,7 @@ func (s *RuleStorage) Store(rule Rule) (int64, error) {
 }
 
 // Retrieve gets the rule from the storage by its index
-func (s *RuleStorage) Retrieve(idx int64) (Rule, error) {
+func (s *RulesStorage) Retrieve(idx int64) (Rule, error) {
 	s.Lock()
 	defer s.Unlock()
 
@@ -130,7 +130,7 @@ func (s *RuleStorage) Retrieve(idx int64) (Rule, error) {
 
 // RetrieveNetworkRule is a helper method that retrieves a network rule from the storage
 // It returns a pointer to the rule or nil in any other case (not found or error)
-func (s *RuleStorage) RetrieveNetworkRule(idx int64) *NetworkRule {
+func (s *RulesStorage) RetrieveNetworkRule(idx int64) *NetworkRule {
 	r, err := s.Retrieve(idx)
 	if err != nil {
 		log.Printf("Cannot retrieve rule %d: %s", idx, err)
@@ -147,7 +147,7 @@ func (s *RuleStorage) RetrieveNetworkRule(idx int64) *NetworkRule {
 
 // RetrieveHostRule is a helper method that retrieves a host rule from the storage
 // It returns a pointer to the rule or nil in any other case (not found or error)
-func (s *RuleStorage) RetrieveHostRule(idx int64) *HostRule {
+func (s *RulesStorage) RetrieveHostRule(idx int64) *HostRule {
 	r, err := s.Retrieve(idx)
 	if err != nil {
 		log.Printf("Cannot retrieve rule %d: %s", idx, err)

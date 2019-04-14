@@ -12,7 +12,7 @@ const (
 
 // NetworkEngine is the engine that supports quick search over network rules
 type NetworkEngine struct {
-	ruleStorage          *RuleStorage
+	ruleStorage          *RulesStorage
 	domainsLookupTable   map[uint32][]int64
 	shortcutsLookupTable map[uint32][]int64
 	shortcutsHistogram   map[uint32]int
@@ -20,7 +20,7 @@ type NetworkEngine struct {
 }
 
 // NewNetworkEngine builds an instance of the network engine
-func NewNetworkEngine(rules []*NetworkRule, s *RuleStorage) *NetworkEngine {
+func NewNetworkEngine(rules []*NetworkRule, s *RulesStorage) *NetworkEngine {
 	engine := NetworkEngine{
 		ruleStorage:          s,
 		domainsLookupTable:   map[uint32][]int64{},

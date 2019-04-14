@@ -14,12 +14,12 @@ type DNSEngine struct {
 	RulesCount           int            // count of rules loaded to the engine
 	networkEngine        *NetworkEngine // networkEngine is constructed from the network rules
 	hostRulesLookupTable map[string]int64
-	ruleStorage          *RuleStorage
+	ruleStorage          *RulesStorage
 }
 
 // ParseDNSEngine parses the specified filter lists and returns a DNSEngine built from them.
 // key of the map is the filter list ID, value is the raw content of the filter list.
-func ParseDNSEngine(filterLists map[int]string, s *RuleStorage) *DNSEngine {
+func ParseDNSEngine(filterLists map[int]string, s *RulesStorage) *DNSEngine {
 	d := DNSEngine{
 		ruleStorage:          s,
 		hostRulesLookupTable: map[string]int64{},
