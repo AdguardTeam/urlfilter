@@ -30,7 +30,11 @@ type testRequest struct {
 }
 
 func TestEmptyNetworkEngine(t *testing.T) {
-	engine := NewNetworkEngine(make([]*NetworkRule, 0))
+	ruleStorage, err := NewRuleStorage("")
+	if err != nil {
+		t.Fatalf("cannot initialize rule storage: %s", err)
+	}
+	engine := NewNetworkEngine(make([]*NetworkRule, 0), ruleStorage)
 	r := NewRequest("http://example.org/", "", TypeOther)
 	rule, ok := engine.Match(r)
 	assert.False(t, ok)
@@ -152,7 +156,11 @@ func buildNetworkEngine(t *testing.T) *NetworkEngine {
 	}
 
 	log.Printf("Loaded %d rules from %s", len(rules), filterPath)
-	return NewNetworkEngine(rules)
+	ruleStorage, err := NewRuleStorage("")
+	if err != nil {
+		t.Fatalf("cannot initialize rule storage: %s", err)
+	}
+	return NewNetworkEngine(rules, ruleStorage)
 }
 
 func loadRequests(t *testing.T) []testRequest {

@@ -1,6 +1,9 @@
 package urlfilter
 
 import (
+	"bytes"
+	"log"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -229,4 +232,26 @@ func TestInvalidDomainRestrictions(t *testing.T) {
 
 	_, err = NewNetworkRule("||example.org^$domain=|example.com", 0)
 	assert.NotNil(t, err)
+}
+
+func TestNetworkRuleSerialize(t *testing.T) {
+	ruleText := "||example.org^$domain=example.org|~subdomain.example.org"
+	rule, err := NewNetworkRule(ruleText, -1)
+	assert.Nil(t, err)
+	assert.NotNil(t, rule)
+
+	b := bytes.Buffer{}
+	length, err := SerializeRule(rule, &b)
+	assert.Nil(t, err)
+	assert.Equal(t, length, b.Len())
+
+	log.Printf("Rule text length: %d", len(ruleText))
+	log.Printf("Serialized length: %d", length)
+
+	r, err := DeserializeRule(&b)
+	assert.Nil(t, err)
+	assert.NotNil(t, r)
+
+	deserializedRule := r.(*NetworkRule)
+	assert.True(t, reflect.DeepEqual(rule, deserializedRule))
 }

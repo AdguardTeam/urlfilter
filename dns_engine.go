@@ -1,6 +1,10 @@
 package urlfilter
 
-import "strings"
+import (
+	"bufio"
+	"fmt"
+	"strings"
+)
 
 // DNSEngine combines host rules and network rules and is supposed to quickly find
 // matching rules for hostnames.
@@ -9,53 +13,56 @@ import "strings"
 type DNSEngine struct {
 	RulesCount           int            // count of rules loaded to the engine
 	networkEngine        *NetworkEngine // networkEngine is constructed from the network rules
-	hostRulesLookupTable map[string]*HostRule
+	hostRulesLookupTable map[string]int64
+	ruleStorage          *RuleStorage
 }
 
 // ParseDNSEngine parses the specified filter lists and returns a DNSEngine built from them.
 // key of the map is the filter list ID, value is the raw content of the filter list.
-func ParseDNSEngine(filterLists map[int]string) *DNSEngine {
-	var networkRules []*NetworkRule
-	var hostRules []*HostRule
+func ParseDNSEngine(filterLists map[int]string, s *RuleStorage) *DNSEngine {
+	d := DNSEngine{
+		ruleStorage:          s,
+		hostRulesLookupTable: map[string]int64{},
+		RulesCount:           0,
+	}
+
+	networkEngine := &NetworkEngine{
+		ruleStorage:          s,
+		domainsLookupTable:   map[uint32][]int64{},
+		shortcutsLookupTable: map[uint32][]int64{},
+		shortcutsHistogram:   map[uint32]int{},
+	}
 
 	for filterListID, filterContents := range filterLists {
-		lines := strings.Split(filterContents, "\n")
-		for _, line := range lines {
-			line = strings.TrimSpace(line)
+		scanner := bufio.NewScanner(strings.NewReader(filterContents))
+		for scanner.Scan() {
+			line := strings.TrimSpace(scanner.Text())
 			if line == "" || isComment(line) || isCosmetic(line) {
 				continue
 			}
 
 			hostRule, err := NewHostRule(line, filterListID)
 			if err == nil {
-				hostRules = append(hostRules, hostRule)
+				idx, err := s.Store(hostRule)
+				if err != nil {
+					panic(fmt.Errorf("cannot store rule %s: %s", line, err))
+				}
+
+				for _, hostname := range hostRule.Hostnames {
+					d.hostRulesLookupTable[hostname] = idx
+				}
+				d.RulesCount++
 			} else {
 				networkRule, err := NewNetworkRule(line, filterListID)
 				if err == nil && isHostLevelNetworkRule(networkRule) {
-					networkRules = append(networkRules, networkRule)
+					networkEngine.addRule(networkRule)
+					d.RulesCount++
 				}
 			}
 		}
 	}
 
-	return NewDNSEngine(networkRules, hostRules)
-}
-
-// NewDNSEngine creates a new instance of the DNSEngine
-func NewDNSEngine(networkRules []*NetworkRule, hostRules []*HostRule) *DNSEngine {
-	d := DNSEngine{
-		networkEngine:        NewNetworkEngine(networkRules),
-		hostRulesLookupTable: map[string]*HostRule{},
-		RulesCount:           len(networkRules) + len(hostRules),
-	}
-
-	// Populate the host rules lookup table
-	for _, h := range hostRules {
-		for _, hostname := range h.Hostnames {
-			d.hostRulesLookupTable[hostname] = h
-		}
-	}
-
+	d.networkEngine = networkEngine
 	return &d
 }
 
@@ -72,12 +79,17 @@ func (d *DNSEngine) Match(hostname string) (Rule, bool) {
 		return networkRule, true
 	}
 
-	hostRule, found := d.hostRulesLookupTable[hostname]
-	if found && hostRule.Match(r.Hostname) {
-		return hostRule, true
+	hostRuleIdx, found := d.hostRulesLookupTable[hostname]
+	if !found {
+		return nil, false
 	}
 
-	return nil, false
+	rule := d.ruleStorage.RetrieveHostRule(hostRuleIdx)
+	if rule == nil {
+		return nil, false
+	}
+
+	return rule, rule.Match(r.Hostname)
 }
 
 // isHostLevelNetworkRule checks if this rule can be used for hosts-level blocking
