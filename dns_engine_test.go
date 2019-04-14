@@ -53,7 +53,7 @@ func TestBenchDNSEngine(t *testing.T) {
 	defer ruleStorage.Close()
 
 	startParse := time.Now()
-	dnsEngine := ParseDNSEngine(filterLists, ruleStorage)
+	dnsEngine := NewDNSEngine(filterLists, ruleStorage)
 	assert.NotNil(t, dnsEngine)
 
 	log.Printf("Elapsed on parsing rules: %v", time.Since(startParse))
@@ -117,7 +117,7 @@ func TestDNSEngineMatchHostname(t *testing.T) {
 	if err != nil {
 		t.Fatalf("cannot initialize rule storage: %s", err)
 	}
-	dnsEngine := ParseDNSEngine(filterLists, ruleStorage)
+	dnsEngine := NewDNSEngine(filterLists, ruleStorage)
 	assert.NotNil(t, dnsEngine)
 
 	r, ok := dnsEngine.Match("example.org")
