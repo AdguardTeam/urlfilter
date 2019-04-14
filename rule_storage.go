@@ -1,6 +1,7 @@
 package urlfilter
 
 import (
+	"bufio"
 	"errors"
 	"io"
 	"log"
@@ -15,8 +16,12 @@ import (
 // of all loaded rules will be used.
 // TODO: Consider using LRU cache instead of map
 type RuleStorage struct {
-	buffer io.ReadWriteSeeker // buffer with serialized rules
-	cache  map[int64]Rule     // cache with the rules which were retrieved
+	buffer         io.ReadWriteSeeker // buffer with serialized rules
+	bufferedWriter *bufio.Writer      // buffered writer is used to speed up writing to a file
+	currentIndex   int64              // current index in the buffer
+	bufferLength   int64              // bufferLength
+
+	cache map[int64]Rule // cache with the rules which were retrieved
 
 	sync.Mutex
 }
@@ -38,8 +43,9 @@ func NewRuleStorage(filePath string) (*RuleStorage, error) {
 	}
 
 	s := &RuleStorage{
-		buffer: buffer,
-		cache:  map[int64]Rule{},
+		buffer:         buffer,
+		bufferedWriter: bufio.NewWriter(buffer),
+		cache:          map[int64]Rule{},
 	}
 
 	return s, nil
@@ -70,17 +76,26 @@ func (s *RuleStorage) Store(rule Rule) (int64, error) {
 	s.Lock()
 	defer s.Unlock()
 
-	idx, err := s.buffer.Seek(0, io.SeekEnd)
+	var ruleIndex int64
+
+	if s.currentIndex == s.bufferLength {
+		ruleIndex = s.currentIndex
+	} else {
+		idx, err := s.buffer.Seek(0, io.SeekEnd)
+		if err != nil {
+			return 0, err
+		}
+		ruleIndex = idx
+	}
+
+	count, err := SerializeRule(rule, s.bufferedWriter)
+	s.bufferLength += int64(count)
+	s.currentIndex = s.bufferLength
 	if err != nil {
 		return 0, err
 	}
 
-	_, err = SerializeRule(rule, s.buffer)
-	if err != nil {
-		return 0, err
-	}
-
-	return idx, nil
+	return ruleIndex, nil
 }
 
 // Retrieve gets the rule from the storage by its index
@@ -93,7 +108,13 @@ func (s *RuleStorage) Retrieve(idx int64) (Rule, error) {
 		return rule, nil
 	}
 
-	_, err := s.buffer.Seek(idx, io.SeekStart)
+	// Make sure that we've written everything to the file
+	err := s.bufferedWriter.Flush()
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = s.buffer.Seek(idx, io.SeekStart)
 	if err != nil {
 		return nil, err
 	}

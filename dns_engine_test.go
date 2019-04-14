@@ -3,10 +3,7 @@ package urlfilter
 import (
 	"io/ioutil"
 	"log"
-	"os"
-	"runtime"
 	"runtime/debug"
-	"runtime/pprof"
 	"testing"
 	"time"
 
@@ -16,7 +13,6 @@ import (
 const (
 	networkFilterPath = testResourcesDir + "/adguard_sdn_filter.txt"
 	hostsPath         = testResourcesDir + "/hosts"
-	pprofFilePath     = testResourcesDir + "/dnsengine.pprof"
 )
 
 func TestBenchDNSEngine(t *testing.T) {
@@ -37,10 +33,20 @@ func TestBenchDNSEngine(t *testing.T) {
 		2: string(hostsBytes),  // (9988 kB diff in-memory / 6480 kB diff with file storage)
 	}
 
+	testRequests := loadRequests(t)
+	assert.True(t, len(testRequests) > 0)
+	var testHostnames []string
+	for _, req := range testRequests {
+		h := extractHostname(req.URL)
+		if h != "" {
+			testHostnames = append(testHostnames, h)
+		}
+	}
+
 	start := getRSS()
 	log.Printf("RSS before loading rules - %d kB", start/1024)
 
-	ruleStorage, err := NewRuleStorage("")
+	ruleStorage, err := NewRuleStorage("test/temp.db")
 	if err != nil {
 		t.Fatalf("cannot initialize rule storage: %s", err)
 	}
@@ -50,17 +56,6 @@ func TestBenchDNSEngine(t *testing.T) {
 	dnsEngine := ParseDNSEngine(filterLists, ruleStorage)
 	assert.NotNil(t, dnsEngine)
 
-	// Save pprof
-	f, err := os.Create(pprofFilePath)
-	if err != nil {
-		log.Fatal("could not create memory profile: ", err)
-	}
-	defer f.Close()
-	runtime.GC() // get up-to-date statistics
-	if err := pprof.WriteHeapProfile(f); err != nil {
-		log.Fatal("could not write memory profile: ", err)
-	}
-
 	log.Printf("Elapsed on parsing rules: %v", time.Since(startParse))
 	log.Printf("Filters size - %d kB", len(filterBytes)/1024)
 	log.Printf("Hosts size - %d kB", len(hostsBytes)/1024)
@@ -69,6 +64,48 @@ func TestBenchDNSEngine(t *testing.T) {
 
 	afterLoad := getRSS()
 	log.Printf("RSS after loading rules - %d kB (%d kB diff)", afterLoad/1024, (afterLoad-start)/1024)
+
+	totalMatches := 0
+	totalElapsed := time.Duration(0)
+	minElapsedMatch := time.Hour
+	maxElapsedMatch := time.Duration(0)
+
+	for i, reqHostname := range testHostnames {
+		if i != 0 && i%10000 == 0 {
+			log.Printf("Processed %d requests", i)
+		}
+
+		startMatch := time.Now()
+		rule, found := dnsEngine.Match(reqHostname)
+		elapsedMatch := time.Since(startMatch)
+		totalElapsed += elapsedMatch
+		if elapsedMatch > maxElapsedMatch {
+			maxElapsedMatch = elapsedMatch
+		}
+		if elapsedMatch < minElapsedMatch {
+			minElapsedMatch = elapsedMatch
+		}
+
+		if found {
+			switch v := rule.(type) {
+			case *HostRule:
+				totalMatches++
+			case *NetworkRule:
+				if !v.Whitelist {
+					totalMatches++
+				}
+			}
+		}
+	}
+
+	log.Printf("Total matches: %d", totalMatches)
+	log.Printf("Total elapsed: %v", totalElapsed)
+	log.Printf("Average per request: %v", time.Duration(int64(totalElapsed)/int64(len(testHostnames))))
+	log.Printf("Max per request: %v", maxElapsedMatch)
+	log.Printf("Min per request: %v", minElapsedMatch)
+
+	afterMatch := getRSS()
+	log.Printf("RSS after matching - %d kB (%d kB diff)\n", afterMatch/1024, (afterMatch-afterLoad)/1024)
 }
 
 func TestDNSEngineMatchHostname(t *testing.T) {

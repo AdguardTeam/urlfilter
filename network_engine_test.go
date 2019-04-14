@@ -8,11 +8,13 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/shirou/gopsutil/process"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -42,6 +44,8 @@ func TestEmptyNetworkEngine(t *testing.T) {
 }
 
 func TestBenchNetworkEngine(t *testing.T) {
+	debug.SetGCPercent(10)
+
 	testRequests := loadRequests(t)
 	assert.True(t, len(testRequests) > 0)
 	var requests []*Request
@@ -56,6 +60,7 @@ func TestBenchNetworkEngine(t *testing.T) {
 	startParse := time.Now()
 	engine := buildNetworkEngine(t)
 	assert.NotNil(t, engine)
+	defer engine.ruleStorage.Close()
 	log.Printf("Elapsed on parsing rules: %v", time.Since(startParse))
 
 	afterLoad := getRSS()
