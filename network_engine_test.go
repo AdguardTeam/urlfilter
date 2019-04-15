@@ -8,11 +8,13 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/shirou/gopsutil/process"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -30,7 +32,11 @@ type testRequest struct {
 }
 
 func TestEmptyNetworkEngine(t *testing.T) {
-	engine := NewNetworkEngine(make([]*NetworkRule, 0))
+	ruleStorage, err := NewRuleStorage("")
+	if err != nil {
+		t.Fatalf("cannot initialize rule storage: %s", err)
+	}
+	engine := NewNetworkEngine(make([]*NetworkRule, 0), ruleStorage)
 	r := NewRequest("http://example.org/", "", TypeOther)
 	rule, ok := engine.Match(r)
 	assert.False(t, ok)
@@ -38,6 +44,8 @@ func TestEmptyNetworkEngine(t *testing.T) {
 }
 
 func TestBenchNetworkEngine(t *testing.T) {
+	debug.SetGCPercent(10)
+
 	testRequests := loadRequests(t)
 	assert.True(t, len(testRequests) > 0)
 	var requests []*Request
@@ -52,6 +60,7 @@ func TestBenchNetworkEngine(t *testing.T) {
 	startParse := time.Now()
 	engine := buildNetworkEngine(t)
 	assert.NotNil(t, engine)
+	defer engine.ruleStorage.Close()
 	log.Printf("Elapsed on parsing rules: %v", time.Since(startParse))
 
 	afterLoad := getRSS()
@@ -152,7 +161,11 @@ func buildNetworkEngine(t *testing.T) *NetworkEngine {
 	}
 
 	log.Printf("Loaded %d rules from %s", len(rules), filterPath)
-	return NewNetworkEngine(rules)
+	ruleStorage, err := NewRuleStorage("")
+	if err != nil {
+		t.Fatalf("cannot initialize rule storage: %s", err)
+	}
+	return NewNetworkEngine(rules, ruleStorage)
 }
 
 func loadRequests(t *testing.T) []testRequest {

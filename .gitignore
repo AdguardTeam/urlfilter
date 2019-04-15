@@ -3,3 +3,5 @@
 .idea
 test/requests.json
 test/requests2.json
+test/*.pprof
+test/*.db

@@ -4,10 +4,13 @@ import (
 	"fmt"
 	"net"
 	"strings"
+
+	"github.com/asaskevich/govalidator"
 )
 
 // HostRule is a structure for simple host-level rules (i.e. /etc/hosts syntax).
 // http://man7.org/linux/man-pages/man5/hosts.5.html
+// It also supports "just domain" syntax. In this case, the IP will be set to 0.0.0.0.
 type HostRule struct {
 	RuleText     string   // RuleText is the original rule text
 	FilterListID int      // Filter list identifier
@@ -25,21 +28,25 @@ func NewHostRule(ruleText string, filterListID int) (*HostRule, error) {
 	}
 
 	parts := strings.Fields(strings.TrimSpace(ruleText))
-	if len(parts) < 2 {
-		return nil, fmt.Errorf("cannot parse host rule %s", ruleText)
-	}
-
 	var ip net.IP
 	var hostnames []string
-	for i, part := range parts {
-		if i == 0 {
-			ip = net.ParseIP(parts[0])
-			if ip == nil {
-				return nil, fmt.Errorf("cannot parse the IP address from %s", ruleText)
+
+	if len(parts) >= 2 {
+		for i, part := range parts {
+			if i == 0 {
+				ip = net.ParseIP(parts[0])
+				if ip == nil {
+					return nil, fmt.Errorf("cannot parse the IP address from %s", ruleText)
+				}
+			} else {
+				hostnames = append(hostnames, part)
 			}
-		} else {
-			hostnames = append(hostnames, part)
 		}
+	} else if len(parts) == 1 && govalidator.IsDNSName(parts[0]) {
+		hostnames = append(hostnames, parts[0])
+		ip = net.IPv4(0, 0, 0, 0)
+	} else {
+		return nil, fmt.Errorf("cannot parse host rule %s", ruleText)
 	}
 
 	h.Hostnames = hostnames
