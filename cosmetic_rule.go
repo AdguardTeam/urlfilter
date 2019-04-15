@@ -32,8 +32,8 @@ const (
 	// https://kb.adguard.com/en/general/how-to-create-your-own-ad-filters#cosmetic-css-rules
 	markerCSS                cosmeticRuleMarker = "#$#"
 	markerCSSException       cosmeticRuleMarker = "#@$#"
-	markerCSSExtCSS          cosmeticRuleMarker = "#?$#"
-	markerCSSExtCSSException cosmeticRuleMarker = "#@?$"
+	markerCSSExtCSS          cosmeticRuleMarker = "#$?#"
+	markerCSSExtCSSException cosmeticRuleMarker = "#@$?#"
 
 	// https://kb.adguard.com/en/general/how-to-create-your-own-ad-filters#javascript-rules
 	markerJS          cosmeticRuleMarker = "#%#"
