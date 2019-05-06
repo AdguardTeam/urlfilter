@@ -76,7 +76,7 @@ func TestBenchDNSEngine(t *testing.T) {
 		}
 
 		startMatch := time.Now()
-		rule, found := dnsEngine.Match(reqHostname)
+		rules, found := dnsEngine.Match(reqHostname)
 		elapsedMatch := time.Since(startMatch)
 		totalElapsed += elapsedMatch
 		if elapsedMatch > maxElapsedMatch {
@@ -87,7 +87,7 @@ func TestBenchDNSEngine(t *testing.T) {
 		}
 
 		if found {
-			switch v := rule.(type) {
+			switch v := rules[0].(type) {
 			case *HostRule:
 				totalMatches++
 			case *NetworkRule:
@@ -122,16 +122,35 @@ func TestDNSEngineMatchHostname(t *testing.T) {
 
 	r, ok := dnsEngine.Match("example.org")
 	assert.True(t, ok)
+	assert.True(t, len(r) == 1)
 
-	_, ok = r.(*NetworkRule)
+	_, ok = r[0].(*NetworkRule)
 	assert.True(t, ok)
 
 	r, ok = dnsEngine.Match("example.com")
 	assert.True(t, ok)
+	assert.True(t, len(r) == 1)
 
-	_, ok = r.(*HostRule)
+	_, ok = r[0].(*HostRule)
 	assert.True(t, ok)
 
 	_, ok = dnsEngine.Match("example.net")
 	assert.False(t, ok)
+}
+
+func TestDNSEngineMatchIP6(t *testing.T) {
+	filterLists := map[int]string{
+		1: "192.168.1.1 example.org\n2000:: example.org",
+	}
+
+	ruleStorage, err := NewRuleStorage("")
+	if err != nil {
+		t.Fatalf("cannot initialize rule storage: %s", err)
+	}
+	dnsEngine := NewDNSEngine(filterLists, ruleStorage)
+	assert.NotNil(t, dnsEngine)
+
+	r, ok := dnsEngine.Match("example.org")
+	assert.True(t, ok)
+	assert.True(t, len(r) == 2)
 }
