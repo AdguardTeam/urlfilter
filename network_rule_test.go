@@ -278,6 +278,24 @@ func TestNetworkRulePriority(t *testing.T) {
 	compareRulesPriority(t, "||example.org", "||example.org", false)
 }
 
+func TestInvalidRule(t *testing.T) {
+	r, err := NewNetworkRule("*$third-party", -1)
+	assert.Nil(t, r)
+	assert.NotNil(t, err)
+
+	r, err = NewNetworkRule("$third-party", -1)
+	assert.Nil(t, r)
+	assert.NotNil(t, err)
+
+	r, err = NewNetworkRule("ad$third-party", -1)
+	assert.Nil(t, r)
+	assert.NotNil(t, err)
+
+	r, err = NewNetworkRule("$domain=ya.ru", -1)
+	assert.NotNil(t, r)
+	assert.Nil(t, err)
+}
+
 func compareRulesPriority(t *testing.T, left string, right string, expected bool) {
 	l, err := NewNetworkRule(left, -1)
 	assert.Nil(t, err)
