@@ -5,12 +5,7 @@ type Engine struct {
 }
 
 // NewEngine parses the filtering rules and creates a filtering engine of them
-func NewEngine(rules string) (*Engine, error) {
-	if rules == "" {
-		// Empty engine
-		return nil, nil
-	}
-
+func NewEngine(filterLists map[int]string, s *RulesStorage) (*Engine, error) {
 	return &Engine{}, nil
 }
 

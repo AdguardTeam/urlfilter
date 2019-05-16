@@ -70,9 +70,9 @@ type CosmeticResult struct {
 // hostname is the page hostname
 // includeCSS defines if we should inject any CSS and element hiding rules (see $elemhide)
 // includeJS defines if we should inject JS into the page (see $jsinject)
-// includeGeneric defines if we should inject generic CSS, JS and element hiding rules (see $generichide)
+// includeGenericCSS defines if we should inject generic CSS and element hiding rules (see $generichide)
 // TODO: Additionally, we should provide a method that writes result to an io.Writer
-func (e *CosmeticEngine) Match(hostname string, includeCSS bool, includeJS bool, includeGeneric bool) *CosmeticResult {
+func (e *CosmeticEngine) Match(hostname string, includeCSS bool, includeJS bool, includeGenericCSS bool) *CosmeticResult {
 	r := &CosmeticResult{
 		ElementHiding: StylesResult{},
 		CSS:           StylesResult{},
@@ -81,7 +81,7 @@ func (e *CosmeticEngine) Match(hostname string, includeCSS bool, includeJS bool,
 
 	if includeCSS {
 		c := e.lookupTables[CosmeticElementHiding]
-		if includeGeneric {
+		if includeGenericCSS {
 			for _, rule := range c.genericRules {
 				if !c.isWhitelisted(hostname, rule) && rule.Match(hostname) {
 					r.ElementHiding.append(rule)

@@ -104,6 +104,8 @@ example.org#@#banner_generic_disabled`
 			rule, err := NewCosmeticRule(line, 1)
 			if err == nil {
 				rules = append(rules, rule)
+			} else {
+				t.Fatalf("cannot create a rule %s: %s", line, err)
 			}
 		}
 	}
