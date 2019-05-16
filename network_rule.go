@@ -116,6 +116,17 @@ func NewNetworkRule(ruleText string, filterListID int) (*NetworkRule, error) {
 		return nil, err
 	}
 
+	// validate rule
+	if pattern == MaskStartURL || pattern == MaskPipe ||
+		pattern == MaskAnyCharacter || pattern == "" ||
+		len(pattern) < 3 {
+		if len(rule.permittedDomains) == 0 {
+			// Rule matches too much and does not have any domain restriction
+			// We should not allow this kind of rules
+			return nil, fmt.Errorf("the rule is too wide, add domain restriction or make it more specific")
+		}
+	}
+
 	rule.loadShortcut()
 	return &rule, nil
 }
