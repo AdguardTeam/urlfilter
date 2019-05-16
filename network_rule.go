@@ -171,6 +171,27 @@ func (f *NetworkRule) IsOptionDisabled(option NetworkRuleOption) bool {
 	return (f.disabledOptions & option) == option
 }
 
+// isHigherPriority checks if the rule has higher priority that the specified rule
+// whitelist + $important > $important > whitelist > basic rules
+func (f *NetworkRule) isHigherPriority(r *NetworkRule) bool {
+	important := f.IsOptionEnabled(OptionImportant)
+	rImportant := r.IsOptionEnabled(OptionImportant)
+
+	if (f.Whitelist && important) && !(r.Whitelist && rImportant) {
+		return true
+	}
+
+	if important && !rImportant {
+		return true
+	}
+
+	if f.Whitelist && !rImportant && !r.Whitelist {
+		return true
+	}
+
+	return false
+}
+
 // matchPattern uses the regex pattern to match the request URL
 func (f *NetworkRule) matchPattern(r *Request) bool {
 	f.Lock()
@@ -323,6 +344,9 @@ func (f *NetworkRule) loadOption(name string, value string) error {
 		return f.setOptionEnabled(OptionMatchCase, true)
 	case "~match-case":
 		return f.setOptionEnabled(OptionMatchCase, false)
+	case "important":
+		return f.setOptionEnabled(OptionImportant, true)
+
 	case "domain":
 		permitted, restricted, err := loadDomains(value, "|")
 		f.permittedDomains = permitted

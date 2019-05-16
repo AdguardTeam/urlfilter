@@ -255,3 +255,33 @@ func TestNetworkRuleSerialize(t *testing.T) {
 	deserializedRule := r.(*NetworkRule)
 	assert.True(t, reflect.DeepEqual(rule, deserializedRule))
 }
+
+func TestNetworkRulePriority(t *testing.T) {
+	compareRulesPriority(t, "@@||example.org$important", "@@||example.org$important", false)
+	compareRulesPriority(t, "@@||example.org$important", "||example.org$important", true)
+	compareRulesPriority(t, "@@||example.org$important", "@@||example.org", true)
+	compareRulesPriority(t, "@@||example.org$important", "||example.org", true)
+
+	compareRulesPriority(t, "||example.org$important", "@@||example.org$important", false)
+	compareRulesPriority(t, "||example.org$important", "||example.org$important", false)
+	compareRulesPriority(t, "||example.org$important", "@@||example.org", true)
+	compareRulesPriority(t, "||example.org$important", "||example.org", true)
+
+	compareRulesPriority(t, "@@||example.org", "@@||example.org$important", false)
+	compareRulesPriority(t, "@@||example.org", "||example.org$important", false)
+	compareRulesPriority(t, "@@||example.org", "@@||example.org", false)
+	compareRulesPriority(t, "@@||example.org", "||example.org", true)
+
+	compareRulesPriority(t, "||example.org", "@@||example.org$important", false)
+	compareRulesPriority(t, "||example.org", "||example.org$important", false)
+	compareRulesPriority(t, "||example.org", "@@||example.org", false)
+	compareRulesPriority(t, "||example.org", "||example.org", false)
+}
+
+func compareRulesPriority(t *testing.T, left string, right string, expected bool) {
+	l, err := NewNetworkRule(left, -1)
+	assert.Nil(t, err)
+	r, err := NewNetworkRule(right, -1)
+	assert.Nil(t, err)
+	assert.Equal(t, expected, l.isHigherPriority(r))
+}
