@@ -45,14 +45,17 @@ func (n *NetworkEngine) Match(r *Request) (*NetworkRule, bool) {
 		return nil, false
 	}
 
+	var resultRule *NetworkRule
+
 	for i := range rules {
 		rule := rules[i]
-		if rule.Whitelist {
-			return rule, true
+
+		if resultRule == nil || rule.isHigherPriority(resultRule) {
+			resultRule = rule
 		}
 	}
 
-	return rules[0], true
+	return resultRule, true
 }
 
 // MatchAll finds all rules matching the specified request regardless of the rule types

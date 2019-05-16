@@ -43,6 +43,39 @@ func TestEmptyNetworkEngine(t *testing.T) {
 	assert.Nil(t, rule)
 }
 
+func TestMatchImportantRule(t *testing.T) {
+	ruleStorage, err := NewRuleStorage("")
+	if err != nil {
+		t.Fatalf("cannot initialize rule storage: %s", err)
+	}
+	rules := make([]*NetworkRule, 0)
+	r1, _ := NewNetworkRule("||test2.example.org^$important", -1)
+	rules = append(rules, r1)
+	r2, _ := NewNetworkRule("@@||example.org^", -1)
+	rules = append(rules, r2)
+	r3, _ := NewNetworkRule("||test1.example.org^", -1)
+	rules = append(rules, r3)
+	engine := NewNetworkEngine(rules, ruleStorage)
+
+	r := NewRequest("http://example.org/", "", TypeOther)
+	rule, ok := engine.Match(r)
+	assert.True(t, ok)
+	assert.NotNil(t, rule)
+	assert.Equal(t, r2.String(), rule.String())
+
+	r = NewRequest("http://test1.example.org/", "", TypeOther)
+	rule, ok = engine.Match(r)
+	assert.True(t, ok)
+	assert.NotNil(t, rule)
+	assert.Equal(t, r2.String(), rule.String())
+
+	r = NewRequest("http://test2.example.org/", "", TypeOther)
+	rule, ok = engine.Match(r)
+	assert.True(t, ok)
+	assert.NotNil(t, rule)
+	assert.Equal(t, r1.String(), rule.String())
+}
+
 func TestBenchNetworkEngine(t *testing.T) {
 	debug.SetGCPercent(10)
 
