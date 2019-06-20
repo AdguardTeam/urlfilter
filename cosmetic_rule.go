@@ -2,7 +2,6 @@ package urlfilter
 
 import (
 	"bytes"
-	"fmt"
 	"sort"
 	"strings"
 )
@@ -101,14 +100,14 @@ func NewCosmeticRule(ruleText string, filterListID int) (*CosmeticRule, error) {
 
 	index, m := findCosmeticRuleMarker(ruleText)
 	if index == -1 {
-		return nil, fmt.Errorf("invalid cosmetic rule: %s", ruleText)
+		return nil, &RuleSyntaxError{msg: "cannot find cosmetic marker", ruleText: ruleText}
 	}
 
 	if index > 0 {
 		domains := ruleText[:index]
 		permitted, restricted, err := loadDomains(domains, ",")
 		if err != nil {
-			return nil, fmt.Errorf("cannot load domains for %s: %s", ruleText, err)
+			return nil, &RuleSyntaxError{msg: "cannot load domains", ruleText: ruleText}
 		}
 		f.permittedDomains = permitted
 		f.restrictedDomains = restricted
@@ -116,7 +115,7 @@ func NewCosmeticRule(ruleText string, filterListID int) (*CosmeticRule, error) {
 
 	f.Content = strings.TrimSpace(ruleText[index+len(m):])
 	if f.Content == "" {
-		return nil, fmt.Errorf("empty rule content: %s", ruleText)
+		return nil, &RuleSyntaxError{msg: "empty rule content", ruleText: ruleText}
 	}
 
 	// TODO: validate content
@@ -129,7 +128,7 @@ func NewCosmeticRule(ruleText string, filterListID int) (*CosmeticRule, error) {
 		f.Type = CosmeticElementHiding
 		f.Whitelist = true
 	default:
-		return nil, fmt.Errorf("this type of cosmetic rules is not supported yet: %s", ruleText)
+		return nil, ErrUnsupportedRule
 	}
 
 	return &f, nil
@@ -196,6 +195,10 @@ func findCosmeticRuleMarker(ruleText string) (int, string) {
 	for _, firstMarkerChar := range cosmeticRuleMarkersFirstChars {
 		startIndex := strings.IndexByte(ruleText, firstMarkerChar)
 		if startIndex == -1 {
+			continue
+		}
+
+		if startIndex > 0 && ruleText[startIndex-1] == ' ' {
 			continue
 		}
 

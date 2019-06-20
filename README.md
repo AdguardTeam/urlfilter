@@ -37,3 +37,7 @@ You can learn more about AdGuard filtering rules syntax from [this article](http
     * [ ] $replace
     * [ ] $csp
     * [ ] $cookie
+    
+#### How to use
+
+TODO

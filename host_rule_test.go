@@ -57,6 +57,18 @@ func TestParseHostRuleText(t *testing.T) {
 	rule, err = NewHostRule("", 1)
 	assert.NotNil(t, err)
 	assert.Nil(t, rule)
+
+	rule, err = NewHostRule("#", 1)
+	assert.NotNil(t, err)
+	assert.Nil(t, rule)
+
+	rule, err = NewHostRule("0.0.0.0 www.ruclicks.com  #[clicksagent.com]", 1)
+	assert.Nil(t, err)
+	assert.NotNil(t, rule)
+	assert.Equal(t, 1, rule.FilterListID)
+	assert.Equal(t, net.IPv4(0, 0, 0, 0), rule.IP)
+	assert.Equal(t, 1, len(rule.Hostnames))
+	assert.Equal(t, "www.ruclicks.com", rule.Hostnames[0])
 }
 
 func TestHostRuleMatch(t *testing.T) {
