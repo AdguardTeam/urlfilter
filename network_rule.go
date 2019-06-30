@@ -182,6 +182,15 @@ func (f *NetworkRule) IsOptionDisabled(option NetworkRuleOption) bool {
 	return (f.disabledOptions & option) == option
 }
 
+// isRegexRule returns true if rule's pattern is a regular expression
+func (f *NetworkRule) isRegexRule() bool {
+	if strings.HasPrefix(f.pattern, maskRegexRule) &&
+		strings.HasSuffix(f.pattern, maskRegexRule) {
+		return true
+	}
+	return false
+}
+
 // isHigherPriority checks if the rule has higher priority that the specified rule
 // whitelist + $important > $important > whitelist > basic rules
 func (f *NetworkRule) isHigherPriority(r *NetworkRule) bool {
@@ -523,8 +532,7 @@ func (f *NetworkRule) loadDomains(domains string) error {
 // any special characters
 func (f *NetworkRule) loadShortcut() {
 	var shortcut string
-	if strings.HasPrefix(f.pattern, maskRegexRule) &&
-		strings.HasSuffix(f.pattern, maskRegexRule) {
+	if f.isRegexRule() {
 		shortcut = findRegexpShortcut(f.pattern)
 	} else {
 		shortcut = findShortcut(f.pattern)

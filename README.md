@@ -19,7 +19,7 @@ You can learn more about AdGuard filtering rules syntax from [this article](http
 * [X] Benchmark basic rules matching
 * [X] Hosts matching rules
     * [X] /etc/hosts matching
-* [ ] Memory optimization
+* [X] Memory optimization
 * [ ] Tech document
 * [ ] Cosmetic rules
     * [X] Basic element hiding and CSS rules

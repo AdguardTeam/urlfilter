@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 
@@ -15,7 +14,7 @@ import (
 
 func main() {
 	flag.Parse()
-	err := setCA(caCert, caKey)
+	err := setRootCA()
 	if err != nil {
 		panic(err)
 	}
@@ -44,17 +43,11 @@ func main() {
 }
 
 func buildNetworkEngine() *urlfilter.NetworkEngine {
-	filterBytes, err := ioutil.ReadFile("easylist.txt")
+	list, err := urlfilter.NewFileRuleList(1, "easylist.txt", false)
 	if err != nil {
 		panic(err)
 	}
-	lists := []urlfilter.RuleList{
-		&urlfilter.StringRuleList{
-			ID:             1,
-			RulesText:      string(filterBytes),
-			IgnoreCosmetic: true,
-		},
-	}
+	lists := []urlfilter.RuleList{list}
 	ruleStorage, err := urlfilter.NewRuleStorage(lists)
 	if err != nil {
 		panic(fmt.Sprintf("cannot initialize rule storage: %s", err))

@@ -8,11 +8,18 @@ import (
 	"github.com/joomcode/errorx"
 )
 
-// TODO: Add a better readme here
-
 // RuleStorage is an abstraction that combines several rule lists
 // It can be scanned using RuleStorageScanner, and also it allows
 // retrieving rules by its index
+//
+// The idea is to keep rules in a serialized format (even original format in the case of FileRuleList)
+// and create them in a lazy manner only when we really need them. When the filtering engine is
+// being initialized, we need to scan the rule lists once in order to fill up the lookup tables.
+// We use rule indexes as a unique rule identifier instead of the rule itself.
+// The rule is created (see RetrieveRule) only when there's a chance that it's needed.
+//
+// Rule index is an int64 value that actually consists of two int32 values:
+// One is the rule list identifier, and the second is the index of the rule inside of that list.
 type RuleStorage struct {
 	// Lists is an array of rules lists which can be accessed
 	// using this RuleStorage

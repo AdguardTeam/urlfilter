@@ -20,8 +20,8 @@ func NewDNSEngine(s *RuleStorage) *DNSEngine {
 	scan := s.NewRuleStorageScanner()
 	for scan.Scan() {
 		f, _ := scan.Rule()
-		if _, ok := f.(*HostRule); ok {
-			hostRulesCount++
+		if hostRule, ok := f.(*HostRule); ok {
+			hostRulesCount += len(hostRule.Hostnames)
 		} else if _, ok := f.(*NetworkRule); ok {
 			networkRulesCount++
 		}
@@ -50,7 +50,6 @@ func NewDNSEngine(s *RuleStorage) *DNSEngine {
 			d.addRule(hostRule, idx)
 		} else if networkRule, ok := f.(*NetworkRule); ok {
 			if isHostLevelNetworkRule(networkRule) {
-				// TODO: check if this is a regex rule and add it to a list of rules here
 				networkEngine.addRule(networkRule, idx)
 			}
 		}
