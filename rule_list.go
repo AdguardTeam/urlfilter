@@ -96,6 +96,7 @@ func (l *FileRuleList) GetID() int {
 
 // NewScanner creates a new rules scanner that reads the list contents
 func (l *FileRuleList) NewScanner() *RuleScanner {
+	_, _ = l.File.Seek(0, io.SeekStart)
 	return NewRuleScanner(l.File, l.ID, l.IgnoreCosmetic)
 }
 

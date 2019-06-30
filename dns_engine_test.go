@@ -27,7 +27,10 @@ func TestBenchDNSEngine(t *testing.T) {
 		t.Fatalf("cannot read %s", hostsPath)
 	}
 
-	ruleLists := []RuleList{filterRuleList, hostsRuleList}
+	ruleLists := []RuleList{
+		filterRuleList,
+		hostsRuleList,
+	}
 	ruleStorage, err := NewRuleStorage(ruleLists)
 	if err != nil {
 		t.Fatalf("cannot create rule storage: %s", err)
@@ -95,6 +98,7 @@ func TestBenchDNSEngine(t *testing.T) {
 	log.Printf("Average per request: %v", time.Duration(int64(totalElapsed)/int64(len(testHostnames))))
 	log.Printf("Max per request: %v", maxElapsedMatch)
 	log.Printf("Min per request: %v", minElapsedMatch)
+	log.Printf("Storage cache length: %d", len(ruleStorage.cache))
 
 	afterMatch := getRSS()
 	log.Printf("RSS after matching - %d kB (%d kB diff)\n", afterMatch/1024, (afterMatch-afterLoad)/1024)

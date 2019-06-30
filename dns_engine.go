@@ -5,30 +5,43 @@ package urlfilter
 // First, it looks over network rules and returns first rule found.
 // Then, if nothing found, it looks up the host rules.
 type DNSEngine struct {
-	RulesCount              int              // count of rules loaded to the engine
-	networkEngine           *NetworkEngine   // networkEngine is constructed from the network rules
-	hostRulesLookupTable    map[string]int64 // map for hosts mapped to IPv4 addresses
-	hostRulesLookupTableIP6 map[string]int64 // map for hosts mapped to IPv6 addresses
-	rulesStorage            *RuleStorage
+	RulesCount    int                // count of rules loaded to the engine
+	networkEngine *NetworkEngine     // networkEngine is constructed from the network rules
+	lookupTable   map[uint32][]int64 // map for hosts hashes mapped to the list of rule indexes
+	rulesStorage  *RuleStorage
 }
 
 // NewDNSEngine parses the specified filter lists and returns a DNSEngine built from them.
 // key of the map is the filter list ID, value is the raw content of the filter list.
 func NewDNSEngine(s *RuleStorage) *DNSEngine {
+	// At first, we count rules in the rule storage so that we could pre-allocate lookup tables
+	// Surprisingly, this helps us save a lot on allocations
+	var hostRulesCount, networkRulesCount int
+	scan := s.NewRuleStorageScanner()
+	for scan.Scan() {
+		f, _ := scan.Rule()
+		if _, ok := f.(*HostRule); ok {
+			hostRulesCount++
+		} else if _, ok := f.(*NetworkRule); ok {
+			networkRulesCount++
+		}
+	}
+
+	// Initialize the DNSEngine using these newly acquired numbers
 	d := DNSEngine{
-		rulesStorage:            s,
-		hostRulesLookupTable:    map[string]int64{},
-		hostRulesLookupTableIP6: map[string]int64{},
-		RulesCount:              0,
+		rulesStorage: s,
+		lookupTable:  make(map[uint32][]int64, hostRulesCount),
+		RulesCount:   0,
 	}
 
 	networkEngine := &NetworkEngine{
 		ruleStorage:          s,
-		domainsLookupTable:   map[uint32][]int64{},
-		shortcutsLookupTable: map[uint32][]int64{},
-		shortcutsHistogram:   map[uint32]int{},
+		domainsLookupTable:   make(map[uint32][]int64, 0),
+		shortcutsLookupTable: make(map[uint32][]int64, networkRulesCount),
+		shortcutsHistogram:   make(map[uint32]int, 0),
 	}
 
+	// Go through all rules in the storage and add them to the lookup tables
 	scanner := s.NewRuleStorageScanner()
 	for scanner.Scan() {
 		f, idx := scanner.Rule()
@@ -37,6 +50,7 @@ func NewDNSEngine(s *RuleStorage) *DNSEngine {
 			d.addRule(hostRule, idx)
 		} else if networkRule, ok := f.(*NetworkRule); ok {
 			if isHostLevelNetworkRule(networkRule) {
+				// TODO: check if this is a regex rule and add it to a list of rules here
 				networkEngine.addRule(networkRule, idx)
 			}
 		}
@@ -45,18 +59,6 @@ func NewDNSEngine(s *RuleStorage) *DNSEngine {
 	d.RulesCount += networkEngine.RulesCount
 	d.networkEngine = networkEngine
 	return &d
-}
-
-// addRule adds rule to the index
-func (d *DNSEngine) addRule(hostRule *HostRule, storageIdx int64) {
-	for _, hostname := range hostRule.Hostnames {
-		if hostRule.IP.To4() == nil {
-			d.hostRulesLookupTableIP6[hostname] = storageIdx
-		} else {
-			d.hostRulesLookupTable[hostname] = storageIdx
-		}
-	}
-	d.RulesCount++
 }
 
 // Match finds a matching rule for the specified hostname.
@@ -73,35 +75,41 @@ func (d *DNSEngine) Match(hostname string) ([]Rule, bool) {
 	r := NewRequestForHostname(hostname)
 	networkRule, ok := d.networkEngine.Match(r)
 	if ok {
+		// Network rules always have higher priority
 		return []Rule{networkRule}, true
 	}
 
-	var rules []Rule
+	return d.matchLookupTable(hostname)
+}
 
-	if rule, ok := d.matchHostRulesLookupTable(hostname, d.hostRulesLookupTable); ok {
-		rules = append(rules, rule)
+// matchLookupTable looks for matching rules in the d.lookupTable
+func (d *DNSEngine) matchLookupTable(hostname string) ([]Rule, bool) {
+	hash := fastHash(hostname)
+	rulesIndexes, ok := d.lookupTable[hash]
+	if !ok {
+		return nil, false
 	}
 
-	if rule, ok := d.matchHostRulesLookupTable(hostname, d.hostRulesLookupTableIP6); ok {
-		rules = append(rules, rule)
+	var rules []Rule
+	for _, idx := range rulesIndexes {
+		rule := d.rulesStorage.RetrieveHostRule(idx)
+		if rule != nil && rule.Match(hostname) {
+			rules = append(rules, rule)
+		}
 	}
 
 	return rules, len(rules) > 0
 }
 
-// matchHostRulesLookupTable looks for a matching rule in the specified lookup table
-func (d *DNSEngine) matchHostRulesLookupTable(hostname string, lookupTable map[string]int64) (*HostRule, bool) {
-	hostRuleIdx, found := lookupTable[hostname]
-	if !found {
-		return nil, false
+// addRule adds rule to the index
+func (d *DNSEngine) addRule(hostRule *HostRule, storageIdx int64) {
+	for _, hostname := range hostRule.Hostnames {
+		hash := fastHash(hostname)
+		rulesIndexes, _ := d.lookupTable[hash]
+		d.lookupTable[hash] = append(rulesIndexes, storageIdx)
 	}
 
-	rule := d.rulesStorage.RetrieveHostRule(hostRuleIdx)
-	if rule != nil && rule.Match(hostname) {
-		return rule, true
-	}
-
-	return nil, false
+	d.RulesCount++
 }
 
 // isHostLevelNetworkRule checks if this rule can be used for hosts-level blocking
