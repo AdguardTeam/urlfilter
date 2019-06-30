@@ -5,7 +5,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"io"
-	"log"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime/debug"
@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/AdguardTeam/golibs/log"
 	"github.com/shirou/gopsutil/process"
-
 	"github.com/stretchr/testify/assert"
 )
 
@@ -32,11 +32,8 @@ type testRequest struct {
 }
 
 func TestEmptyNetworkEngine(t *testing.T) {
-	ruleStorage, err := NewRuleStorage("")
-	if err != nil {
-		t.Fatalf("cannot initialize rule storage: %s", err)
-	}
-	engine := NewNetworkEngine(make([]*NetworkRule, 0), ruleStorage)
+	ruleStorage := newTestRuleStorage(t, 1, "")
+	engine := NewNetworkEngine(ruleStorage)
 	r := NewRequest("http://example.org/", "", TypeOther)
 	rule, ok := engine.Match(r)
 	assert.False(t, ok)
@@ -44,36 +41,30 @@ func TestEmptyNetworkEngine(t *testing.T) {
 }
 
 func TestMatchImportantRule(t *testing.T) {
-	ruleStorage, err := NewRuleStorage("")
-	if err != nil {
-		t.Fatalf("cannot initialize rule storage: %s", err)
-	}
-	rules := make([]*NetworkRule, 0)
-	r1, _ := NewNetworkRule("||test2.example.org^$important", -1)
-	rules = append(rules, r1)
-	r2, _ := NewNetworkRule("@@||example.org^", -1)
-	rules = append(rules, r2)
-	r3, _ := NewNetworkRule("||test1.example.org^", -1)
-	rules = append(rules, r3)
-	engine := NewNetworkEngine(rules, ruleStorage)
+	r1 := "||test2.example.org^$important"
+	r2 := "@@||example.org^"
+	r3 := "||test1.example.org^"
+	rulesText := strings.Join([]string{r1, r2, r3}, "\n")
+	ruleStorage := newTestRuleStorage(t, -1, rulesText)
+	engine := NewNetworkEngine(ruleStorage)
 
 	r := NewRequest("http://example.org/", "", TypeOther)
 	rule, ok := engine.Match(r)
 	assert.True(t, ok)
 	assert.NotNil(t, rule)
-	assert.Equal(t, r2.String(), rule.String())
+	assert.Equal(t, r2, rule.String())
 
 	r = NewRequest("http://test1.example.org/", "", TypeOther)
 	rule, ok = engine.Match(r)
 	assert.True(t, ok)
 	assert.NotNil(t, rule)
-	assert.Equal(t, r2.String(), rule.String())
+	assert.Equal(t, r2, rule.String())
 
 	r = NewRequest("http://test2.example.org/", "", TypeOther)
 	rule, ok = engine.Match(r)
 	assert.True(t, ok)
 	assert.NotNil(t, rule)
-	assert.Equal(t, r1.String(), rule.String())
+	assert.Equal(t, r1, rule.String())
 }
 
 func TestBenchNetworkEngine(t *testing.T) {
@@ -168,37 +159,39 @@ func isSupportedURL(url string) bool {
 }
 
 func buildNetworkEngine(t *testing.T) *NetworkEngine {
-	file, err := os.Open(filterPath)
+	filterBytes, err := ioutil.ReadFile(filterPath)
 	if err != nil {
-		t.Fatalf("cannot load %s: %s", filterPath, err)
+		t.Fatalf("cannot read %s", filterPath)
 	}
-	defer file.Close()
-
-	var rules []*NetworkRule
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-
-		if line != "" && !isCosmetic(line) && !isComment(line) {
-
-			rule, err := NewNetworkRule(line, 0)
-			if err == nil {
-				rules = append(rules, rule)
-			}
-		}
+	lists := []RuleList{
+		&StringRuleList{
+			ID:             1,
+			RulesText:      string(filterBytes),
+			IgnoreCosmetic: true,
+		},
 	}
 
-	if err := scanner.Err(); err != nil {
-		t.Fatal(err)
-	}
-
-	log.Printf("Loaded %d rules from %s", len(rules), filterPath)
-	ruleStorage, err := NewRuleStorage("")
+	ruleStorage, err := NewRuleStorage(lists)
 	if err != nil {
 		t.Fatalf("cannot initialize rule storage: %s", err)
 	}
-	return NewNetworkEngine(rules, ruleStorage)
+	engine := NewNetworkEngine(ruleStorage)
+	log.Printf("Loaded %d rules from %s", engine.RulesCount, filterPath)
+
+	return engine
+}
+
+func newTestRuleStorage(t *testing.T, listID int, rulesText string) *RuleStorage {
+	list := &StringRuleList{
+		ID:             listID,
+		RulesText:      rulesText,
+		IgnoreCosmetic: false,
+	}
+	ruleStorage, err := NewRuleStorage([]RuleList{list})
+	if err != nil {
+		t.Fatalf("cannot initialize rule storage: %s", err)
+	}
+	return ruleStorage
 }
 
 func loadRequests(t *testing.T) []testRequest {

@@ -9,8 +9,8 @@ import (
 func TestStringRuleListScanner(t *testing.T) {
 	ruleList := &StringRuleList{
 		ID:             1,
-		ignoreCosmetic: false,
-		rulesText:      "||example.org\n! test\n##banner",
+		IgnoreCosmetic: false,
+		RulesText:      "||example.org\n! test\n##banner",
 	}
 	assert.Equal(t, 1, ruleList.GetID())
 

@@ -2,10 +2,10 @@ package urlfilter
 
 import (
 	"bytes"
-	"log"
 	"reflect"
 	"testing"
 
+	"github.com/AdguardTeam/golibs/log"
 	"github.com/stretchr/testify/assert"
 )
 

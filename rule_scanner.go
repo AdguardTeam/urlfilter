@@ -21,7 +21,7 @@ type RuleScanner struct {
 // NewRuleScanner returns a new RuleScanner to read from r.
 // r -- source of the filtering rules
 // listID -- filter list ID
-// ignoreCosmetic -- if true, cosmetic rules will be ignored
+// IgnoreCosmetic -- if true, cosmetic rules will be ignored
 func NewRuleScanner(r io.Reader, listID int, ignoreCosmetic bool) *RuleScanner {
 	return &RuleScanner{
 		listID:         listID,
@@ -56,19 +56,17 @@ func (s *RuleScanner) Rule() (Rule, int) {
 
 // readNextLine reads the next line and returns it and the index of the beginning of the string
 func (s *RuleScanner) readNextLine() (string, int, error) {
-	line := ""
 	lineIndex := s.currentPos
 
 	for {
-		bytes, isPrefix, err := s.reader.ReadLine()
-		if bytes == nil || err != nil {
-			return line, lineIndex, io.EOF
+		bytes, err := s.reader.ReadBytes('\n')
+		if len(bytes) > 0 {
+			s.currentPos += len(bytes)
+			return string(bytes), lineIndex, nil
 		}
-		line += string(bytes)
-		s.currentPos += len(bytes)
-		if !isPrefix {
-			s.currentPos++
-			return line, lineIndex, nil
+
+		if err != nil {
+			return "", lineIndex, io.EOF
 		}
 	}
 }

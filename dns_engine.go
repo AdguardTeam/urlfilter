@@ -1,11 +1,5 @@
 package urlfilter
 
-import (
-	"bufio"
-	"fmt"
-	"strings"
-)
-
 // DNSEngine combines host rules and network rules and is supposed to quickly find
 // matching rules for hostnames.
 // First, it looks over network rules and returns first rule found.
@@ -15,12 +9,12 @@ type DNSEngine struct {
 	networkEngine           *NetworkEngine   // networkEngine is constructed from the network rules
 	hostRulesLookupTable    map[string]int64 // map for hosts mapped to IPv4 addresses
 	hostRulesLookupTableIP6 map[string]int64 // map for hosts mapped to IPv6 addresses
-	rulesStorage            *RulesStorage
+	rulesStorage            *RuleStorage
 }
 
 // NewDNSEngine parses the specified filter lists and returns a DNSEngine built from them.
 // key of the map is the filter list ID, value is the raw content of the filter list.
-func NewDNSEngine(filterLists map[int]string, s *RulesStorage) *DNSEngine {
+func NewDNSEngine(s *RuleStorage) *DNSEngine {
 	d := DNSEngine{
 		rulesStorage:            s,
 		hostRulesLookupTable:    map[string]int64{},
@@ -35,39 +29,27 @@ func NewDNSEngine(filterLists map[int]string, s *RulesStorage) *DNSEngine {
 		shortcutsHistogram:   map[uint32]int{},
 	}
 
-	for filterListID, filterContents := range filterLists {
-		scanner := bufio.NewScanner(strings.NewReader(filterContents))
-		for scanner.Scan() {
-			line := strings.TrimSpace(scanner.Text())
-			if line == "" || isComment(line) || isCosmetic(line) {
-				continue
+	scanner := s.NewRuleStorageScanner()
+	for scanner.Scan() {
+		f, idx := scanner.Rule()
+
+		if hostRule, ok := f.(*HostRule); ok {
+			for _, hostname := range hostRule.Hostnames {
+				if hostRule.IP.To4() == nil {
+					d.hostRulesLookupTableIP6[hostname] = idx
+				} else {
+					d.hostRulesLookupTable[hostname] = idx
+				}
 			}
-
-			hostRule, err := NewHostRule(line, filterListID)
-			if err == nil {
-				idx, err := s.Store(hostRule)
-				if err != nil {
-					panic(fmt.Errorf("cannot store rule %s: %s", line, err))
-				}
-
-				for _, hostname := range hostRule.Hostnames {
-					if hostRule.IP.To4() == nil {
-						d.hostRulesLookupTableIP6[hostname] = idx
-					} else {
-						d.hostRulesLookupTable[hostname] = idx
-					}
-				}
-				d.RulesCount++
-			} else {
-				networkRule, err := NewNetworkRule(line, filterListID)
-				if err == nil && isHostLevelNetworkRule(networkRule) {
-					networkEngine.addRule(networkRule)
-					d.RulesCount++
-				}
+			d.RulesCount++
+		} else if networkRule, ok := f.(*NetworkRule); ok {
+			if isHostLevelNetworkRule(networkRule) {
+				networkEngine.addRule(networkRule, idx)
 			}
 		}
 	}
 
+	d.RulesCount += networkEngine.RulesCount
 	d.networkEngine = networkEngine
 	return &d
 }

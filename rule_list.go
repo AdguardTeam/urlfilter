@@ -1,20 +1,23 @@
 package urlfilter
 
-import "strings"
+import (
+	"io"
+	"strings"
+)
 
 // RuleList represents a set of filtering rules
 type RuleList interface {
 	GetID() int                             // GetID returns the rule list identifier
 	NewScanner() *RuleScanner               // Creates a new scanner that reads the list contents
 	RetrieveRule(ruleIdx int) (Rule, error) // Retrieves a rule by its index
+	io.Closer                               // Closes the rules list
 }
 
 // StringRuleList represents a string-based rule list
 type StringRuleList struct {
-	ID int // Rule list ID
-
-	rulesText      string // String with filtering rules (one per line)
-	ignoreCosmetic bool   // Whether to ignore cosmetic rules or not
+	ID             int    // Rule list ID
+	RulesText      string // String with filtering rules (one per line)
+	IgnoreCosmetic bool   // Whether to ignore cosmetic rules or not
 }
 
 // GetID returns the rule list identifier
@@ -24,32 +27,36 @@ func (l *StringRuleList) GetID() int {
 
 // NewScanner creates a new rules scanner that reads the list contents
 func (l *StringRuleList) NewScanner() *RuleScanner {
-	r := strings.NewReader(l.rulesText)
+	r := strings.NewReader(l.RulesText)
 
-	return NewRuleScanner(r, l.ID, l.ignoreCosmetic)
+	return NewRuleScanner(r, l.ID, l.IgnoreCosmetic)
 }
 
 // RetrieveRule finds and deserializes rule by its index.
 // If there's no rule by that index or rule is invalid, it will return an error.
 func (l *StringRuleList) RetrieveRule(ruleIdx int) (Rule, error) {
-
-	if ruleIdx < 0 || ruleIdx >= len(l.rulesText) {
+	if ruleIdx < 0 || ruleIdx >= len(l.RulesText) {
 		return nil, ErrRuleRetrieval
 	}
 
-	endOfLine := strings.IndexByte(l.rulesText[ruleIdx:], '\n')
+	endOfLine := strings.IndexByte(l.RulesText[ruleIdx:], '\n')
 	if endOfLine == -1 {
-		endOfLine = len(l.rulesText)
+		endOfLine = len(l.RulesText)
 	} else {
 		endOfLine += ruleIdx
 	}
 
-	line := strings.TrimSpace(l.rulesText[ruleIdx:endOfLine])
+	line := strings.TrimSpace(l.RulesText[ruleIdx:endOfLine])
 	if len(line) == 0 {
 		return nil, ErrRuleRetrieval
 	}
 
 	return NewRule(line, l.ID)
+}
+
+// Close does nothing as there's nothing to close in the StringRuleList
+func (l *StringRuleList) Close() error {
+	return nil
 }
 
 // TODO: Implement file-based rule list

@@ -1,15 +1,15 @@
 package main
 
 import (
-	"bufio"
 	"flag"
-	"log"
+	"fmt"
+	"io/ioutil"
 	"net/http"
 	"os"
-	"strings"
+
+	"log"
 
 	"github.com/AdguardTeam/urlfilter"
-
 	"github.com/ameshkov/goproxy"
 )
 
@@ -44,30 +44,21 @@ func main() {
 }
 
 func buildNetworkEngine() *urlfilter.NetworkEngine {
-	file, err := os.Open("easylist.txt")
+	filterBytes, err := ioutil.ReadFile("easylist.txt")
 	if err != nil {
 		panic(err)
 	}
-
-	var rules []*urlfilter.NetworkRule
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-
-		if line != "" {
-
-			rule, err := urlfilter.NewNetworkRule(line, 0)
-			if err == nil {
-				rules = append(rules, rule)
-			}
-		}
+	lists := []urlfilter.RuleList{
+		&urlfilter.StringRuleList{
+			ID:             1,
+			RulesText:      string(filterBytes),
+			IgnoreCosmetic: true,
+		},
 	}
-
-	rulesStorage, err := urlfilter.NewRuleStorage("")
+	ruleStorage, err := urlfilter.NewRuleStorage(lists)
 	if err != nil {
-		panic(err)
+		panic(fmt.Sprintf("cannot initialize rule storage: %s", err))
 	}
 
-	return urlfilter.NewNetworkEngine(rules, rulesStorage)
+	return urlfilter.NewNetworkEngine(ruleStorage)
 }
