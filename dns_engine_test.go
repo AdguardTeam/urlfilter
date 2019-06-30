@@ -1,7 +1,6 @@
 package urlfilter
 
 import (
-	"io/ioutil"
 	"runtime/debug"
 	"testing"
 	"time"
@@ -18,28 +17,17 @@ const (
 func TestBenchDNSEngine(t *testing.T) {
 	debug.SetGCPercent(10)
 
-	filterBytes, err := ioutil.ReadFile(networkFilterPath)
+	filterRuleList, err := NewFileRuleList(1, networkFilterPath, true)
 	if err != nil {
 		t.Fatalf("cannot read %s", networkFilterPath)
 	}
 
-	hostsBytes, err := ioutil.ReadFile(hostsPath)
+	hostsRuleList, err := NewFileRuleList(2, hostsPath, true)
 	if err != nil {
 		t.Fatalf("cannot read %s", hostsPath)
 	}
 
-	ruleLists := []RuleList{
-		&StringRuleList{
-			ID:             1,
-			RulesText:      string(filterBytes),
-			IgnoreCosmetic: true,
-		},
-		&StringRuleList{
-			ID:             2,
-			RulesText:      string(hostsBytes),
-			IgnoreCosmetic: true,
-		},
-	}
+	ruleLists := []RuleList{filterRuleList, hostsRuleList}
 	ruleStorage, err := NewRuleStorage(ruleLists)
 	if err != nil {
 		t.Fatalf("cannot create rule storage: %s", err)
@@ -64,9 +52,6 @@ func TestBenchDNSEngine(t *testing.T) {
 	assert.NotNil(t, dnsEngine)
 
 	log.Printf("Elapsed on parsing rules: %v", time.Since(startParse))
-	log.Printf("Filters size - %d kB", len(filterBytes)/1024)
-	log.Printf("Hosts size - %d kB", len(hostsBytes)/1024)
-	log.Printf("Files size - %d kB", (len(filterBytes)+len(hostsBytes))/1024)
 	log.Printf("Rules count - %v", dnsEngine.RulesCount)
 
 	afterLoad := getRSS()

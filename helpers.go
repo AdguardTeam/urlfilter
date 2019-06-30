@@ -1,8 +1,12 @@
 package urlfilter
 
 import (
+	"bytes"
+	"io"
 	"strings"
 )
+
+const readerBufferSize = 8 * 1024
 
 // splitWithEscapeCharacter splits string by the specified separator if it is not escaped
 func splitWithEscapeCharacter(str string, sep byte, escapeCharacter byte, preserveAllTokens bool) []string {
@@ -72,4 +76,26 @@ func (s byLength) Swap(i, j int) {
 }
 func (s byLength) Less(i, j int) bool {
 	return len(s[i]) < len(s[j])
+}
+
+// readLine reads from the reader until '\n'
+// r - reader to read from
+// b - buffer to use (the idea is to reuse the same buffer when it's possible)
+func readLine(r io.Reader, b []byte) (string, error) {
+	line := ""
+
+	for {
+		n, err := r.Read(b)
+		if n > 0 {
+			idx := bytes.IndexByte(b[:n], '\n')
+			if idx == -1 {
+				line += string(b[:n])
+			} else {
+				line += string(b[:idx])
+				return line, err
+			}
+		} else {
+			return line, err
+		}
+	}
 }

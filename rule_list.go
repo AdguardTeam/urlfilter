@@ -2,7 +2,10 @@ package urlfilter
 
 import (
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
+	"sync"
 )
 
 // RuleList represents a set of filtering rules
@@ -59,4 +62,78 @@ func (l *StringRuleList) Close() error {
 	return nil
 }
 
-// TODO: Implement file-based rule list
+// FileRuleList represents a file-based rule list
+type FileRuleList struct {
+	ID             int      // Rule list ID
+	IgnoreCosmetic bool     // Whether to ignore cosmetic rules or not
+	File           *os.File // File with rules
+
+	buffer []byte // buffer that is used for reading from the file
+	sync.Mutex
+}
+
+// NewFileRuleList initializes a new file-based rule list
+func NewFileRuleList(id int, path string, ignoreCosmetic bool) (*FileRuleList, error) {
+	l := &FileRuleList{
+		ID:             id,
+		IgnoreCosmetic: ignoreCosmetic,
+		buffer:         make([]byte, readerBufferSize),
+	}
+
+	f, err := os.Open(filepath.Clean(path))
+	if err != nil {
+		return nil, err
+	}
+
+	l.File = f
+	return l, nil
+}
+
+// GetID returns the rule list identifier
+func (l *FileRuleList) GetID() int {
+	return l.ID
+}
+
+// NewScanner creates a new rules scanner that reads the list contents
+func (l *FileRuleList) NewScanner() *RuleScanner {
+	return NewRuleScanner(l.File, l.ID, l.IgnoreCosmetic)
+}
+
+// RetrieveRule finds and deserializes rule by its index.
+// If there's no rule by that index or rule is invalid, it will return an error.
+func (l *FileRuleList) RetrieveRule(ruleIdx int) (Rule, error) {
+	l.Lock()
+	defer l.Unlock()
+
+	if ruleIdx < 0 {
+		return nil, ErrRuleRetrieval
+	}
+
+	_, err := l.File.Seek(int64(ruleIdx), io.SeekStart)
+	if err != nil {
+		return nil, err
+	}
+
+	// Read line from the file
+	line, err := readLine(l.File, l.buffer)
+	if err == io.EOF {
+		err = nil
+	}
+
+	// Check if there were any errors while reading
+	if err != nil {
+		return nil, err
+	}
+
+	line = strings.TrimSpace(line)
+	if len(line) == 0 {
+		return nil, ErrRuleRetrieval
+	}
+
+	return NewRule(line, l.ID)
+}
+
+// Close closes the underlying file
+func (l *FileRuleList) Close() error {
+	return l.File.Close()
+}

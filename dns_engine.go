@@ -34,14 +34,7 @@ func NewDNSEngine(s *RuleStorage) *DNSEngine {
 		f, idx := scanner.Rule()
 
 		if hostRule, ok := f.(*HostRule); ok {
-			for _, hostname := range hostRule.Hostnames {
-				if hostRule.IP.To4() == nil {
-					d.hostRulesLookupTableIP6[hostname] = idx
-				} else {
-					d.hostRulesLookupTable[hostname] = idx
-				}
-			}
-			d.RulesCount++
+			d.addRule(hostRule, idx)
 		} else if networkRule, ok := f.(*NetworkRule); ok {
 			if isHostLevelNetworkRule(networkRule) {
 				networkEngine.addRule(networkRule, idx)
@@ -52,6 +45,18 @@ func NewDNSEngine(s *RuleStorage) *DNSEngine {
 	d.RulesCount += networkEngine.RulesCount
 	d.networkEngine = networkEngine
 	return &d
+}
+
+// addRule adds rule to the index
+func (d *DNSEngine) addRule(hostRule *HostRule, storageIdx int64) {
+	for _, hostname := range hostRule.Hostnames {
+		if hostRule.IP.To4() == nil {
+			d.hostRulesLookupTableIP6[hostname] = storageIdx
+		} else {
+			d.hostRulesLookupTable[hostname] = storageIdx
+		}
+	}
+	d.RulesCount++
 }
 
 // Match finds a matching rule for the specified hostname.

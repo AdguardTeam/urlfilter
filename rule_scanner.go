@@ -5,8 +5,6 @@ import (
 	"io"
 )
 
-const readerBufferSize = 8 * 1024
-
 // RuleScanner implements an interface for reading filtering rules.
 type RuleScanner struct {
 	listID         int  // filter list ID

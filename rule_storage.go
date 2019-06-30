@@ -8,6 +8,8 @@ import (
 	"github.com/joomcode/errorx"
 )
 
+// TODO: Add a better readme here
+
 // RuleStorage is an abstraction that combines several rule lists
 // It can be scanned using RuleStorageScanner, and also it allows
 // retrieving rules by its index
