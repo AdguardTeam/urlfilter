@@ -1,12 +1,9 @@
 package urlfilter
 
 import (
-	"bytes"
 	"net"
-	"reflect"
 	"testing"
 
-	"github.com/AdguardTeam/golibs/log"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -83,26 +80,4 @@ func TestHostRuleMatch(t *testing.T) {
 	assert.Nil(t, err)
 	assert.True(t, rule.Match("www.opensource.org"))
 	assert.False(t, rule.Match("opensource.org"))
-}
-
-func TestHostRuleSerialize(t *testing.T) {
-	ruleText := "127.0.1.1       thishost.mydomain.org  thishost"
-	rule, err := NewHostRule(ruleText, -1)
-	assert.Nil(t, err)
-	assert.NotNil(t, rule)
-
-	b := bytes.Buffer{}
-	length, err := SerializeRule(rule, &b)
-	assert.Nil(t, err)
-	assert.Equal(t, length, b.Len())
-
-	log.Printf("Rule text length: %d", len(ruleText))
-	log.Printf("Serialized length: %d", length)
-
-	r, err := DeserializeRule(&b)
-	assert.Nil(t, err)
-	assert.NotNil(t, r)
-
-	deserializedRule := r.(*HostRule)
-	assert.True(t, reflect.DeepEqual(rule, deserializedRule))
 }
