@@ -1,7 +1,6 @@
 package urlfilter
 
 import (
-	"fmt"
 	"net"
 	"strings"
 
@@ -27,6 +26,12 @@ func NewHostRule(ruleText string, filterListID int) (*HostRule, error) {
 		FilterListID: filterListID,
 	}
 
+	// Strip comment
+	commentIndex := strings.IndexByte(ruleText, '#')
+	if commentIndex > 0 {
+		ruleText = ruleText[0 : commentIndex-1]
+	}
+
 	parts := strings.Fields(strings.TrimSpace(ruleText))
 	var ip net.IP
 	var hostnames []string
@@ -36,7 +41,7 @@ func NewHostRule(ruleText string, filterListID int) (*HostRule, error) {
 			if i == 0 {
 				ip = net.ParseIP(parts[0])
 				if ip == nil {
-					return nil, fmt.Errorf("cannot parse the IP address from %s", ruleText)
+					return nil, &RuleSyntaxError{msg: "cannot parse IP", ruleText: ruleText}
 				}
 			} else {
 				hostnames = append(hostnames, part)
@@ -46,7 +51,7 @@ func NewHostRule(ruleText string, filterListID int) (*HostRule, error) {
 		hostnames = append(hostnames, parts[0])
 		ip = net.IPv4(0, 0, 0, 0)
 	} else {
-		return nil, fmt.Errorf("cannot parse host rule %s", ruleText)
+		return nil, &RuleSyntaxError{msg: "invalid syntax", ruleText: ruleText}
 	}
 
 	h.Hostnames = hostnames

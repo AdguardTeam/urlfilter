@@ -1,21 +1,20 @@
 package main
 
 import (
-	"bufio"
 	"flag"
-	"log"
+	"fmt"
 	"net/http"
 	"os"
-	"strings"
+
+	"log"
 
 	"github.com/AdguardTeam/urlfilter"
-
 	"github.com/ameshkov/goproxy"
 )
 
 func main() {
 	flag.Parse()
-	err := setCA(caCert, caKey)
+	err := setRootCA()
 	if err != nil {
 		panic(err)
 	}
@@ -44,30 +43,15 @@ func main() {
 }
 
 func buildNetworkEngine() *urlfilter.NetworkEngine {
-	file, err := os.Open("easylist.txt")
+	list, err := urlfilter.NewFileRuleList(1, "easylist.txt", false)
 	if err != nil {
 		panic(err)
 	}
-
-	var rules []*urlfilter.NetworkRule
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-
-		if line != "" {
-
-			rule, err := urlfilter.NewNetworkRule(line, 0)
-			if err == nil {
-				rules = append(rules, rule)
-			}
-		}
-	}
-
-	rulesStorage, err := urlfilter.NewRuleStorage("")
+	lists := []urlfilter.RuleList{list}
+	ruleStorage, err := urlfilter.NewRuleStorage(lists)
 	if err != nil {
-		panic(err)
+		panic(fmt.Sprintf("cannot initialize rule storage: %s", err))
 	}
 
-	return urlfilter.NewNetworkEngine(rules, rulesStorage)
+	return urlfilter.NewNetworkEngine(ruleStorage)
 }
