@@ -6,7 +6,9 @@ import (
 	"strings"
 )
 
-const readerBufferSize = 8 * 1024
+// On Linux the size of the data block is usually 4KB
+// So it makes sense to use 4KB.
+const readerBufferSize = 4 * 1024
 
 // splitWithEscapeCharacter splits string by the specified separator if it is not escaped
 func splitWithEscapeCharacter(str string, sep byte, escapeCharacter byte, preserveAllTokens bool) []string {
