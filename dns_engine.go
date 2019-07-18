@@ -72,7 +72,6 @@ func (d *DNSEngine) Match(hostname string) ([]Rule, bool) {
 	}
 
 	r := NewRequestForHostname(hostname)
-	r.DNSRequest = true
 	networkRule, ok := d.networkEngine.Match(r)
 	if ok {
 		// Network rules always have higher priority
