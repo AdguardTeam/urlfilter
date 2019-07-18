@@ -45,6 +45,7 @@ const (
 type Request struct {
 	RequestType RequestType // request type
 	ThirdParty  bool        // true if request is third-party
+	DNSRequest  bool        // true if this is a DNS request
 
 	URL          string // Request URL
 	URLLowerCase string // Request URL in lower case

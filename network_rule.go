@@ -235,6 +235,10 @@ func (f *NetworkRule) matchPattern(r *Request) bool {
 		f.regex = re
 	}
 	f.Unlock()
+
+	if r.DNSRequest && !strings.HasPrefix(f.pattern, MaskStartURL) {
+		return f.regex.MatchString(r.Hostname)
+	}
 	return f.regex.MatchString(r.URL)
 }
 
