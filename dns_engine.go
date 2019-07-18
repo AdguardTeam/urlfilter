@@ -53,10 +53,12 @@ func NewDNSEngine(s *RuleStorage) *DNSEngine {
 		if hostRule, ok := f.(*HostRule); ok {
 			d.addRule(hostRule, idx)
 		} else if networkRule, ok := f.(*NetworkRule); ok {
-			if networkRule.isRegexRule() {
-				d.regexRules = append(d.regexRules, networkRule)
-			} else if isHostLevelNetworkRule(networkRule) {
-				networkEngine.addRule(networkRule, idx)
+			if isHostLevelNetworkRule(networkRule) {
+				if networkRule.isRegexRule() {
+					d.regexRules = append(d.regexRules, networkRule)
+				} else {
+					networkEngine.addRule(networkRule, idx)
+				}
 			}
 		}
 	}
