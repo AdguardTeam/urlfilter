@@ -46,9 +46,9 @@ type Request struct {
 	RequestType RequestType // request type
 	ThirdParty  bool        // true if request is third-party
 
-	// If filter rule is not beginning with "||", this flag allows to match by host name,
-	//  rather than by URL.
-	// For DNS Engine and for HTTP CONNECT and SNI matching.
+	// IsHostnameRequest means that the request is for a given Hostname,
+	//  and not for a URL, and we don't really know what protocol it is.
+	// This can be true for DNS requests, or for HTTP CONNECT, or SNI matching.
 	IsHostnameRequest bool
 
 	URL          string // Request URL
