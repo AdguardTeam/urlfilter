@@ -212,8 +212,8 @@ func (f *NetworkRule) isHigherPriority(r *NetworkRule) bool {
 	return false
 }
 
-// matchPattern uses the regex pattern to match the request URL
-func (f *NetworkRule) matchPattern(r *Request) bool {
+// buildPattern builds the regex pattern
+func (f *NetworkRule) buildPattern() bool {
 	f.Lock()
 	if f.regex == nil {
 		if f.invalid {
@@ -235,7 +235,23 @@ func (f *NetworkRule) matchPattern(r *Request) bool {
 		f.regex = re
 	}
 	f.Unlock()
+	return true
+}
+
+// matchPattern uses the regex pattern to match the request URL
+func (f *NetworkRule) matchPattern(r *Request) bool {
+	if !f.buildPattern() {
+		return false
+	}
 	return f.regex.MatchString(r.URL)
+}
+
+// matchHostnamePattern uses the regex pattern to match hostname
+func (f *NetworkRule) matchHostnamePattern(r *Request) bool {
+	if !f.buildPattern() {
+		return false
+	}
+	return f.regex.MatchString(r.Hostname)
 }
 
 // matchShortcut simply checks if shortcut is a substring of the URL

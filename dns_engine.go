@@ -9,6 +9,10 @@ type DNSEngine struct {
 	networkEngine *NetworkEngine     // networkEngine is constructed from the network rules
 	lookupTable   map[uint32][]int64 // map for hosts hashes mapped to the list of rule indexes
 	rulesStorage  *RuleStorage
+
+	// Separate array of regexp rules.
+	// We match them against a host name, not a full URL.
+	regexRules []*NetworkRule
 }
 
 // NewDNSEngine parses the specified filter lists and returns a DNSEngine built from them.
@@ -49,7 +53,9 @@ func NewDNSEngine(s *RuleStorage) *DNSEngine {
 		if hostRule, ok := f.(*HostRule); ok {
 			d.addRule(hostRule, idx)
 		} else if networkRule, ok := f.(*NetworkRule); ok {
-			if isHostLevelNetworkRule(networkRule) {
+			if networkRule.isRegexRule() {
+				d.regexRules = append(d.regexRules, networkRule)
+			} else if isHostLevelNetworkRule(networkRule) {
 				networkEngine.addRule(networkRule, idx)
 			}
 		}
@@ -78,7 +84,18 @@ func (d *DNSEngine) Match(hostname string) ([]Rule, bool) {
 		return []Rule{networkRule}, true
 	}
 
-	return d.matchLookupTable(hostname)
+	rules, ok := d.matchLookupTable(hostname)
+	if ok {
+		return rules, true
+	}
+
+	for _, rule := range d.regexRules {
+		if rule.matchHostnamePattern(r) {
+			return []Rule{rule}, true
+		}
+	}
+
+	return []Rule{}, false
 }
 
 // matchLookupTable looks for matching rules in the d.lookupTable
