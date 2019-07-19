@@ -138,3 +138,20 @@ func TestDNSEngineMatchIP6(t *testing.T) {
 	assert.True(t, ok)
 	assert.True(t, len(r) == 2)
 }
+
+func TestRegexp(t *testing.T) {
+	text := "/^stats?\\./"
+	ruleStorage := newTestRuleStorage(t, 1, text)
+	dnsEngine := NewDNSEngine(ruleStorage)
+
+	rules, ok := dnsEngine.Match("stats.test.com")
+	assert.True(t, ok && rules[0].Text() == text)
+
+	text = "@@/^stats?\\./"
+	ruleStorage = newTestRuleStorage(t, 1, "||stats.test.com^\n"+text)
+	dnsEngine = NewDNSEngine(ruleStorage)
+
+	rules, ok = dnsEngine.Match("stats.test.com")
+	nr := rules[0].(*NetworkRule)
+	assert.True(t, ok && rules[0].Text() == text && nr.Whitelist)
+}
