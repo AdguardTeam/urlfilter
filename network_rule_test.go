@@ -97,17 +97,29 @@ func TestParseModifiers(t *testing.T) {
 	checkModifier(t, "jsinject", OptionJsinject, true)
 	checkModifier(t, "urlblock", OptionUrlblock, true)
 	checkModifier(t, "content", OptionContent, true)
+	checkModifier(t, "extension", OptionExtension, true)
 
 	checkModifier(t, "document", OptionElemhide, true)
 	checkModifier(t, "document", OptionJsinject, true)
 	checkModifier(t, "document", OptionUrlblock, true)
 	checkModifier(t, "document", OptionContent, true)
+	checkModifier(t, "document", OptionExtension, true)
 
 	checkModifier(t, "stealth", OptionStealth, true)
 
 	checkModifier(t, "popup", OptionPopup, true)
 	checkModifier(t, "empty", OptionEmpty, true)
 	checkModifier(t, "mp4", OptionMp4, true)
+}
+
+func TestDisablingExtensionModifier(t *testing.T) {
+	ruleText := "@@||example.org$document,~extension"
+
+	f, err := NewNetworkRule(ruleText, 0)
+	assert.Nil(t, err)
+	assert.NotNil(t, f)
+	assert.False(t, f.IsOptionEnabled(OptionExtension))
+	assert.False(t, f.IsOptionDisabled(OptionExtension))
 }
 
 func checkRequestType(t *testing.T, name string, requestType RequestType, permitted bool) {

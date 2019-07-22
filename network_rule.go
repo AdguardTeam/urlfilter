@@ -1,7 +1,6 @@
 package urlfilter
 
 import (
-	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -497,40 +496,6 @@ func (f *NetworkRule) loadOption(name string, value string) error {
 	}
 
 	return fmt.Errorf("unknown filter modifier: %s=%s", name, value)
-}
-
-// loadDomains loads $domain modifier contents
-func (f *NetworkRule) loadDomains(domains string) error {
-	if domains == "" {
-		return errors.New("empty $domain modifier")
-	}
-
-	var permittedDomains []string
-	var restrictedDomains []string
-
-	list := strings.Split(domains, "|")
-	for i := 0; i < len(list); i++ {
-		d := list[i]
-		restricted := false
-		if strings.HasPrefix(d, "~") {
-			restricted = true
-			d = d[1:]
-		}
-
-		if strings.TrimSpace(d) == "" {
-			return fmt.Errorf("empty domain specified: %s", domains)
-		}
-
-		if restricted {
-			restrictedDomains = append(restrictedDomains, d)
-		} else {
-			permittedDomains = append(permittedDomains, d)
-		}
-	}
-
-	f.permittedDomains = permittedDomains
-	f.restrictedDomains = restrictedDomains
-	return nil
 }
 
 // loadShortcut extracts a shortcut from the pattern.
