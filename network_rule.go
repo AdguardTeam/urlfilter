@@ -88,7 +88,7 @@ type NetworkRule struct {
 	restrictedRequestTypes RequestType // Flag with all restricted request types. 0 means NONE.
 
 	pattern string         // Pattern is the basic rule pattern ready to be compiled to regex
-	regex   *regexp.Regexp // Regex is the regular expression compiled from the regex
+	regex   *regexp.Regexp // Regex is the regular expression compiled from the pattern
 	invalid bool           // Marker that the rule is invalid. Match will always return false in this case
 
 	sync.Mutex
@@ -194,6 +194,8 @@ func (f *NetworkRule) isRegexRule() bool {
 // isHigherPriority checks if the rule has higher priority that the specified rule
 // whitelist + $important > $important > whitelist > basic rules
 func (f *NetworkRule) isHigherPriority(r *NetworkRule) bool {
+	// TODO: Rules with more modifiers have higher priority
+
 	important := f.IsOptionEnabled(OptionImportant)
 	rImportant := r.IsOptionEnabled(OptionImportant)
 
@@ -298,7 +300,7 @@ func (f *NetworkRule) setRequestType(requestType RequestType, permitted bool) {
 	}
 }
 
-// enableOption enables or disables the specified option
+// setOptionEnabled enables or disables the specified option
 // it can return error if this option cannot be used with this type of rules
 func (f *NetworkRule) setOptionEnabled(option NetworkRuleOption, enabled bool) error {
 	if f.Whitelist && (option&OptionBlacklistOnly) == option {
@@ -391,7 +393,7 @@ func (f *NetworkRule) loadOption(name string, value string) error {
 	case "content":
 		return f.setOptionEnabled(OptionContent, true)
 
-	// $extension can be also removed
+	// $extension can be also disabled
 	case "extension":
 		return f.setOptionEnabled(OptionExtension, true)
 	case "~extension":

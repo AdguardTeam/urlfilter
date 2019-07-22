@@ -31,10 +31,10 @@ func TestParseNetworkRuleText(t *testing.T) {
 	assert.Equal(t, true, whitelist)
 	assert.Nil(t, err)
 
-	pattern, options, whitelist, err = parseRuleText("@@||example.org/this$is$path$third-party")
+	pattern, options, whitelist, err = parseRuleText("||example.org/this$is$path$third-party")
 	assert.Equal(t, "||example.org/this$is$path", pattern)
 	assert.Equal(t, "third-party", options)
-	assert.Equal(t, true, whitelist)
+	assert.Equal(t, false, whitelist)
 	assert.Nil(t, err)
 
 	pattern, options, whitelist, err = parseRuleText("/regex/")
@@ -54,6 +54,110 @@ func TestParseNetworkRuleText(t *testing.T) {
 	assert.Equal(t, "replace=/test/test2/", options)
 	assert.Equal(t, true, whitelist)
 	assert.Nil(t, err)
+
+	pattern, options, whitelist, err = parseRuleText("/regex/$replace=/test/test2/")
+	assert.Equal(t, "/regex/", pattern)
+	assert.Equal(t, "replace=/test/test2/", options)
+	assert.Equal(t, false, whitelist)
+	assert.Nil(t, err)
+
+	_, _, _, err = parseRuleText("@@")
+	assert.NotNil(t, err)
+}
+
+func checkModifier(t *testing.T, name string, option NetworkRuleOption, enabled bool) {
+	ruleText := "||example.org$" + name
+	if (option & OptionWhitelistOnly) == option {
+		ruleText = "@@" + ruleText
+	}
+
+	f, err := NewNetworkRule(ruleText, 0)
+	assert.Nil(t, err)
+	assert.NotNil(t, f)
+
+	if enabled {
+		assert.True(t, f.IsOptionEnabled(option))
+	} else {
+		assert.True(t, f.IsOptionDisabled(option))
+	}
+}
+
+func TestParseModifiers(t *testing.T) {
+	checkModifier(t, "important", OptionImportant, true)
+	checkModifier(t, "third-party", OptionThirdParty, true)
+	checkModifier(t, "~first-party", OptionThirdParty, true)
+	checkModifier(t, "first-party", OptionThirdParty, false)
+	checkModifier(t, "~third-party", OptionThirdParty, false)
+	checkModifier(t, "match-case", OptionMatchCase, true)
+	checkModifier(t, "~match-case", OptionMatchCase, false)
+
+	checkModifier(t, "elemhide", OptionElemhide, true)
+	checkModifier(t, "generichide", OptionGenerichide, true)
+	checkModifier(t, "genericblock", OptionGenericblock, true)
+	checkModifier(t, "jsinject", OptionJsinject, true)
+	checkModifier(t, "urlblock", OptionUrlblock, true)
+	checkModifier(t, "content", OptionContent, true)
+
+	checkModifier(t, "document", OptionElemhide, true)
+	checkModifier(t, "document", OptionJsinject, true)
+	checkModifier(t, "document", OptionUrlblock, true)
+	checkModifier(t, "document", OptionContent, true)
+
+	checkModifier(t, "stealth", OptionStealth, true)
+
+	checkModifier(t, "popup", OptionPopup, true)
+	checkModifier(t, "empty", OptionEmpty, true)
+	checkModifier(t, "mp4", OptionMp4, true)
+}
+
+func checkRequestType(t *testing.T, name string, requestType RequestType, permitted bool) {
+	f, err := NewNetworkRule("||example.org^$"+name, 0)
+	assert.Nil(t, err)
+	assert.NotNil(t, f)
+
+	if permitted {
+		assert.Equal(t, f.permittedRequestTypes, requestType)
+	} else {
+		assert.Equal(t, f.restrictedRequestTypes, requestType)
+	}
+}
+
+func TestParseRequestTypeModifiers(t *testing.T) {
+	checkRequestType(t, "script", TypeScript, true)
+	checkRequestType(t, "~script", TypeScript, false)
+
+	checkRequestType(t, "stylesheet", TypeStylesheet, true)
+	checkRequestType(t, "~stylesheet", TypeStylesheet, false)
+
+	checkRequestType(t, "subdocument", TypeSubdocument, true)
+	checkRequestType(t, "~subdocument", TypeSubdocument, false)
+
+	checkRequestType(t, "object", TypeObject, true)
+	checkRequestType(t, "~object", TypeObject, false)
+
+	checkRequestType(t, "object", TypeObject, true)
+	checkRequestType(t, "~object", TypeObject, false)
+
+	checkRequestType(t, "image", TypeImage, true)
+	checkRequestType(t, "~image", TypeImage, false)
+
+	checkRequestType(t, "xmlhttprequest", TypeXmlhttprequest, true)
+	checkRequestType(t, "~xmlhttprequest", TypeXmlhttprequest, false)
+
+	checkRequestType(t, "object-subrequest", TypeObjectSubrequest, true)
+	checkRequestType(t, "~object-subrequest", TypeObjectSubrequest, false)
+
+	checkRequestType(t, "media", TypeMedia, true)
+	checkRequestType(t, "~media", TypeMedia, false)
+
+	checkRequestType(t, "font", TypeFont, true)
+	checkRequestType(t, "~font", TypeFont, false)
+
+	checkRequestType(t, "websocket", TypeWebsocket, true)
+	checkRequestType(t, "~websocket", TypeWebsocket, false)
+
+	checkRequestType(t, "other", TypeOther, true)
+	checkRequestType(t, "~other", TypeOther, false)
 }
 
 func TestFindShortcut(t *testing.T) {
@@ -71,6 +175,12 @@ func TestFindShortcut(t *testing.T) {
 
 	shortcut = findRegexpShortcut("/^http:\\/\\/[a-z]+\\.example/")
 	assert.Equal(t, "example", shortcut)
+
+	shortcut = findRegexpShortcut("//")
+	assert.Equal(t, "", shortcut)
+
+	shortcut = findRegexpShortcut("/^http:\\/\\/(?!test.)example.org/")
+	assert.Equal(t, "", shortcut)
 }
 
 func TestSimpleBasicRules(t *testing.T) {
@@ -87,8 +197,16 @@ func TestSimpleBasicRules(t *testing.T) {
 	assert.True(t, f.Match(r))
 }
 
-func TestUnknownModifier(t *testing.T) {
+func TestInvalidModifiers(t *testing.T) {
 	_, err := NewNetworkRule("||example.org^$unknown", 0)
+	assert.NotNil(t, err)
+
+	// Whitelist-only modifier
+	_, err = NewNetworkRule("||example.org^$elemhide", 0)
+	assert.NotNil(t, err)
+
+	// Blacklist-only modifier
+	_, err = NewNetworkRule("@@||example.org^$popup", 0)
 	assert.NotNil(t, err)
 }
 
@@ -221,6 +339,12 @@ func TestDomainRestrictions(t *testing.T) {
 	r = NewRequest("https://example.org/", "https://subdomain.example.org/", TypeScript)
 	assert.Nil(t, err)
 	assert.False(t, f.Match(r))
+
+	// Wide restricted
+	f, err = NewNetworkRule("$domain=example.org", 0)
+	r = NewRequest("https://example.com/", "https://example.org/", TypeScript)
+	assert.Nil(t, err)
+	assert.True(t, f.Match(r))
 }
 
 func TestInvalidDomainRestrictions(t *testing.T) {
@@ -266,6 +390,7 @@ func TestInvalidRule(t *testing.T) {
 	assert.Nil(t, r)
 	assert.NotNil(t, err)
 
+	// This one is valid because it has domain restriction
 	r, err = NewNetworkRule("$domain=ya.ru", -1)
 	assert.NotNil(t, r)
 	assert.Nil(t, err)
