@@ -1,7 +1,6 @@
 package urlfilter
 
 import (
-	"fmt"
 	"math"
 	"strings"
 )
@@ -12,15 +11,22 @@ const (
 
 // NetworkEngine is the engine that supports quick search over network rules
 type NetworkEngine struct {
-	ruleStorage          *RulesStorage
-	domainsLookupTable   map[uint32][]int64
-	shortcutsLookupTable map[uint32][]int64
-	shortcutsHistogram   map[uint32]int
-	otherRules           []*NetworkRule
+	RulesCount int // RulesCount -- count of rules added to the engine
+
+	ruleStorage *RuleStorage // Storage for the network filtering rules
+
+	// Domain lookup table. Key is the domain name hash.
+	domainsLookupTable map[uint32][]int64
+
+	shortcutsLookupTable map[uint32][]int64 // Shortcuts lookup table. Key is the shortcut hash.
+	shortcutsHistogram   map[uint32]int     // Shortcuts histogram helps us choose the best shortcut for the shortcuts lookup table.
+
+	// Rules for which we could not find a shortcut and could not place it to the shortcuts lookup table.
+	otherRules []*NetworkRule
 }
 
 // NewNetworkEngine builds an instance of the network engine
-func NewNetworkEngine(rules []*NetworkRule, s *RulesStorage) *NetworkEngine {
+func NewNetworkEngine(s *RuleStorage) *NetworkEngine {
 	engine := NetworkEngine{
 		ruleStorage:          s,
 		domainsLookupTable:   map[uint32][]int64{},
@@ -28,9 +34,14 @@ func NewNetworkEngine(rules []*NetworkRule, s *RulesStorage) *NetworkEngine {
 		shortcutsHistogram:   map[uint32]int{},
 	}
 
-	for i := range rules {
-		rule := rules[i]
-		engine.addRule(rule)
+	scanner := s.NewRuleStorageScanner()
+
+	for scanner.Scan() {
+		f, idx := scanner.Rule()
+		rule, ok := f.(*NetworkRule)
+		if ok {
+			engine.addRule(rule, idx)
+		}
 	}
 
 	return &engine
@@ -45,14 +56,17 @@ func (n *NetworkEngine) Match(r *Request) (*NetworkRule, bool) {
 		return nil, false
 	}
 
+	var resultRule *NetworkRule
+
 	for i := range rules {
 		rule := rules[i]
-		if rule.Whitelist {
-			return rule, true
+
+		if resultRule == nil || rule.isHigherPriority(resultRule) {
+			resultRule = rule
 		}
 	}
 
-	return rules[0], true
+	return resultRule, true
 }
 
 // MatchAll finds all rules matching the specified request regardless of the rule types
@@ -120,26 +134,22 @@ func (n *NetworkEngine) matchDomainsLookupTable(r *Request) []*NetworkRule {
 }
 
 // addRule adds rule to the network engine
-func (n *NetworkEngine) addRule(f *NetworkRule) {
-	if !n.addRuleToShortcutsTable(f) {
-		if !n.addRuleToDomainsTable(f) {
+func (n *NetworkEngine) addRule(f *NetworkRule, storageIdx int64) {
+	if !n.addRuleToShortcutsTable(f, storageIdx) {
+		if !n.addRuleToDomainsTable(f, storageIdx) {
 			if !containsRule(n.otherRules, f) {
 				n.otherRules = append(n.otherRules, f)
 			}
 		}
 	}
+	n.RulesCount++
 }
 
 // addRuleToDomainsTable tries to add the rule to the domains lookup table.
 // returns true if it was added (the domain
-func (n *NetworkEngine) addRuleToDomainsTable(f *NetworkRule) bool {
+func (n *NetworkEngine) addRuleToDomainsTable(f *NetworkRule, storageIdx int64) bool {
 	if len(f.permittedDomains) == 0 {
 		return false
-	}
-
-	idx, err := n.ruleStorage.Store(f)
-	if err != nil {
-		panic(fmt.Errorf("cannot store rule %s: %s", f.RuleText, err))
 	}
 
 	for _, domain := range f.permittedDomains {
@@ -147,7 +157,7 @@ func (n *NetworkEngine) addRuleToDomainsTable(f *NetworkRule) bool {
 
 		// Add the rule to the lookup table
 		rulesIndexes := n.domainsLookupTable[hash]
-		rulesIndexes = append(rulesIndexes, idx)
+		rulesIndexes = append(rulesIndexes, storageIdx)
 		n.domainsLookupTable[hash] = rulesIndexes
 	}
 
@@ -156,7 +166,7 @@ func (n *NetworkEngine) addRuleToDomainsTable(f *NetworkRule) bool {
 
 // addRuleToShortcutsTable tries to add the rule to the shortcuts table.
 // returns true if it was added or false if the shortcut is too short
-func (n *NetworkEngine) addRuleToShortcutsTable(f *NetworkRule) bool {
+func (n *NetworkEngine) addRuleToShortcutsTable(f *NetworkRule, storageIdx int64) bool {
 	shortcuts := getRuleShortcuts(f)
 	if len(shortcuts) == 0 {
 		return false
@@ -181,12 +191,8 @@ func (n *NetworkEngine) addRuleToShortcutsTable(f *NetworkRule) bool {
 	n.shortcutsHistogram[shortcutHash] = minCount + 1
 
 	// Add the rule to the lookup table
-	idx, err := n.ruleStorage.Store(f)
-	if err != nil {
-		panic(fmt.Errorf("cannot store rule %s: %s", f.RuleText, err))
-	}
 	rulesIndexes, _ := n.shortcutsLookupTable[shortcutHash]
-	rulesIndexes = append(rulesIndexes, idx)
+	rulesIndexes = append(rulesIndexes, storageIdx)
 	n.shortcutsLookupTable[shortcutHash] = rulesIndexes
 
 	return true

@@ -15,10 +15,12 @@ You can learn more about AdGuard filtering rules syntax from [this article](http
 * [X] Basic filtering rules
     * [X] Core blocking syntax
     * [X] Basic engine
+    * [X] Basic rules validation (don't match everything, unexpected modifiers, etc)
 * [X] Benchmark basic rules matching
 * [X] Hosts matching rules
     * [X] /etc/hosts matching
-    * [X] Memory optimization
+* [X] Memory optimization
+* [ ] Tech document
 * [ ] Cosmetic rules
     * [X] Basic element hiding and CSS rules
         * [ ] Proper CSS rules validation
@@ -30,10 +32,15 @@ You can learn more about AdGuard filtering rules syntax from [this article](http
     * [ ] Add cosmetic filters to the proxy example
     * [ ] Handling cosmetic modifiers $elemhide, $generichide, $jsinject
     * [ ] Advanced modifiers part 1
-        * [ ] $important
+        * [X] $important
         * [ ] $badfilter
 * [ ] HTML filtering rules
 * [ ] Advanced modifiers part 2
     * [ ] $replace
     * [ ] $csp
     * [ ] $cookie
+    * [ ] $redirect
+    
+#### How to use
+
+TODO

@@ -1,10 +1,7 @@
 package urlfilter
 
 import (
-	"bytes"
-	"log"
 	"net"
-	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -57,6 +54,18 @@ func TestParseHostRuleText(t *testing.T) {
 	rule, err = NewHostRule("", 1)
 	assert.NotNil(t, err)
 	assert.Nil(t, rule)
+
+	rule, err = NewHostRule("#", 1)
+	assert.NotNil(t, err)
+	assert.Nil(t, rule)
+
+	rule, err = NewHostRule("0.0.0.0 www.ruclicks.com  #[clicksagent.com]", 1)
+	assert.Nil(t, err)
+	assert.NotNil(t, rule)
+	assert.Equal(t, 1, rule.FilterListID)
+	assert.Equal(t, net.IPv4(0, 0, 0, 0), rule.IP)
+	assert.Equal(t, 1, len(rule.Hostnames))
+	assert.Equal(t, "www.ruclicks.com", rule.Hostnames[0])
 }
 
 func TestHostRuleMatch(t *testing.T) {
@@ -71,26 +80,4 @@ func TestHostRuleMatch(t *testing.T) {
 	assert.Nil(t, err)
 	assert.True(t, rule.Match("www.opensource.org"))
 	assert.False(t, rule.Match("opensource.org"))
-}
-
-func TestHostRuleSerialize(t *testing.T) {
-	ruleText := "127.0.1.1       thishost.mydomain.org  thishost"
-	rule, err := NewHostRule(ruleText, -1)
-	assert.Nil(t, err)
-	assert.NotNil(t, rule)
-
-	b := bytes.Buffer{}
-	length, err := SerializeRule(rule, &b)
-	assert.Nil(t, err)
-	assert.Equal(t, length, b.Len())
-
-	log.Printf("Rule text length: %d", len(ruleText))
-	log.Printf("Serialized length: %d", length)
-
-	r, err := DeserializeRule(&b)
-	assert.Nil(t, err)
-	assert.NotNil(t, r)
-
-	deserializedRule := r.(*HostRule)
-	assert.True(t, reflect.DeepEqual(rule, deserializedRule))
 }

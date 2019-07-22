@@ -1,7 +1,6 @@
 package urlfilter
 
 import (
-	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -88,7 +87,7 @@ type NetworkRule struct {
 	restrictedRequestTypes RequestType // Flag with all restricted request types. 0 means NONE.
 
 	pattern string         // Pattern is the basic rule pattern ready to be compiled to regex
-	regex   *regexp.Regexp // Regex is the regular expression compiled from the regex
+	regex   *regexp.Regexp // Regex is the regular expression compiled from the pattern
 	invalid bool           // Marker that the rule is invalid. Match will always return false in this case
 
 	sync.Mutex
@@ -114,6 +113,17 @@ func NewNetworkRule(ruleText string, filterListID int) (*NetworkRule, error) {
 	err = rule.loadOptions(options)
 	if err != nil {
 		return nil, err
+	}
+
+	// validate rule
+	if pattern == MaskStartURL || pattern == MaskPipe ||
+		pattern == MaskAnyCharacter || pattern == "" ||
+		len(pattern) < 3 {
+		if len(rule.permittedDomains) == 0 {
+			// Rule matches too much and does not have any domain restriction
+			// We should not allow this kind of rules
+			return nil, fmt.Errorf("the rule is too wide, add domain restriction or make it more specific")
+		}
 	}
 
 	rule.loadShortcut()
@@ -171,6 +181,38 @@ func (f *NetworkRule) IsOptionDisabled(option NetworkRuleOption) bool {
 	return (f.disabledOptions & option) == option
 }
 
+// isRegexRule returns true if rule's pattern is a regular expression
+func (f *NetworkRule) isRegexRule() bool {
+	if strings.HasPrefix(f.pattern, maskRegexRule) &&
+		strings.HasSuffix(f.pattern, maskRegexRule) {
+		return true
+	}
+	return false
+}
+
+// isHigherPriority checks if the rule has higher priority that the specified rule
+// whitelist + $important > $important > whitelist > basic rules
+func (f *NetworkRule) isHigherPriority(r *NetworkRule) bool {
+	// TODO: Rules with more modifiers have higher priority
+
+	important := f.IsOptionEnabled(OptionImportant)
+	rImportant := r.IsOptionEnabled(OptionImportant)
+
+	if (f.Whitelist && important) && !(r.Whitelist && rImportant) {
+		return true
+	}
+
+	if important && !rImportant {
+		return true
+	}
+
+	if f.Whitelist && !rImportant && !r.Whitelist {
+		return true
+	}
+
+	return false
+}
+
 // matchPattern uses the regex pattern to match the request URL
 func (f *NetworkRule) matchPattern(r *Request) bool {
 	f.Lock()
@@ -194,6 +236,10 @@ func (f *NetworkRule) matchPattern(r *Request) bool {
 		f.regex = re
 	}
 	f.Unlock()
+
+	if r.IsHostnameRequest && !strings.HasPrefix(f.pattern, MaskStartURL) {
+		return f.regex.MatchString(r.Hostname)
+	}
 	return f.regex.MatchString(r.URL)
 }
 
@@ -253,7 +299,7 @@ func (f *NetworkRule) setRequestType(requestType RequestType, permitted bool) {
 	}
 }
 
-// enableOption enables or disables the specified option
+// setOptionEnabled enables or disables the specified option
 // it can return error if this option cannot be used with this type of rules
 func (f *NetworkRule) setOptionEnabled(option NetworkRuleOption, enabled bool) error {
 	if f.Whitelist && (option&OptionBlacklistOnly) == option {
@@ -323,6 +369,9 @@ func (f *NetworkRule) loadOption(name string, value string) error {
 		return f.setOptionEnabled(OptionMatchCase, true)
 	case "~match-case":
 		return f.setOptionEnabled(OptionMatchCase, false)
+	case "important":
+		return f.setOptionEnabled(OptionImportant, true)
+
 	case "domain":
 		permitted, restricted, err := loadDomains(value, "|")
 		f.permittedDomains = permitted
@@ -343,7 +392,7 @@ func (f *NetworkRule) loadOption(name string, value string) error {
 	case "content":
 		return f.setOptionEnabled(OptionContent, true)
 
-	// $extension can be also removed
+	// $extension can be also disabled
 	case "extension":
 		return f.setOptionEnabled(OptionExtension, true)
 	case "~extension":
@@ -449,47 +498,12 @@ func (f *NetworkRule) loadOption(name string, value string) error {
 	return fmt.Errorf("unknown filter modifier: %s=%s", name, value)
 }
 
-// loadDomains loads $domain modifier contents
-func (f *NetworkRule) loadDomains(domains string) error {
-	if domains == "" {
-		return errors.New("empty $domain modifier")
-	}
-
-	var permittedDomains []string
-	var restrictedDomains []string
-
-	list := strings.Split(domains, "|")
-	for i := 0; i < len(list); i++ {
-		d := list[i]
-		restricted := false
-		if strings.HasPrefix(d, "~") {
-			restricted = true
-			d = d[1:]
-		}
-
-		if strings.TrimSpace(d) == "" {
-			return fmt.Errorf("empty domain specified: %s", domains)
-		}
-
-		if restricted {
-			restrictedDomains = append(restrictedDomains, d)
-		} else {
-			permittedDomains = append(permittedDomains, d)
-		}
-	}
-
-	f.permittedDomains = permittedDomains
-	f.restrictedDomains = restrictedDomains
-	return nil
-}
-
 // loadShortcut extracts a shortcut from the pattern.
 // shortcut is the longest substring of the pattern that does not contain
 // any special characters
 func (f *NetworkRule) loadShortcut() {
 	var shortcut string
-	if strings.HasPrefix(f.pattern, maskRegexRule) &&
-		strings.HasSuffix(f.pattern, maskRegexRule) {
+	if f.isRegexRule() {
 		shortcut = findRegexpShortcut(f.pattern)
 	} else {
 		shortcut = findShortcut(f.pattern)

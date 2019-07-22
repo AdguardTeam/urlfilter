@@ -1,12 +1,11 @@
 package urlfilter
 
 import (
-	"io/ioutil"
-	"log"
 	"runtime/debug"
 	"testing"
 	"time"
 
+	"github.com/AdguardTeam/golibs/log"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -18,20 +17,25 @@ const (
 func TestBenchDNSEngine(t *testing.T) {
 	debug.SetGCPercent(10)
 
-	filterBytes, err := ioutil.ReadFile(networkFilterPath)
+	filterRuleList, err := NewFileRuleList(1, networkFilterPath, true)
 	if err != nil {
 		t.Fatalf("cannot read %s", networkFilterPath)
 	}
 
-	hostsBytes, err := ioutil.ReadFile(hostsPath)
+	hostsRuleList, err := NewFileRuleList(2, hostsPath, true)
 	if err != nil {
 		t.Fatalf("cannot read %s", hostsPath)
 	}
 
-	filterLists := map[int]string{
-		1: string(filterBytes), // (6652 kB diff in-memory / 5560 kB diff with file storage)
-		2: string(hostsBytes),  // (9988 kB diff in-memory / 6480 kB diff with file storage)
+	ruleLists := []RuleList{
+		filterRuleList,
+		hostsRuleList,
 	}
+	ruleStorage, err := NewRuleStorage(ruleLists)
+	if err != nil {
+		t.Fatalf("cannot create rule storage: %s", err)
+	}
+	defer ruleStorage.Close()
 
 	testRequests := loadRequests(t)
 	assert.True(t, len(testRequests) > 0)
@@ -46,20 +50,11 @@ func TestBenchDNSEngine(t *testing.T) {
 	start := getRSS()
 	log.Printf("RSS before loading rules - %d kB", start/1024)
 
-	ruleStorage, err := NewRuleStorage("test/temp.db")
-	if err != nil {
-		t.Fatalf("cannot initialize rule storage: %s", err)
-	}
-	defer ruleStorage.Close()
-
 	startParse := time.Now()
-	dnsEngine := NewDNSEngine(filterLists, ruleStorage)
+	dnsEngine := NewDNSEngine(ruleStorage)
 	assert.NotNil(t, dnsEngine)
 
 	log.Printf("Elapsed on parsing rules: %v", time.Since(startParse))
-	log.Printf("Filters size - %d kB", len(filterBytes)/1024)
-	log.Printf("Hosts size - %d kB", len(hostsBytes)/1024)
-	log.Printf("Files size - %d kB", (len(filterBytes)+len(hostsBytes))/1024)
 	log.Printf("Rules count - %v", dnsEngine.RulesCount)
 
 	afterLoad := getRSS()
@@ -103,21 +98,16 @@ func TestBenchDNSEngine(t *testing.T) {
 	log.Printf("Average per request: %v", time.Duration(int64(totalElapsed)/int64(len(testHostnames))))
 	log.Printf("Max per request: %v", maxElapsedMatch)
 	log.Printf("Min per request: %v", minElapsedMatch)
+	log.Printf("Storage cache length: %d", len(ruleStorage.cache))
 
 	afterMatch := getRSS()
 	log.Printf("RSS after matching - %d kB (%d kB diff)\n", afterMatch/1024, (afterMatch-afterLoad)/1024)
 }
 
 func TestDNSEngineMatchHostname(t *testing.T) {
-	filterLists := map[int]string{
-		1: "||example.org^\n0.0.0.0 example.com",
-	}
-
-	ruleStorage, err := NewRuleStorage("")
-	if err != nil {
-		t.Fatalf("cannot initialize rule storage: %s", err)
-	}
-	dnsEngine := NewDNSEngine(filterLists, ruleStorage)
+	rulesText := "||example.org^\n0.0.0.0 example.com"
+	ruleStorage := newTestRuleStorage(t, 1, rulesText)
+	dnsEngine := NewDNSEngine(ruleStorage)
 	assert.NotNil(t, dnsEngine)
 
 	r, ok := dnsEngine.Match("example.org")
@@ -139,18 +129,29 @@ func TestDNSEngineMatchHostname(t *testing.T) {
 }
 
 func TestDNSEngineMatchIP6(t *testing.T) {
-	filterLists := map[int]string{
-		1: "192.168.1.1 example.org\n2000:: example.org",
-	}
-
-	ruleStorage, err := NewRuleStorage("")
-	if err != nil {
-		t.Fatalf("cannot initialize rule storage: %s", err)
-	}
-	dnsEngine := NewDNSEngine(filterLists, ruleStorage)
+	rulesText := "192.168.1.1 example.org\n2000:: example.org"
+	ruleStorage := newTestRuleStorage(t, 1, rulesText)
+	dnsEngine := NewDNSEngine(ruleStorage)
 	assert.NotNil(t, dnsEngine)
 
 	r, ok := dnsEngine.Match("example.org")
 	assert.True(t, ok)
 	assert.True(t, len(r) == 2)
+}
+
+func TestRegexp(t *testing.T) {
+	text := "/^stats?\\./"
+	ruleStorage := newTestRuleStorage(t, 1, text)
+	dnsEngine := NewDNSEngine(ruleStorage)
+
+	rules, ok := dnsEngine.Match("stats.test.com")
+	assert.True(t, ok && rules[0].Text() == text)
+
+	text = "@@/^stats?\\./"
+	ruleStorage = newTestRuleStorage(t, 1, "||stats.test.com^\n"+text)
+	dnsEngine = NewDNSEngine(ruleStorage)
+
+	rules, ok = dnsEngine.Match("stats.test.com")
+	nr := rules[0].(*NetworkRule)
+	assert.True(t, ok && rules[0].Text() == text && nr.Whitelist)
 }
