@@ -53,11 +53,11 @@ var cosmeticRulesMarkers = []string{
 	string(markerHTML), string(markerHTMLException),
 }
 
-// necessary for findRuleMarker function. Initialized in the init() function
+// necessary for findCosmeticRuleMarker function. Initialized in the init() function
 var cosmeticRuleMarkersFirstChars []byte
 
 func init() {
-	// This is important for "findRuleMarker" function to sort markers in this order
+	// This is important for "findCosmeticRuleMarker" function to sort markers in this order
 	sort.Sort(sort.Reverse(byLength(cosmeticRulesMarkers)))
 
 	for _, marker := range cosmeticRulesMarkers {
@@ -198,6 +198,10 @@ func findCosmeticRuleMarker(ruleText string) (int, string) {
 			continue
 		}
 
+		// Handling false positives while looking for cosmetic rules in host files.
+		//
+		// For instance, it could look like this:
+		// 0.0.0.0 jackbootedroom.com  ## phishing
 		if startIndex > 0 && ruleText[startIndex-1] == ' ' {
 			continue
 		}

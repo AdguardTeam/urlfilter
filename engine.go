@@ -5,7 +5,7 @@ type Engine struct {
 }
 
 // NewEngine parses the filtering rules and creates a filtering engine of them
-func NewEngine(filterLists map[int]string, s *RulesStorage) (*Engine, error) {
+func NewEngine(filterLists map[int]string, s *RuleStorage) (*Engine, error) {
 	return &Engine{}, nil
 }
 
