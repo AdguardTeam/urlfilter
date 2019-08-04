@@ -156,9 +156,6 @@ func TestParseRequestTypeModifiers(t *testing.T) {
 	checkRequestType(t, "xmlhttprequest", TypeXmlhttprequest, true)
 	checkRequestType(t, "~xmlhttprequest", TypeXmlhttprequest, false)
 
-	checkRequestType(t, "object-subrequest", TypeObjectSubrequest, true)
-	checkRequestType(t, "~object-subrequest", TypeObjectSubrequest, false)
-
 	checkRequestType(t, "media", TypeMedia, true)
 	checkRequestType(t, "~media", TypeMedia, false)
 

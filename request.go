@@ -24,8 +24,7 @@ const (
 	TypeImage
 	// TypeXmlhttprequest (ajax/fetch) $xmlhttprequest
 	TypeXmlhttprequest
-	// TypeObjectSubrequest - a request sent from inside of an object (flash) $object-subrequest
-	TypeObjectSubrequest
+
 	// TypeMedia (video/music) $media
 	TypeMedia
 	// TypeFont (any custom font) $font
@@ -37,7 +36,7 @@ const (
 
 	// TypeAllRequestTypes combines all other request type flags
 	TypeAllRequestTypes = TypeDocument | TypeSubdocument | TypeScript | TypeStylesheet |
-		TypeObject | TypeImage | TypeXmlhttprequest | TypeObjectSubrequest | TypeMedia |
+		TypeObject | TypeImage | TypeXmlhttprequest | TypeMedia |
 		TypeFont | TypeWebsocket | TypeOther
 )
 
