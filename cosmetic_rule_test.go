@@ -66,4 +66,5 @@ func TestCosmeticRuleMatch(t *testing.T) {
 	assert.True(t, f.Match("test.example.org"))
 	assert.False(t, f.Match("testexample.org"))
 	assert.False(t, f.Match("sub.example.org"))
+	assert.False(t, f.Match("sub.sub.example.org"))
 }
