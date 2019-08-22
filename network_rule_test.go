@@ -204,6 +204,12 @@ func TestSimpleBasicRules(t *testing.T) {
 	r = NewRequest("https://example.org/", "", TypeOther)
 	assert.Nil(t, err)
 	assert.True(t, f.Match(r))
+
+	// Simple pattern rule
+	f, err = NewNetworkRule("_prebid_", 0)
+	r = NewRequest("https://ap.lijit.com/rtb/bid?src=prebid_prebid_1.35.0", "https://www.drudgereport.com/", TypeXmlhttprequest)
+	assert.Nil(t, err)
+	assert.True(t, f.Match(r))
 }
 
 func TestInvalidModifiers(t *testing.T) {
@@ -384,6 +390,20 @@ func TestNetworkRulePriority(t *testing.T) {
 	compareRulesPriority(t, "||example.org", "||example.org$important", false)
 	compareRulesPriority(t, "||example.org", "@@||example.org", false)
 	compareRulesPriority(t, "||example.org", "||example.org", false)
+}
+
+func TestMatchSource(t *testing.T) {
+	url := "https://ci.phncdn.com/videos/201809/25/184777011/original/(m=ecuKGgaaaa)(mh=VSmV9NL_iouBcWJJ)4.jpg"
+	sourceURL := "https://www.pornhub.com/view_video.php?viewkey=ph5be89d11de4b0"
+
+	r := NewRequest(url, sourceURL, TypeImage)
+	ruleText := "|https://$image,media,script,third-party,domain=~feedback.pornhub.com|pornhub.com|redtube.com|redtube.com.br|tube8.com|tube8.es|tube8.fr|youporn.com|youporngay.com"
+	f, err := NewNetworkRule(ruleText, 0)
+	if err != nil {
+		t.Fatalf("failed to create rule: %s", err)
+	}
+
+	assert.True(t, f.Match(r))
 }
 
 func TestInvalidRule(t *testing.T) {

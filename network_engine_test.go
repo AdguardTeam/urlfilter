@@ -25,6 +25,7 @@ const (
 )
 
 type testRequest struct {
+	LineNumber  int
 	Line        string
 	URL         string `json:"url"`
 	FrameUrl    string `json:"frameUrl"`
@@ -65,6 +66,35 @@ func TestMatchImportantRule(t *testing.T) {
 	assert.True(t, ok)
 	assert.NotNil(t, rule)
 	assert.Equal(t, r1, rule.String())
+}
+
+func TestMatchSourceRule(t *testing.T) {
+	ruleText := "|https://$image,media,script,third-party,domain=~feedback.pornhub.com|pornhub.com|redtube.com|redtube.com.br|tube8.com|tube8.es|tube8.fr|youporn.com|youporngay.com"
+	ruleStorage := newTestRuleStorage(t, -1, ruleText)
+	engine := NewNetworkEngine(ruleStorage)
+
+	url := "https://ci.phncdn.com/videos/201809/25/184777011/original/(m=ecuKGgaaaa)(mh=VSmV9NL_iouBcWJJ)4.jpg"
+	sourceURL := "https://www.pornhub.com/view_video.php?viewkey=ph5be89d11de4b0"
+
+	r := NewRequest(url, sourceURL, TypeImage)
+	rule, ok := engine.Match(r)
+	assert.True(t, ok)
+	assert.NotNil(t, rule)
+}
+
+func TestMatchSimplePattern(t *testing.T) {
+	// Simple pattern rule
+	ruleText := "_prebid_"
+	ruleStorage := newTestRuleStorage(t, -1, ruleText)
+	engine := NewNetworkEngine(ruleStorage)
+
+	url := "https://ap.lijit.com/rtb/bid?src=prebid_prebid_1.35.0"
+	sourceURL := "https://www.drudgereport.com/"
+
+	r := NewRequest(url, sourceURL, TypeXmlhttprequest)
+	rule, ok := engine.Match(r)
+	assert.True(t, ok)
+	assert.NotNil(t, rule)
 }
 
 func TestBenchNetworkEngine(t *testing.T) {
@@ -212,13 +242,16 @@ func loadRequests(t *testing.T) []testRequest {
 	var requests []testRequest
 
 	scanner := bufio.NewScanner(file)
+	lineNumber := 0
 	for scanner.Scan() {
+		lineNumber++
 		line := strings.TrimSpace(scanner.Text())
 		if line != "" {
 			var req testRequest
 			err := json.Unmarshal([]byte(line), &req)
 			if err == nil && isSupportedURL(req.URL) && isSupportedURL(req.FrameUrl) {
 				req.Line = line
+				req.LineNumber = lineNumber
 				requests = append(requests, req)
 			}
 		}
@@ -243,7 +276,7 @@ func unzip(src, dest string) error {
 		}
 	}()
 
-	os.MkdirAll(dest, 0755)
+	_ = os.MkdirAll(dest, 0755)
 
 	// Closure to address file descriptors issue with all the deferred .Close() methods
 	extractAndWriteFile := func(f *zip.File) error {
@@ -260,9 +293,9 @@ func unzip(src, dest string) error {
 		path := filepath.Join(dest, f.Name)
 
 		if f.FileInfo().IsDir() {
-			os.MkdirAll(path, f.Mode())
+			_ = os.MkdirAll(path, f.Mode())
 		} else {
-			os.MkdirAll(filepath.Dir(path), f.Mode())
+			_ = os.MkdirAll(filepath.Dir(path), f.Mode())
 			f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
 			if err != nil {
 				return err

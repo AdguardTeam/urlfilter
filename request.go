@@ -24,7 +24,6 @@ const (
 	TypeImage
 	// TypeXmlhttprequest (ajax/fetch) $xmlhttprequest
 	TypeXmlhttprequest
-
 	// TypeMedia (video/music) $media
 	TypeMedia
 	// TypeFont (any custom font) $font
