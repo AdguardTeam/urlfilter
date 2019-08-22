@@ -81,3 +81,13 @@ func TestHostRuleMatch(t *testing.T) {
 	assert.True(t, rule.Match("www.opensource.org"))
 	assert.False(t, rule.Match("opensource.org"))
 }
+
+func TestInvalidHostRule(t *testing.T) {
+	rule, err := NewHostRule("_prebid_", 1)
+	assert.Nil(t, rule)
+	assert.NotNil(t, err)
+
+	rule, err = NewHostRule("_728x90.", 1)
+	assert.Nil(t, rule)
+	assert.NotNil(t, err)
+}

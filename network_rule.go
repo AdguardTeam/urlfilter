@@ -463,12 +463,6 @@ func (f *NetworkRule) loadOption(name string, value string) error {
 	case "~xmlhttprequest":
 		f.setRequestType(TypeXmlhttprequest, false)
 		return nil
-	case "object-subrequest":
-		f.setRequestType(TypeObjectSubrequest, true)
-		return nil
-	case "~object-subrequest":
-		f.setRequestType(TypeObjectSubrequest, false)
-		return nil
 	case "media":
 		f.setRequestType(TypeMedia, true)
 		return nil
