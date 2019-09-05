@@ -1,6 +1,9 @@
 package urlfilter
 
-import "net/http"
+import (
+	"mime"
+	"net/http"
+)
 
 // Session contains all the necessary data to filter requests and responses.
 // It also contains the current state of the request.
@@ -18,7 +21,7 @@ import "net/http"
 //    update them.
 //    The possible outcomes are:
 // 2.1. The request must be blocked.
-// 2.2. The response must be modified (with a $replace rule, for instance).
+// 2.2. The response must be modified (with a $replace or a $csp rule, for instance).
 // 2.3. This is an HTML response so we need to filter the response body and apply cosmetic filters.
 // 2.4. We should continue execution and do nothing with the response.
 type Session struct {
@@ -28,6 +31,9 @@ type Session struct {
 	HTTPRequest  *http.Request  // HTTP request data
 	HTTPResponse *http.Response // HTTP response data
 
+	MediaType string // Mime media type
+	Charset   string // Response charset (if it's possible to parse it from content-type)
+
 	MatchingRules []Rule // Rules matching the request
 }
 
@@ -35,18 +41,29 @@ type Session struct {
 // id -- unique session identifier
 // req -- HTTP request data
 func NewSession(id int64, req *http.Request) *Session {
-	requestType := getRequestType(req)
+	requestType := assumeRequestType(req, nil)
 
 	s := Session{
 		ID:          id,
 		Request:     NewRequest(req.URL.String(), req.Referer(), requestType),
 		HTTPRequest: req,
 	}
+
+	s.Request.RequestType = assumeRequestType(s.HTTPRequest, s.HTTPResponse)
 	return &s
 }
 
-// getRequestType assumes request type from what we know at this point: HTTP request data.
-func getRequestType(req *http.Request) RequestType {
-	// TODO: Implement
-	return TypeOther
+// SetResponse sets the response of this session
+// This can also end in changing the request type
+func (s *Session) SetResponse(res *http.Response) {
+	s.HTTPResponse = res
+	s.Request.RequestType = assumeRequestType(s.HTTPRequest, s.HTTPResponse)
+
+	contentType := res.Header.Get("Content-Type")
+	mediaType, params, _ := mime.ParseMediaType(contentType)
+
+	s.MediaType = mediaType
+	if charset, ok := params["charset"]; ok {
+		s.Charset = charset
+	}
 }

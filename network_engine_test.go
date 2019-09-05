@@ -157,7 +157,7 @@ func TestBenchNetworkEngine(t *testing.T) {
 	log.Printf("RSS after matching - %d kB (%d kB diff)\n", afterMatch/1024, (afterMatch-afterLoad)/1024)
 }
 
-// getRequestType converts string value from requests.json to RequestType
+// assumeRequestType converts string value from requests.json to RequestType
 // This maps puppeteer types to WebRequest types
 func testGetRequestType(t string) RequestType {
 	switch t {
