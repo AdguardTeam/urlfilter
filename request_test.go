@@ -49,6 +49,11 @@ func TestNewRequest(t *testing.T) {
 	assert.Equal(t, true, r.ThirdParty)
 }
 
+func TestCountRequestType(t *testing.T) {
+	assert.Equal(t, 1, TypeDocument.Count())
+	assert.Equal(t, 2, (TypeDocument | TypeOther).Count())
+}
+
 func TestAssumeRequestTypeFromMediaType(t *testing.T) {
 	assert.Equal(t, TypeDocument, assumeRequestTypeFromMediaType("text/html"))
 	assert.Equal(t, TypeDocument, assumeRequestTypeFromMediaType("text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3"))

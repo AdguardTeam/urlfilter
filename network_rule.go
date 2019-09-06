@@ -26,7 +26,7 @@ var (
 
 // NetworkRuleOption is the enumeration of various rule options
 // In order to save memory, we store some options as a flag
-type NetworkRuleOption uint
+type NetworkRuleOption uint64
 
 // NetworkRuleOption enumeration
 const (
@@ -69,6 +69,24 @@ const (
 		OptionJsinject | OptionUrlblock | OptionContent | OptionExtension |
 		OptionStealth
 )
+
+// Count returns the count of enabled options
+func (o NetworkRuleOption) Count() int {
+	if o == 0 {
+		return 0
+	}
+
+	flags := uint64(o)
+	count := 0
+	var i uint
+	for i = 0; i < 64; i++ {
+		mask := uint64(1 << i)
+		if (flags & mask) == mask {
+			count++
+		}
+	}
+	return count
+}
 
 // NetworkRule is a basic filtering rule
 // https://kb.adguard.com/en/general/how-to-create-your-own-ad-filters#basic-rules
@@ -230,7 +248,10 @@ func (f *NetworkRule) isHigherPriority(r *NetworkRule) bool {
 		return true
 	}
 
-	return false
+	// More specific rules (i.e. with more modifiers) have higher priority
+	count := f.enabledOptions.Count() + f.disabledOptions.Count() + f.permittedRequestTypes.Count() + f.restrictedRequestTypes.Count()
+	rCount := r.enabledOptions.Count() + r.disabledOptions.Count() + r.permittedRequestTypes.Count() + r.restrictedRequestTypes.Count()
+	return count > rCount
 }
 
 // isDocumentRule checks if the rule is a document-level whitelist rule

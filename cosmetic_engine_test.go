@@ -3,7 +3,6 @@ package urlfilter
 import (
 	"encoding/json"
 	"log"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -97,17 +96,18 @@ func buildCosmeticEngine(t *testing.T) *CosmeticEngine {
 example.org##banner_specific
 example.org#@#banner_generic_disabled`
 
-	var rules []*CosmeticRule
-	lines := strings.Split(rulesText, "\n")
-	for _, line := range lines {
-		if line != "" {
-			rule, err := NewCosmeticRule(line, 1)
-			if err == nil {
-				rules = append(rules, rule)
-			} else {
-				t.Fatalf("cannot create a rule %s: %s", line, err)
-			}
-		}
+	lists := []RuleList{
+		&StringRuleList{
+			ID:             1,
+			RulesText:      rulesText,
+			IgnoreCosmetic: false,
+		},
 	}
-	return NewCosmeticEngine(rules)
+
+	ruleStorage, err := NewRuleStorage(lists)
+	if err != nil {
+		t.Fatalf("failed to create a rule storage: %s", err)
+	}
+
+	return NewCosmeticEngine(ruleStorage)
 }

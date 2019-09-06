@@ -34,7 +34,7 @@ type Session struct {
 	MediaType string // Mime media type
 	Charset   string // Response charset (if it's possible to parse it from content-type)
 
-	MatchingRules []Rule // Rules matching the request
+	Result MatchingResult // Filtering engine result
 }
 
 // NewSession creates a new instance of the Session struct and initializes it.
@@ -49,7 +49,6 @@ func NewSession(id int64, req *http.Request) *Session {
 		HTTPRequest: req,
 	}
 
-	s.Request.RequestType = assumeRequestType(s.HTTPRequest, s.HTTPResponse)
 	return &s
 }
 
@@ -57,6 +56,8 @@ func NewSession(id int64, req *http.Request) *Session {
 // This can also end in changing the request type
 func (s *Session) SetResponse(res *http.Response) {
 	s.HTTPResponse = res
+
+	// Re-calculate RequestType once we have the response headers
 	s.Request.RequestType = assumeRequestType(s.HTTPRequest, s.HTTPResponse)
 
 	contentType := res.Header.Get("Content-Type")

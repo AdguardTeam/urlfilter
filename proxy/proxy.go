@@ -39,8 +39,8 @@ type Server struct {
 	// the MITM proxy server instance
 	proxyHTTPServer *goproxy.ProxyHttpServer
 
-	// TODO: Replace with the urlfilter.Engine when it's ready
-	networkEngine *urlfilter.NetworkEngine
+	// filtering engine
+	engine *urlfilter.Engine
 
 	// The list of current sessions
 	sessions      map[int64]*urlfilter.Session
@@ -61,12 +61,12 @@ func NewServer(config Config) (*Server, error) {
 		sessionsGuard: &sync.Mutex{},
 	}
 
-	networkEngine, err := buildNetworkEngine(config)
+	engine, err := buildEngine(config)
 	if err != nil {
 		return nil, err
 	}
 
-	s.networkEngine = networkEngine
+	s.engine = engine
 	err = setCA(config.CertKeyPair)
 	if err != nil {
 		return nil, err
@@ -99,9 +99,12 @@ func (s *Server) onRequest(r *http.Request, ctx *goproxy.ProxyCtx) (*http.Reques
 	s.sessions[session.ID] = session
 	s.sessionsGuard.Unlock()
 
-	rule, ok := s.networkEngine.Match(session.Request)
-	if ok && !rule.Whitelist {
-		ctx.Logf("blocked: %s", session.Request.URL)
+	session.Result = s.engine.MatchRequest(session.Request)
+	rule := session.Result.GetBasicResult()
+
+	if rule != nil && !rule.Whitelist {
+		ctx.Logf("Blocked by %s: %s", rule.String(), session.Request.URL)
+		// TODO: Replace with a "CreateBlockedResponse" method of the urlfilter.Engine
 		return r, goproxy.NewResponse(r, goproxy.ContentTypeText, http.StatusInternalServerError, "Blocked")
 	}
 
@@ -122,6 +125,15 @@ func (s *Server) onResponse(r *http.Response, ctx *goproxy.ProxyCtx) *http.Respo
 	// Update the session -- this will cause requestType re-calc
 	session.SetResponse(r)
 
+	// Now once we received the response, we must re-calculate the result
+	session.Result = s.engine.MatchRequest(session.Request)
+	rule := session.Result.GetBasicResult()
+	if rule != nil && !rule.Whitelist {
+		ctx.Logf("Blocked by %s: %s", rule.String(), session.Request.URL)
+		// TODO: Replace with a "CreateBlockedResponse" method of the urlfilter.Engine
+		return goproxy.NewResponse(ctx.Req, goproxy.ContentTypeText, http.StatusInternalServerError, "Blocked")
+	}
+
 	if session.Request.RequestType == urlfilter.TypeDocument {
 		s.filterHTML(session, ctx)
 	}
@@ -133,8 +145,8 @@ func (s *Server) onResponse(r *http.Response, ctx *goproxy.ProxyCtx) *http.Respo
 	return r
 }
 
-// buildNetworkEngine builds a new network engine
-func buildNetworkEngine(config Config) (*urlfilter.NetworkEngine, error) {
+// buildEngine builds a new network engine
+func buildEngine(config Config) (*urlfilter.Engine, error) {
 	var lists []urlfilter.RuleList
 
 	for filterID, path := range config.FiltersPaths {
@@ -150,7 +162,7 @@ func buildNetworkEngine(config Config) (*urlfilter.NetworkEngine, error) {
 		return nil, fmt.Errorf("cannot initialize rule storage: %s", err)
 	}
 
-	return urlfilter.NewNetworkEngine(ruleStorage), nil
+	return urlfilter.NewEngine(ruleStorage), nil
 }
 
 func setCA(goproxyCa tls.Certificate) error {

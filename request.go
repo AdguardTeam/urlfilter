@@ -11,7 +11,7 @@ import (
 )
 
 // RequestType is the request types enumeration
-type RequestType int
+type RequestType uint32
 
 const (
 	// TypeDocument (main frame)
@@ -37,6 +37,24 @@ const (
 	// TypeOther - any other request type
 	TypeOther
 )
+
+// Count returns count of the enabled flags
+func (t RequestType) Count() int {
+	if t == 0 {
+		return 0
+	}
+
+	flags := uint32(t)
+	count := 0
+	var i uint
+	for i = 0; i < 32; i++ {
+		mask := uint32(1 << i)
+		if (flags & mask) == mask {
+			count++
+		}
+	}
+	return count
+}
 
 // Request represents a web request with all it's necessary properties
 type Request struct {

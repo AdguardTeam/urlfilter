@@ -6,8 +6,8 @@ type CosmeticEngine struct {
 	lookupTables map[CosmeticRuleType]*cosmeticLookupTable
 }
 
-// NewCosmeticEngine builds a new cosmetic engine from the list of rules
-func NewCosmeticEngine(rules []*CosmeticRule) *CosmeticEngine {
+// NewCosmeticEngine builds a new cosmetic engine from the specified rule storage
+func NewCosmeticEngine(s *RuleStorage) *CosmeticEngine {
 	engine := CosmeticEngine{
 		lookupTables: map[CosmeticRuleType]*cosmeticLookupTable{
 			CosmeticElementHiding: newCosmeticLookupTable(),
@@ -16,17 +16,27 @@ func NewCosmeticEngine(rules []*CosmeticRule) *CosmeticEngine {
 		},
 	}
 
-	for _, rule := range rules {
-		switch rule.Type {
-		case CosmeticElementHiding:
-			engine.lookupTables[CosmeticElementHiding].addRule(rule)
-		default:
-			// TODO: Implement
-			// ignore
+	scanner := s.NewRuleStorageScanner()
+	for scanner.Scan() {
+		f, _ := scanner.Rule()
+		rule, ok := f.(*CosmeticRule)
+		if ok {
+			engine.addRule(rule)
 		}
 	}
 
 	return &engine
+}
+
+// addRule adds a new cosmetic rule to one of the lookup tables
+func (e *CosmeticEngine) addRule(rule *CosmeticRule) {
+	switch rule.Type {
+	case CosmeticElementHiding:
+		e.lookupTables[CosmeticElementHiding].addRule(rule)
+	default:
+		// TODO: Implement
+		// ignore
+	}
 }
 
 // StylesResult contains either element hiding or CSS rules

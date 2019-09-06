@@ -7,10 +7,24 @@ type Engine struct {
 }
 
 // NewEngine parses the filtering rules and creates a filtering engine of them
-func NewEngine(s *RuleStorage) (*Engine, error) {
-	return &Engine{}, nil
+func NewEngine(s *RuleStorage) *Engine {
+	return &Engine{
+		networkEngine:  NewNetworkEngine(s),
+		cosmeticEngine: NewCosmeticEngine(s),
+	}
 }
 
-func (e *Engine) Match(r *Request) {
+// MatchRequest - matches the specified request against the filtering engine
+// and returns the matching result.
+func (e *Engine) MatchRequest(r *Request) MatchingResult {
+	var rules []*NetworkRule
+	var sourceRules []*NetworkRule
 
+	rules = e.networkEngine.MatchAll(r)
+	if r.SourceURL != "" {
+		sourceRequest := NewRequest(r.SourceURL, "", TypeDocument)
+		sourceRules = e.networkEngine.MatchAll(sourceRequest)
+	}
+
+	return NewMatchingResult(rules, sourceRules)
 }
