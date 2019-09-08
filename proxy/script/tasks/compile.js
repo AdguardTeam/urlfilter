@@ -1,3 +1,6 @@
+/**
+ * This task compiles the content script javascript bundle
+ */
 const fs = require('fs');
 const console = require('console');
 const { rollup } = require('rollup');
@@ -20,15 +23,20 @@ const outputOptions = {
     globals: {
         // contentScriptConfiguration will be replaced in runtime
         // by a dynamically built configuration object
-        configuration: 'contentScriptConfiguration',
+        configuration: config.contentScriptConfigurationName,
     },
     banner: `/* ${pkg.name} v${pkg.version} ${new Date().toDateString()} */`,
 };
 
 async function build() {
     try {
+        console.info('Start compiling the content script');
+
         const bundle = await rollup(inputOptions);
         await bundle.write(outputOptions);
+
+        console.info('Finished compiling the content script');
+        console.info(`Output is ${outputOptions.file}`);
     } catch (ex) {
         console.error(ex);
     }

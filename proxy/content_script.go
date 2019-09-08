@@ -27,6 +27,11 @@ type contentScriptURLParameters struct {
 	Timestamp         int64 // just to avoid caching
 }
 
+type contentScriptParameters struct {
+	Nonce  string                   // random string that we'll be using as a CSP nonce
+	Result urlfilter.CosmeticResult // cosmetic result
+}
+
 // buildInjectionCode creates HTML code for the content script injection
 func (s *Server) buildInjectionCode(session *urlfilter.Session) string {
 	params := contentScriptURLParameters{
@@ -37,6 +42,23 @@ func (s *Server) buildInjectionCode(session *urlfilter.Session) string {
 	}
 	var data bytes.Buffer
 	if err := contentScriptURLTmpl.Execute(&data, params); err != nil {
+		// TODO: log
+		return ""
+	}
+
+	return data.String()
+}
+
+// buildContentScriptCode executes the content script code template
+func (s *Server) buildContentScriptCode(result urlfilter.CosmeticResult) string {
+	params := contentScriptParameters{
+		Nonce:  "",
+		Result: result,
+	}
+
+	var data bytes.Buffer
+	if err := contentScriptTmpl.Execute(&data, params); err != nil {
+		// TODO: log
 		return ""
 	}
 
@@ -61,14 +83,10 @@ func (s *Server) buildContentScript(session *urlfilter.Session) *http.Response {
 	}
 
 	cosmeticResult := s.engine.GetCosmeticResult(hostname, urlfilter.CosmeticOption(option))
-	if len(cosmeticResult.ElementHiding.Generic) == 0 {
-		// TODO: Change this
-		return newNotFoundResponse(r)
-	}
+	body := s.buildContentScriptCode(cosmeticResult)
 
 	contentType := "text/javascript; charset=utf-8"
 	status := http.StatusOK
-	body := "console.log('hello')"
 	return goproxy.NewResponse(r, contentType, status, body)
 }
 

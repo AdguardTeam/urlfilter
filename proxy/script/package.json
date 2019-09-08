@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "license": "GPL-3.0",
   "scripts": {
-    "build": "node tasks/compile.js"
+    "build": "node tasks/compile.js",
+    "generate": "yarn run build ; node tasks/generate.js"
   },
   "devDependencies": {
     "eslint": "^6.3.0",

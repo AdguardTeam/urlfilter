@@ -25,7 +25,10 @@ func main() {
 
 	config := proxy.Config{}
 	config.CertKeyPair = ca
-	config.FiltersPaths = map[int]string{1: "adguard_base_filter.txt"}
+	config.FiltersPaths = map[int]string{
+		1: "adguard_base_filter.txt",
+		2: "adguard_russian_filter.txt",
+	}
 
 	server, err := proxy.NewServer(config)
 	if err != nil {

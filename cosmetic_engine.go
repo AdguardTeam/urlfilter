@@ -65,15 +65,15 @@ func (s *StylesResult) append(r *CosmeticRule) {
 
 // ScriptsResult contains scripts to be executed on a page
 type ScriptsResult struct {
-	Generic  []string `json:"generic"`
-	Specific []string `json:"specific"`
+	Generic  []string
+	Specific []string
 }
 
 // CosmeticResult represents all scripts and styles that needs to be injected into the page
 type CosmeticResult struct {
-	ElementHiding StylesResult  `json:"elementHiding"`
-	CSS           StylesResult  `json:"css"`
-	JS            ScriptsResult `json:"js"`
+	ElementHiding StylesResult
+	CSS           StylesResult
+	JS            ScriptsResult
 }
 
 // Match builds scripts and styles that needs to be injected into the specified page

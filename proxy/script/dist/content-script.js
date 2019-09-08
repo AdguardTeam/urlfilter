@@ -46,7 +46,7 @@
     function getCssRules(rules, style) {
         const cssRules = [];
 
-        rules.forEach(rules, (rule) => {
+        rules.forEach((rule) => {
             if (style) {
                 cssRules.push(`${rule} { ${style} }`);
             } else {
