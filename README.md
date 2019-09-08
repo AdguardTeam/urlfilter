@@ -28,9 +28,10 @@ You can learn more about AdGuard filtering rules syntax from [this article](http
     * [ ] Scriptlet rules
     * [ ] JS rules
 * [ ] Proxy implementation
-    * [X] Proxy example
+    * [X] Simple MITM proxy example
     * [X] Add cosmetic filters to the proxy example
     * [X] Handling cosmetic modifiers $elemhide, $generichide, $jsinject
+    * [ ] (!) Server certificate verification - it should pass badssl.com/dashboard/
     * [ ] Unit tests coverage
     * [ ] Proxy - handle CSP (including <meta> tags with CSP)
     * [ ] Proxy - proper blocking page code

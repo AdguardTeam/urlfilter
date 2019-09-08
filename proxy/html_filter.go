@@ -64,6 +64,10 @@ func findBodyInjectionIndex(body string) int {
 
 // isMatchFound checks if body
 func isMatchFound(body string, match string, index int) bool {
+	if index+len(match) > len(body) {
+		return false
+	}
+
 	str := body[index : index+len(match)]
 	return strings.EqualFold(str, match)
 }
