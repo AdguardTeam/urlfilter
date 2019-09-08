@@ -99,6 +99,10 @@ func (s *Server) onRequest(r *http.Request, ctx *goproxy.ProxyCtx) (*http.Reques
 	s.sessions[session.ID] = session
 	s.sessionsGuard.Unlock()
 
+	if session.Request.Hostname == s.InjectionHost {
+		return r, s.buildContentScript(session)
+	}
+
 	session.Result = s.engine.MatchRequest(session.Request)
 	rule := session.Result.GetBasicResult()
 
@@ -134,7 +138,8 @@ func (s *Server) onResponse(r *http.Response, ctx *goproxy.ProxyCtx) *http.Respo
 		return goproxy.NewResponse(ctx.Req, goproxy.ContentTypeText, http.StatusInternalServerError, "Blocked")
 	}
 
-	if session.Request.RequestType == urlfilter.TypeDocument {
+	if session.Request.RequestType == urlfilter.TypeDocument &&
+		session.Result.GetCosmeticOption() != urlfilter.CosmeticOptionNone {
 		s.filterHTML(session, ctx)
 	}
 

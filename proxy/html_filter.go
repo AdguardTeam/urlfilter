@@ -5,8 +5,6 @@ import (
 	"io/ioutil"
 	"math"
 	"strings"
-	"text/template"
-	"time"
 
 	"github.com/ameshkov/goproxy"
 
@@ -15,35 +13,6 @@ import (
 
 // headBufferSize is the count of bytes where we'll be looking for one of injections points
 const headBufferSize = 16 * 1024
-const contentScriptURL = `
-<script src="//{{.InjectionHostname}}/content-script.js?hostname={{.Hostname}}&option={{.Option}}&ts={{.Timestamp}}"></script>
-`
-
-var timestamp = time.Now().Unix()
-var contentScriptURLTmpl = template.Must(template.New("contentScriptURL").Parse(contentScriptURL))
-
-type contentScriptURLParameters struct {
-	Option            urlfilter.CosmeticOption
-	Hostname          string
-	InjectionHostname string
-	Timestamp         int64 // just to avoid caching
-}
-
-// buildInjectionCode creates HTML code for the content script injection
-func (s *Server) buildInjectionCode(session *urlfilter.Session) string {
-	params := contentScriptURLParameters{
-		Option:            session.Result.GetCosmeticOption(),
-		Hostname:          session.Request.Hostname,
-		InjectionHostname: s.InjectionHost,
-		Timestamp:         timestamp,
-	}
-	var data bytes.Buffer
-	if err := contentScriptURLTmpl.Execute(&data, params); err != nil {
-		return ""
-	}
-
-	return data.String()
-}
 
 // filterHTML replaces the original response with the one where the body is modified
 func (s *Server) filterHTML(session *urlfilter.Session, ctx *goproxy.ProxyCtx) {
@@ -61,6 +30,10 @@ func (s *Server) filterHTML(session *urlfilter.Session, ctx *goproxy.ProxyCtx) {
 	if index == -1 {
 		return
 	}
+
+	// TODO (!!!!): HANDLE CSP PROPERLY
+	session.HTTPResponse.Header.Del("Content-Security-Policy")
+	session.HTTPResponse.Header.Del("Content-Security-Policy-Report-Only")
 
 	injection := s.buildInjectionCode(session)
 	body = body[:index] + injection + body[index:]

@@ -28,12 +28,20 @@ You can learn more about AdGuard filtering rules syntax from [this article](http
     * [ ] Scriptlet rules
     * [ ] JS rules
 * [ ] Basic filtering engine implementation
-    * [X] mitm proxy example
-    * [ ] Add cosmetic filters to the proxy example
-    * [ ] Handling cosmetic modifiers $elemhide, $generichide, $jsinject
+    * [X] Proxy example
+    * [X] Add cosmetic filters to the proxy example
+    * [X] Handling cosmetic modifiers $elemhide, $generichide, $jsinject
+    * [ ] Unit tests coverage
     * [ ] Advanced modifiers part 1
         * [X] $important
         * [ ] $badfilter
+    * [ ] Proxy - handle CSP
+    * [ ] Proxy - proper blocking page code
+    * [ ] Proxy - unblocking via a temporary cookie
+    * [ ] Content script - babel plugin
+    * [ ] Content script - apply ExtCSS rules
+    * [ ] Content script - styles protection
+    * [ ] Content script - unit tests
 * [ ] HTML filtering rules
 * [ ] Advanced modifiers part 2
     * [ ] $replace

@@ -28,3 +28,11 @@ func (e *Engine) MatchRequest(r *Request) MatchingResult {
 
 	return NewMatchingResult(rules, sourceRules)
 }
+
+// GetCosmeticResult gets cosmetic result for the specified hostname and cosmetic options
+func (e *Engine) GetCosmeticResult(hostname string, option CosmeticOption) CosmeticResult {
+	includeCSS := option&CosmeticOptionCSS == CosmeticOptionCSS
+	includeGenericCSS := option&CosmeticOptionGenericCSS == CosmeticOptionGenericCSS
+	includeJS := option&CosmeticOptionJS == CosmeticOptionJS
+	return e.cosmeticEngine.Match(hostname, includeCSS, includeJS, includeGenericCSS)
+}
