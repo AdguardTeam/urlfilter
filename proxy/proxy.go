@@ -7,7 +7,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"sync"
 
 	"github.com/ameshkov/goproxy"
 
@@ -42,10 +41,6 @@ type Server struct {
 	// filtering engine
 	engine *urlfilter.Engine
 
-	// The list of current sessions
-	sessions      map[int64]*urlfilter.Session
-	sessionsGuard *sync.Mutex
-
 	Config // Server configuration
 }
 
@@ -56,9 +51,7 @@ func NewServer(config Config) (*Server, error) {
 	}
 
 	s := &Server{
-		Config:        config,
-		sessions:      map[int64]*urlfilter.Session{},
-		sessionsGuard: &sync.Mutex{},
+		Config: config,
 	}
 
 	engine, err := buildEngine(config)
@@ -94,10 +87,8 @@ func (s *Server) ListenAndServe(addr string) error {
 func (s *Server) onRequest(r *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
 	session := urlfilter.NewSession(ctx.Session, r)
 
-	ctx.Logf("Adding session %d", ctx.Session)
-	s.sessionsGuard.Lock()
-	s.sessions[session.ID] = session
-	s.sessionsGuard.Unlock()
+	ctx.Logf("Saving session %d", ctx.Session)
+	ctx.UserData = session
 
 	if session.Request.Hostname == s.InjectionHost {
 		return r, s.buildContentScript(session)
@@ -117,9 +108,7 @@ func (s *Server) onRequest(r *http.Request, ctx *goproxy.ProxyCtx) (*http.Reques
 
 // onResponse handles all the responses
 func (s *Server) onResponse(r *http.Response, ctx *goproxy.ProxyCtx) *http.Response {
-	s.sessionsGuard.Lock()
-	session, ok := s.sessions[ctx.Session]
-	s.sessionsGuard.Unlock()
+	session, ok := ctx.UserData.(*urlfilter.Session)
 
 	if !ok {
 		ctx.Warnf("could not find session %d", ctx.Session)
@@ -143,10 +132,6 @@ func (s *Server) onResponse(r *http.Response, ctx *goproxy.ProxyCtx) *http.Respo
 		s.filterHTML(session, ctx)
 	}
 
-	ctx.Logf("Removing session %d", ctx.Session)
-	s.sessionsGuard.Lock()
-	delete(s.sessions, ctx.Session)
-	s.sessionsGuard.Unlock()
 	return r
 }
 

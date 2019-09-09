@@ -16,6 +16,7 @@ You can learn more about AdGuard filtering rules syntax from [this article](http
     * [X] Core blocking syntax
     * [X] Basic engine
     * [X] Basic rules validation (don't match everything, unexpected modifiers, etc)
+    * [ ] Domain modifier semantics: https://github.com/AdguardTeam/AdguardBrowserExtension/issues/1474
 * [X] Benchmark basic rules matching
 * [X] Hosts matching rules
     * [X] /etc/hosts matching
