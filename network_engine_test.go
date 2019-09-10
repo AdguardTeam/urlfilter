@@ -104,7 +104,7 @@ func TestBenchNetworkEngine(t *testing.T) {
 	assert.True(t, len(testRequests) > 0)
 	var requests []*Request
 	for _, req := range testRequests {
-		r := NewRequest(req.URL, req.FrameUrl, getRequestType(req.RequestType))
+		r := NewRequest(req.URL, req.FrameUrl, testGetRequestType(req.RequestType))
 		requests = append(requests, r)
 	}
 
@@ -157,9 +157,9 @@ func TestBenchNetworkEngine(t *testing.T) {
 	log.Printf("RSS after matching - %d kB (%d kB diff)\n", afterMatch/1024, (afterMatch-afterLoad)/1024)
 }
 
-// getRequestType converts string value from requests.json to RequestType
+// assumeRequestType converts string value from requests.json to RequestType
 // This maps puppeteer types to WebRequest types
-func getRequestType(t string) RequestType {
+func testGetRequestType(t string) RequestType {
 	switch t {
 	case "document":
 		// Consider document requests as sub_document. This is because the request

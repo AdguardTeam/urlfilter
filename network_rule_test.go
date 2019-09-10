@@ -112,6 +112,13 @@ func TestParseModifiers(t *testing.T) {
 	checkModifier(t, "mp4", OptionMp4, true)
 }
 
+func TestCountModifiers(t *testing.T) {
+	assert.Equal(t, 1, OptionImportant.Count())
+	assert.Equal(t, 2, (OptionImportant | OptionStealth).Count())
+	assert.Equal(t, 4, (OptionImportant | OptionStealth | OptionRedirect | OptionUrlblock).Count())
+	assert.Equal(t, 0, NetworkRuleOption(0).Count())
+}
+
 func TestDisablingExtensionModifier(t *testing.T) {
 	ruleText := "@@||example.org$document,~extension"
 
@@ -371,16 +378,19 @@ func TestInvalidDomainRestrictions(t *testing.T) {
 }
 
 func TestNetworkRulePriority(t *testing.T) {
+	// whitelist+$important --> every other
 	compareRulesPriority(t, "@@||example.org$important", "@@||example.org$important", false)
 	compareRulesPriority(t, "@@||example.org$important", "||example.org$important", true)
 	compareRulesPriority(t, "@@||example.org$important", "@@||example.org", true)
 	compareRulesPriority(t, "@@||example.org$important", "||example.org", true)
 
+	// $important -> whitelist
 	compareRulesPriority(t, "||example.org$important", "@@||example.org$important", false)
 	compareRulesPriority(t, "||example.org$important", "||example.org$important", false)
 	compareRulesPriority(t, "||example.org$important", "@@||example.org", true)
 	compareRulesPriority(t, "||example.org$important", "||example.org", true)
 
+	// whitelist -> basic
 	compareRulesPriority(t, "@@||example.org", "@@||example.org$important", false)
 	compareRulesPriority(t, "@@||example.org", "||example.org$important", false)
 	compareRulesPriority(t, "@@||example.org", "@@||example.org", false)
@@ -390,6 +400,12 @@ func TestNetworkRulePriority(t *testing.T) {
 	compareRulesPriority(t, "||example.org", "||example.org$important", false)
 	compareRulesPriority(t, "||example.org", "@@||example.org", false)
 	compareRulesPriority(t, "||example.org", "||example.org", false)
+
+	// specific -> generic
+	compareRulesPriority(t, "||example.org$domain=example.org", "||example.org$script,stylesheet", true)
+
+	// more modifiers -> less modifiers
+	compareRulesPriority(t, "||example.org$script,stylesheet", "||example.org$script", true)
 }
 
 func TestMatchSource(t *testing.T) {

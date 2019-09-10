@@ -26,7 +26,7 @@ var (
 
 // NetworkRuleOption is the enumeration of various rule options
 // In order to save memory, we store some options as a flag
-type NetworkRuleOption uint
+type NetworkRuleOption uint64
 
 // NetworkRuleOption enumeration
 const (
@@ -55,10 +55,11 @@ const (
 	// Blocking
 	OptionPopup // $popup
 
-	// Other
-	OptionCsp     // $csp
-	OptionReplace // $replace
-	OptionCookie  // $cookie
+	// Advanced (TODO: Implement)
+	OptionCsp      // $csp
+	OptionReplace  // $replace
+	OptionCookie   // $cookie
+	OptionRedirect // $redirect
 
 	// Blacklist-only options
 	OptionBlacklistOnly = OptionPopup | OptionEmpty | OptionMp4
@@ -68,6 +69,24 @@ const (
 		OptionJsinject | OptionUrlblock | OptionContent | OptionExtension |
 		OptionStealth
 )
+
+// Count returns the count of enabled options
+func (o NetworkRuleOption) Count() int {
+	if o == 0 {
+		return 0
+	}
+
+	flags := uint64(o)
+	count := 0
+	var i uint
+	for i = 0; i < 64; i++ {
+		mask := uint64(1 << i)
+		if (flags & mask) == mask {
+			count++
+		}
+	}
+	return count
+}
 
 // NetworkRule is a basic filtering rule
 // https://kb.adguard.com/en/general/how-to-create-your-own-ad-filters#basic-rules
@@ -190,11 +209,16 @@ func (f *NetworkRule) isRegexRule() bool {
 	return false
 }
 
+// isGeneric returns true if the rule is considered "generic"
+// "generic" means that the rule is not restricted to a limited set of domains
+// Please note that it might be forbidden on some domains, though.
+func (f *NetworkRule) isGeneric() bool {
+	return len(f.permittedDomains) == 0
+}
+
 // isHigherPriority checks if the rule has higher priority that the specified rule
 // whitelist + $important > $important > whitelist > basic rules
 func (f *NetworkRule) isHigherPriority(r *NetworkRule) bool {
-	// TODO: Rules with more modifiers have higher priority
-
 	important := f.IsOptionEnabled(OptionImportant)
 	rImportant := r.IsOptionEnabled(OptionImportant)
 
@@ -210,7 +234,36 @@ func (f *NetworkRule) isHigherPriority(r *NetworkRule) bool {
 		return true
 	}
 
-	return false
+	redirect := f.IsOptionEnabled(OptionRedirect)
+	rRedirect := r.IsOptionEnabled(OptionRedirect)
+	if redirect && !rRedirect {
+		// $redirect rules have "slightly" higher priority than regular basic rules
+		return true
+	}
+
+	generic := f.isGeneric()
+	rGeneric := r.isGeneric()
+	if !generic && rGeneric {
+		// specific rules have priority over generic rules
+		return true
+	}
+
+	// More specific rules (i.e. with more modifiers) have higher priority
+	count := f.enabledOptions.Count() + f.disabledOptions.Count() + f.permittedRequestTypes.Count() + f.restrictedRequestTypes.Count()
+	rCount := r.enabledOptions.Count() + r.disabledOptions.Count() + r.permittedRequestTypes.Count() + r.restrictedRequestTypes.Count()
+	return count > rCount
+}
+
+// isDocumentRule checks if the rule is a document-level whitelist rule
+// This means that the rule is supposed to disable or modify blocking
+// of the page subrequests.
+// For instance, `@@||example.org^$urlblock` unblocks all sub-requests.
+func (f *NetworkRule) isDocumentWhitelistRule() bool {
+	if !f.Whitelist {
+		return false
+	}
+
+	return f.IsOptionEnabled(OptionUrlblock) || f.IsOptionEnabled(OptionGenericblock)
 }
 
 // matchPattern uses the regex pattern to match the request URL
@@ -223,6 +276,11 @@ func (f *NetworkRule) matchPattern(r *Request) bool {
 		}
 
 		pattern := patternToRegexp(f.pattern)
+		if pattern == RegexAnyCharacter {
+			f.Unlock()
+			return true
+		}
+
 		if !f.IsOptionEnabled(OptionMatchCase) {
 			pattern = "(?i)" + pattern
 		}

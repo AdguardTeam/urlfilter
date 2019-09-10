@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewCosmeticRule(t *testing.T) {
+func TestNewElementHidingRule(t *testing.T) {
 	f, err := NewCosmeticRule("##banner", 1)
 	assert.Nil(t, err)
 	assert.NotNil(t, f)
@@ -42,6 +42,17 @@ func TestNewCosmeticRule(t *testing.T) {
 	assert.Equal(t, "banner", f.Content)
 }
 
+func TestCosmeticRuleValidation(t *testing.T) {
+	_, err := NewCosmeticRule("||example.org^", 1)
+	assert.NotNil(t, err)
+
+	_, err = NewCosmeticRule("example.org## ", 1)
+	assert.NotNil(t, err)
+
+	_, err = NewCosmeticRule("#@#.banner", 1)
+	assert.NotNil(t, err)
+}
+
 func TestCosmeticRuleMatch(t *testing.T) {
 	f, err := NewCosmeticRule("##banner", 1)
 	assert.Nil(t, err)
@@ -55,4 +66,5 @@ func TestCosmeticRuleMatch(t *testing.T) {
 	assert.True(t, f.Match("test.example.org"))
 	assert.False(t, f.Match("testexample.org"))
 	assert.False(t, f.Match("sub.example.org"))
+	assert.False(t, f.Match("sub.sub.example.org"))
 }
