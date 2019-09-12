@@ -218,6 +218,7 @@ func (f *NetworkRule) isGeneric() bool {
 
 // isHigherPriority checks if the rule has higher priority that the specified rule
 // whitelist + $important > $important > whitelist > basic rules
+// nolint: gocyclo
 func (f *NetworkRule) isHigherPriority(r *NetworkRule) bool {
 	important := f.IsOptionEnabled(OptionImportant)
 	rImportant := r.IsOptionEnabled(OptionImportant)
@@ -226,12 +227,24 @@ func (f *NetworkRule) isHigherPriority(r *NetworkRule) bool {
 		return true
 	}
 
+	if (r.Whitelist && rImportant) && !(f.Whitelist && important) {
+		return false
+	}
+
 	if important && !rImportant {
 		return true
 	}
 
-	if f.Whitelist && !rImportant && !r.Whitelist {
+	if rImportant && !important {
+		return false
+	}
+
+	if f.Whitelist && !r.Whitelist {
 		return true
+	}
+
+	if r.Whitelist && !f.Whitelist {
+		return false
 	}
 
 	redirect := f.IsOptionEnabled(OptionRedirect)

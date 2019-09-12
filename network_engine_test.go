@@ -41,6 +41,20 @@ func TestEmptyNetworkEngine(t *testing.T) {
 	assert.Nil(t, rule)
 }
 
+func TestMatchWhitelistRule(t *testing.T) {
+	r1 := "||example.org^$script"
+	r2 := "@@http://example.org^"
+	rulesText := strings.Join([]string{r1, r2}, "\n")
+	ruleStorage := newTestRuleStorage(t, -1, rulesText)
+	engine := NewNetworkEngine(ruleStorage)
+
+	r := NewRequest("http://example.org/", "", TypeScript)
+	rule, ok := engine.Match(r)
+	assert.True(t, ok)
+	assert.NotNil(t, rule)
+	assert.Equal(t, r2, rule.String())
+}
+
 func TestMatchImportantRule(t *testing.T) {
 	r1 := "||test2.example.org^$important"
 	r2 := "@@||example.org^"
