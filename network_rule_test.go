@@ -206,6 +206,11 @@ func TestSimpleBasicRules(t *testing.T) {
 	assert.Nil(t, err)
 	assert.True(t, f.Match(r))
 
+	f, err = NewNetworkRule("||example.org/*", 0)
+	r = NewRequest("https://example.org/", "", TypeOther)
+	assert.Nil(t, err)
+	assert.True(t, f.Match(r))
+
 	// Simple regex rule
 	f, err = NewNetworkRule("/example\\.org/", 0)
 	r = NewRequest("https://example.org/", "", TypeOther)
