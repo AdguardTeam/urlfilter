@@ -571,14 +571,7 @@ func (f *NetworkRule) loadShortcut() {
 	if f.isRegexRule() {
 		shortcut = findRegexpShortcut(f.pattern)
 	} else {
-		pattern := f.pattern
-
-		// example.org/* -> example.org
-		if strings.HasSuffix(pattern, "/*") {
-			pattern = pattern[:len(pattern)-len("/*")]
-		}
-
-		shortcut = findShortcut(pattern)
+		shortcut = findShortcut(f.pattern)
 	}
 
 	// shortcut needs to be at least longer than 1 character

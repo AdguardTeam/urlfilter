@@ -115,8 +115,8 @@ func NewRequest(url string, sourceURL string, requestType RequestType) *Request 
 func NewRequestForHostname(hostname string) *Request {
 	r := Request{
 		RequestType:       TypeDocument,
-		URL:               "http://" + hostname,
-		URLLowerCase:      "http://" + hostname,
+		URL:               "http://" + hostname + "/",
+		URLLowerCase:      "http://" + hostname + "/",
 		Hostname:          hostname,
 		ThirdParty:        false,
 		IsHostnameRequest: true,
