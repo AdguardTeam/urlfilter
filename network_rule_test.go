@@ -446,6 +446,27 @@ func TestInvalidRule(t *testing.T) {
 	assert.Nil(t, err)
 }
 
+func TestBadfilterRule(t *testing.T) {
+	assertBadfilterNegates(t, "*$image,domain=example.org", "*$image,domain=example.org,badfilter", true)
+	assertBadfilterNegates(t, "*$image,domain=example.org", "*$domain=example.org,badfilter", false)
+	assertBadfilterNegates(t, "*$image,domain=example.org", "*$image,badfilter,domain=example.org", true)
+	assertBadfilterNegates(t, "*$image,domain=example.org|example.com", "*$image,domain=example.org,badfilter", false)
+	assertBadfilterNegates(t, "@@*$image,domain=example.org", "@@*$image,domain=example.org,badfilter", true)
+	assertBadfilterNegates(t, "@@*$image,domain=example.org", "*$image,domain=example.org,badfilter", false)
+}
+
+func assertBadfilterNegates(t *testing.T, rule string, badfilter string, expected bool) {
+	r, err := NewNetworkRule(rule, -1)
+	assert.Nil(t, err)
+	assert.NotNil(t, r)
+
+	b, err := NewNetworkRule(badfilter, -1)
+	assert.Nil(t, err)
+	assert.NotNil(t, b)
+
+	assert.Equal(t, expected, b.negatesBadfilter(r), "")
+}
+
 func compareRulesPriority(t *testing.T, left string, right string, expected bool) {
 	l, err := NewNetworkRule(left, -1)
 	assert.Nil(t, err)

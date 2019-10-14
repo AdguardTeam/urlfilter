@@ -194,7 +194,6 @@ func assumeRequestType(req *http.Request, res *http.Response) RequestType {
 
 // assumeRequestTypeFromMediaType tries to detect the content type from the specified media type
 func assumeRequestTypeFromMediaType(mediaType string) RequestType {
-
 	switch {
 	// $document
 	case strings.Index(mediaType, "application/xhtml") == 0:

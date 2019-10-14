@@ -50,7 +50,7 @@ You can learn more about AdGuard filtering rules syntax from [this article](http
     * [ ] $csp
     * [ ] $cookie
     * [ ] $redirect
-    * [ ] $badfilter
+    * [X] $badfilter
     
 #### How to use
 

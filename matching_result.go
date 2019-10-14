@@ -73,6 +73,9 @@ type MatchingResult struct {
 // sourceRules - a set of rules matching the referrer
 // nolint:gocyclo
 func NewMatchingResult(rules []*NetworkRule, sourceRules []*NetworkRule) MatchingResult {
+	rules = removeBadfilterRules(rules)
+	sourceRules = removeBadfilterRules(sourceRules)
+
 	result := MatchingResult{}
 
 	// First of all, find document-level whitelist rules
@@ -139,7 +142,6 @@ func NewMatchingResult(rules []*NetworkRule, sourceRules []*NetworkRule) Matchin
 // * returns a whitelist rule -- bypass the request.
 // * returns a blocking rule -- block the request.
 func (m *MatchingResult) GetBasicResult() *NetworkRule {
-
 	// https://kb.adguard.com/en/general/how-to-create-your-own-ad-filters#replace-modifier
 	// 1. $replace rules have a higher priority than other basic rules (including exception rules).
 	//    So if a request corresponds to two different rules one of which has the $replace modifier, this rule will be applied.
@@ -181,4 +183,35 @@ func (m *MatchingResult) GetCosmeticOption() CosmeticOption {
 	}
 
 	return option
+}
+
+// removeBadfilterRules looks if there are any matching $badfilter rules and removes
+// matching bad filters from the array (see the $badfilter description for more info)
+func removeBadfilterRules(rules []*NetworkRule) []*NetworkRule {
+	var badfilterRules []*NetworkRule
+
+	for _, badfilter := range rules {
+		if badfilter.IsOptionEnabled(OptionBadfilter) {
+			// lazily create the badfilterRules array
+			if badfilterRules == nil {
+				badfilterRules = []*NetworkRule{}
+			}
+			badfilterRules = append(badfilterRules, badfilter)
+		}
+	}
+
+	if len(badfilterRules) > 0 {
+		filteredRules := []*NetworkRule{}
+		for _, badfilter := range badfilterRules {
+			for _, rule := range rules {
+				if !badfilter.negatesBadfilter(rule) && !rule.IsOptionEnabled(OptionBadfilter) {
+					// lazily create the disabledRules array
+					filteredRules = append(filteredRules, rule)
+				}
+			}
+		}
+		return filteredRules
+	}
+
+	return rules
 }
