@@ -33,6 +33,7 @@ const (
 	OptionThirdParty NetworkRuleOption = 1 << iota // $third-party modifier
 	OptionMatchCase                                // $match-case modifier
 	OptionImportant                                // $important modifier
+	OptionBadfilter                                // $badfilter modifier
 
 	// Whitelist rules modifiers
 	// Each of them can disable part of the functionality
@@ -48,7 +49,7 @@ const (
 	// Whitelist -- specific to Stealth mode
 	OptionStealth // $stealth
 
-	// Content-modifying
+	// Content-modifying (TODO: get rid of, deprecated in favor of $redirect)
 	OptionEmpty // $empty
 	OptionMp4   // $mp4
 
@@ -267,6 +268,48 @@ func (f *NetworkRule) isHigherPriority(r *NetworkRule) bool {
 	return count > rCount
 }
 
+// negatesBadfilter only makes sense when the "f" rule has a `badfilter` modifier
+// it returns true if the "f" rule negates the specified "r" rule
+func (f *NetworkRule) negatesBadfilter(r *NetworkRule) bool {
+	if !f.IsOptionEnabled(OptionBadfilter) {
+		return false
+	}
+
+	if f.Whitelist != r.Whitelist {
+		return false
+	}
+
+	if f.pattern != r.pattern {
+		return false
+	}
+
+	if f.permittedRequestTypes != r.permittedRequestTypes {
+		return false
+	}
+
+	if f.restrictedRequestTypes != r.restrictedRequestTypes {
+		return false
+	}
+
+	if (f.enabledOptions ^ OptionBadfilter) != r.enabledOptions {
+		return false
+	}
+
+	if f.disabledOptions != r.disabledOptions {
+		return false
+	}
+
+	if !stringArraysEquals(f.permittedDomains, r.permittedDomains) {
+		return false
+	}
+
+	if !stringArraysEquals(f.restrictedDomains, r.restrictedDomains) {
+		return false
+	}
+
+	return true
+}
+
 // isDocumentRule checks if the rule is a document-level whitelist rule
 // This means that the rule is supposed to disable or modify blocking
 // of the page subrequests.
@@ -442,6 +485,8 @@ func (f *NetworkRule) loadOption(name string, value string) error {
 		return f.setOptionEnabled(OptionMatchCase, false)
 	case "important":
 		return f.setOptionEnabled(OptionImportant, true)
+	case "badfilter":
+		return f.setOptionEnabled(OptionBadfilter, true)
 
 	case "domain":
 		permitted, restricted, err := loadDomains(value, "|")

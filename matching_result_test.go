@@ -75,6 +75,47 @@ func TestGetCosmeticOption(t *testing.T) {
 	assert.Equal(t, CosmeticOptionNone, result.GetCosmeticOption())
 }
 
+func TestNewMatchingResultBadfilter(t *testing.T) {
+	rules := testNewNetworkRules(t, []string{
+		"||example.org^",
+		"||example.org^$badfilter",
+	}, 0)
+	sourceRules := []*NetworkRule{}
+	result := NewMatchingResult(rules, sourceRules)
+
+	assert.Nil(t, result.BasicRule)
+	assert.Nil(t, result.DocumentRule)
+}
+
+func TestNewMatchingResultBadfilterWhitelist(t *testing.T) {
+	rules := testNewNetworkRules(t, []string{
+		"||example.org^",
+		"@@||example.org^",
+		"@@||example.org^$badfilter",
+	}, 0)
+	sourceRules := []*NetworkRule{}
+	result := NewMatchingResult(rules, sourceRules)
+
+	assert.NotNil(t, result.BasicRule)
+	assert.Nil(t, result.DocumentRule)
+	assert.Equal(t, "||example.org^", result.GetBasicResult().String())
+}
+
+func TestNewMatchingResultBadfilterSourceRules(t *testing.T) {
+	rules := testNewNetworkRules(t, []string{
+		"||example.org^",
+	}, 0)
+	sourceRules := testNewNetworkRules(t, []string{
+		"@@||example.org^$document",
+		"@@||example.org^$document,badfilter",
+	}, 0)
+	result := NewMatchingResult(rules, sourceRules)
+
+	assert.NotNil(t, result.BasicRule)
+	assert.Nil(t, result.DocumentRule)
+	assert.Equal(t, "||example.org^", result.GetBasicResult().String())
+}
+
 // TODO: ADD MORE TESTS
 
 // testNewNetworkRules creates a list of network rules from a string array

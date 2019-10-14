@@ -39,6 +39,8 @@ linters:
     - prealloc
     - maligned
     - nakedret
+    - godox
+    - funlen
     - goconst # disabled until it's possible to configure
   fast: true
 
