@@ -205,7 +205,6 @@ func removeBadfilterRules(rules []*NetworkRule) []*NetworkRule {
 		for _, badfilter := range badfilterRules {
 			for _, rule := range rules {
 				if !badfilter.negatesBadfilter(rule) && !rule.IsOptionEnabled(OptionBadfilter) {
-					// lazily create the disabledRules array
 					filteredRules = append(filteredRules, rule)
 				}
 			}
