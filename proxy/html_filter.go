@@ -6,7 +6,9 @@ import (
 	"math"
 	"strings"
 
-	"github.com/ameshkov/goproxy"
+	"github.com/AdguardTeam/gomitmproxy/proxyutil"
+
+	"github.com/prometheus/common/log"
 
 	"github.com/AdguardTeam/urlfilter"
 )
@@ -15,36 +17,51 @@ import (
 const headBufferSize = 16 * 1024
 
 // filterHTML replaces the original response with the one where the body is modified
-func (s *Server) filterHTML(session *urlfilter.Session, ctx *goproxy.ProxyCtx) {
-	r := session.HTTPResponse
+// TODO: Make it return error and handle it from the outside
+func (s *Server) filterHTML(session *urlfilter.Session) {
+	res := session.HTTPResponse
+	req := session.HTTPRequest
 
-	body, err := decodeLatin1(r.Body)
-	defer r.Body.Close()
-
+	b, err := proxyutil.ReadDecompressedBody(res)
+	// Close the original body
+	_ = res.Body.Close()
 	if err != nil {
-		ctx.Warnf("could not read the full body: %s", err)
+		log.Error("urlfilter id=%s: could not read the full body: %v", session.ID, err)
+		session.HTTPResponse = proxyutil.NewErrorResponse(req, err)
 		return
 	}
 
+	// Use latin1 before modifying the body
+	// Using this 1-byte encoding will let us preserve all original characters
+	// regardless of what exactly is the encoding
+	body, err := proxyutil.DecodeLatin1(bytes.NewReader(b))
+	if err != nil {
+		log.Error("urlfilter id=%s: could not decode the body: %v", session.ID, err)
+		session.HTTPResponse = proxyutil.NewErrorResponse(req, err)
+		return
+	}
+
+	// Modifying the original body
+	modifiedBody := body
 	index := findBodyInjectionIndex(body)
-	if index == -1 {
+	if index != -1 {
+		// TODO (!!!!): HANDLE CSP PROPERLY
+		session.HTTPResponse.Header.Del("Content-Security-Policy")
+		session.HTTPResponse.Header.Del("Content-Security-Policy-Report-Only")
+		injection := s.buildInjectionCode(session)
+		modifiedBody = body[:index] + injection + body[index:]
+	}
+
+	b, err = proxyutil.EncodeLatin1(modifiedBody)
+	if err != nil {
+		log.Errorf("urlfilter id=%s: could not encode body: %v", session.ID, err)
+		session.HTTPResponse = proxyutil.NewErrorResponse(req, err)
 		return
 	}
 
-	// TODO (!!!!): HANDLE CSP PROPERLY
-	session.HTTPResponse.Header.Del("Content-Security-Policy")
-	session.HTTPResponse.Header.Del("Content-Security-Policy-Report-Only")
-
-	injection := s.buildInjectionCode(session)
-	body = body[:index] + injection + body[index:]
-	modifiedBody, err := encodeLatin1(body)
-
-	if err != nil {
-		// TODO: return error page
-		ctx.Warnf("could not encode body: %s", err)
-	}
-
-	r.Body = ioutil.NopCloser(bytes.NewReader(modifiedBody))
+	res.Body = ioutil.NopCloser(bytes.NewReader(b))
+	res.Header.Del("Content-Encoding")
+	res.ContentLength = int64(len(b))
 }
 
 // findBodyInjectionIndex finds a place where we can inject the content script

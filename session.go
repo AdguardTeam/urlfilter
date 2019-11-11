@@ -25,7 +25,7 @@ import (
 // 2.3. This is an HTML response so we need to filter the response body and apply cosmetic filters.
 // 2.4. We should continue execution and do nothing with the response.
 type Session struct {
-	ID      int64    // Session identifier
+	ID      string   // Session identifier
 	Request *Request // Request data
 
 	HTTPRequest  *http.Request  // HTTP request data
@@ -40,7 +40,7 @@ type Session struct {
 // NewSession creates a new instance of the Session struct and initializes it.
 // id -- unique session identifier
 // req -- HTTP request data
-func NewSession(id int64, req *http.Request) *Session {
+func NewSession(id string, req *http.Request) *Session {
 	requestType := assumeRequestType(req, nil)
 
 	s := Session{

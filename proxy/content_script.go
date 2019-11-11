@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"net/http"
 	"strconv"
+	"strings"
 	"text/template"
 	"time"
 
-	"github.com/ameshkov/goproxy"
-
+	"github.com/AdguardTeam/gomitmproxy/proxyutil"
 	"github.com/AdguardTeam/urlfilter"
 )
 
@@ -85,13 +85,15 @@ func (s *Server) buildContentScript(session *urlfilter.Session) *http.Response {
 	cosmeticResult := s.engine.GetCosmeticResult(hostname, urlfilter.CosmeticOption(option))
 	body := s.buildContentScriptCode(cosmeticResult)
 
-	contentType := "text/javascript; charset=utf-8"
-	status := http.StatusOK
-	return goproxy.NewResponse(r, contentType, status, body)
+	res := proxyutil.NewResponse(http.StatusOK, strings.NewReader(body), r)
+	res.Header.Set("Content-Type", "text/javascript; charset=utf-8")
+	return res
 }
 
 func newNotFoundResponse(r *http.Request) *http.Response {
-	return goproxy.NewResponse(r, goproxy.ContentTypeHtml, http.StatusNotFound, "Not Found")
+	res := proxyutil.NewResponse(http.StatusNotFound, strings.NewReader("Not found"), r)
+	res.Header.Set("Content-Type", "text/html")
+	return res
 }
 
 func getQueryParameter(r *http.Request, name string) string {
