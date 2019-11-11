@@ -1,7 +1,7 @@
 github.com/AdguardTeam/golibs v0.2.4 h1:GUssokegKxKF13K67Pgl0ZGwqHjNN6X7sep5ik6ORdY=
 github.com/AdguardTeam/golibs v0.2.4/go.mod h1:R3M+mAg3nWG4X4Hsag5eef/TckHFH12ZYhK7AzJc8+U=
-github.com/AdguardTeam/gomitmproxy v0.1.1 h1:MzmeJfJuVQZMswfLLMn/aimiAtnVNSqZjcbi2ghmZzc=
-github.com/AdguardTeam/gomitmproxy v0.1.1/go.mod h1:Mrt/3EfiXIYY2aZ7KsLuCUJzUARD/fWJ119IfzOB13M=
+github.com/AdguardTeam/gomitmproxy v0.1.2 h1:g+OliTNxPCE40DbX7E/mRiFoLlsOIVMCzR5ShVeTatE=
+github.com/AdguardTeam/gomitmproxy v0.1.2/go.mod h1:Mrt/3EfiXIYY2aZ7KsLuCUJzUARD/fWJ119IfzOB13M=
 github.com/StackExchange/wmi v0.0.0-20181212234831-e0a55b97c705 h1:UUppSQnhf4Yc6xGxSkoQpPhb7RVzuv5Nb1mwJ5VId9s=
 github.com/StackExchange/wmi v0.0.0-20181212234831-e0a55b97c705/go.mod h1:3eOhrUMpNV+6aFIbp5/iudMxNCF27Vw2OZgy4xEx0Fg=
 github.com/alecthomas/template v0.0.0-20160405071501-a0175ee3bccc/go.mod h1:LOuyumcjzFXgccqObfd/Ljyb9UuFJ6TxHnclSeseNhc=

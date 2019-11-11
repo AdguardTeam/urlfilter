@@ -6,11 +6,8 @@ import (
 	"math"
 	"strings"
 
+	"github.com/AdguardTeam/golibs/log"
 	"github.com/AdguardTeam/gomitmproxy/proxyutil"
-
-	"github.com/prometheus/common/log"
-
-	"github.com/AdguardTeam/urlfilter"
 )
 
 // headBufferSize is the count of bytes where we'll be looking for one of injections points
@@ -18,7 +15,7 @@ const headBufferSize = 16 * 1024
 
 // filterHTML replaces the original response with the one where the body is modified
 // TODO: Make it return error and handle it from the outside
-func (s *Server) filterHTML(session *urlfilter.Session) {
+func (s *Server) filterHTML(session *Session) {
 	res := session.HTTPResponse
 	req := session.HTTPRequest
 
@@ -26,7 +23,7 @@ func (s *Server) filterHTML(session *urlfilter.Session) {
 	// Close the original body
 	_ = res.Body.Close()
 	if err != nil {
-		log.Errorf("urlfilter id=%s: could not read the full body: %v", session.ID, err)
+		log.Error("urlfilter id=%s: could not read the full body: %v", session.ID, err)
 		session.HTTPResponse = proxyutil.NewErrorResponse(req, err)
 		return
 	}
@@ -36,7 +33,7 @@ func (s *Server) filterHTML(session *urlfilter.Session) {
 	// regardless of what exactly is the encoding
 	body, err := proxyutil.DecodeLatin1(bytes.NewReader(b))
 	if err != nil {
-		log.Errorf("urlfilter id=%s: could not decode the body: %v", session.ID, err)
+		log.Error("urlfilter id=%s: could not decode the body: %v", session.ID, err)
 		session.HTTPResponse = proxyutil.NewErrorResponse(req, err)
 		return
 	}
@@ -54,7 +51,7 @@ func (s *Server) filterHTML(session *urlfilter.Session) {
 
 	b, err = proxyutil.EncodeLatin1(modifiedBody)
 	if err != nil {
-		log.Errorf("urlfilter id=%s: could not encode body: %v", session.ID, err)
+		log.Error("urlfilter id=%s: could not encode body: %v", session.ID, err)
 		session.HTTPResponse = proxyutil.NewErrorResponse(req, err)
 		return
 	}

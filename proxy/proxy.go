@@ -2,14 +2,14 @@ package proxy
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"strings"
 
-	"github.com/AdguardTeam/gomitmproxy/proxyutil"
-
+	"github.com/AdguardTeam/golibs/log"
 	"github.com/AdguardTeam/gomitmproxy"
+	"github.com/AdguardTeam/gomitmproxy/proxyutil"
 	"github.com/AdguardTeam/urlfilter"
-	"github.com/prometheus/common/log"
 )
 
 const sessionPropKey = "session"
@@ -64,6 +64,7 @@ func NewServer(config Config) (*Server, error) {
 	s.engine = engine
 	s.ProxyConfig.OnRequest = s.onRequest
 	s.ProxyConfig.OnResponse = s.onResponse
+	s.ProxyConfig.OnConnect = s.onConnect
 	s.proxyServer = gomitmproxy.NewProxy(s.ProxyConfig)
 	return s, nil
 }
@@ -81,9 +82,9 @@ func (s *Server) Close() {
 // onRequest handles the outgoing HTTP requests
 func (s *Server) onRequest(sess *gomitmproxy.Session) (*http.Request, *http.Response) {
 	r := sess.Request()
-	session := urlfilter.NewSession(sess.ID(), r)
+	session := NewSession(sess.ID(), r)
 
-	log.Debugf("urlfilter: id=%s: saving session", session.ID)
+	log.Debug("urlfilter: id=%s: saving session", session.ID)
 	sess.SetProp(sessionPropKey, session)
 
 	// TODO: handle it in gomitmproxy properly
@@ -99,7 +100,7 @@ func (s *Server) onRequest(sess *gomitmproxy.Session) (*http.Request, *http.Resp
 	rule := session.Result.GetBasicResult()
 
 	if rule != nil && !rule.Whitelist {
-		log.Debugf("urlfilter: id=%s: blocked by %s: %s", session.ID, rule.String(), session.Request.URL)
+		log.Debug("urlfilter: id=%s: blocked by %s: %s", session.ID, rule.String(), session.Request.URL)
 
 		// TODO: Replace with a "CreateBlockedResponse" method of the urlfilter.Engine
 		body := strings.NewReader("Blocked")
@@ -123,14 +124,14 @@ func (s *Server) onResponse(sess *gomitmproxy.Session) *http.Response {
 
 	v, ok := sess.GetProp(sessionPropKey)
 	if !ok {
-		log.Errorf("urlfilter: id=%s: session not found", sess.ID())
+		log.Error("urlfilter: id=%s: session not found", sess.ID())
 		return nil
 	}
 
-	session, ok := v.(*urlfilter.Session)
+	session, ok := v.(*Session)
 
 	if !ok {
-		log.Errorf("urlfilter: id=%s: session not found (wrong type)", sess.ID())
+		log.Error("urlfilter: id=%s: session not found (wrong type)", sess.ID())
 		return nil
 	}
 
@@ -141,7 +142,7 @@ func (s *Server) onResponse(sess *gomitmproxy.Session) *http.Response {
 	session.Result = s.engine.MatchRequest(session.Request)
 	rule := session.Result.GetBasicResult()
 	if rule != nil && !rule.Whitelist {
-		log.Debugf("urlfilter: id=%s: blocked by %s: %s", session.ID, rule.String(), session.Request.URL)
+		log.Debug("urlfilter: id=%s: blocked by %s: %s", session.ID, rule.String(), session.Request.URL)
 
 		// TODO: Replace with a "CreateBlockedResponse" method of the urlfilter.Engine
 		body := strings.NewReader("Blocked")
@@ -155,6 +156,17 @@ func (s *Server) onResponse(sess *gomitmproxy.Session) *http.Response {
 		session.Result.GetCosmeticOption() != urlfilter.CosmeticOptionNone {
 		s.filterHTML(session)
 		return session.HTTPResponse
+	}
+
+	return nil
+}
+
+// onConnect - the only purpose is to intercept and suppress connections to InjectionHost
+func (s *Server) onConnect(session *gomitmproxy.Session, proto string, addr string) net.Conn {
+	host, _, err := net.SplitHostPort(addr)
+
+	if err == nil && host == s.InjectionHost {
+		return &proxyutil.NoopConn{}
 	}
 
 	return nil

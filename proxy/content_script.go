@@ -8,6 +8,8 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/prometheus/common/log"
+
 	"github.com/AdguardTeam/gomitmproxy/proxyutil"
 	"github.com/AdguardTeam/urlfilter"
 )
@@ -33,7 +35,7 @@ type contentScriptParameters struct {
 }
 
 // buildInjectionCode creates HTML code for the content script injection
-func (s *Server) buildInjectionCode(session *urlfilter.Session) string {
+func (s *Server) buildInjectionCode(session *Session) string {
 	params := contentScriptURLParameters{
 		Option:            session.Result.GetCosmeticOption(),
 		Hostname:          session.Request.Hostname,
@@ -42,7 +44,7 @@ func (s *Server) buildInjectionCode(session *urlfilter.Session) string {
 	}
 	var data bytes.Buffer
 	if err := contentScriptURLTmpl.Execute(&data, params); err != nil {
-		// TODO: log
+		log.Error("error building injection code: %v", err)
 		return ""
 	}
 
@@ -58,7 +60,7 @@ func (s *Server) buildContentScriptCode(result urlfilter.CosmeticResult) string 
 
 	var data bytes.Buffer
 	if err := contentScriptTmpl.Execute(&data, params); err != nil {
-		// TODO: log
+		log.Error("error building content script code: %v", err)
 		return ""
 	}
 
@@ -66,7 +68,7 @@ func (s *Server) buildContentScriptCode(result urlfilter.CosmeticResult) string 
 }
 
 // buildContentScript builds the content script content
-func (s *Server) buildContentScript(session *urlfilter.Session) *http.Response {
+func (s *Server) buildContentScript(session *Session) *http.Response {
 	// TODO: Handle cache
 
 	r := session.HTTPRequest
