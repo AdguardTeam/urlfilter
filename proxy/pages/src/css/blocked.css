@@ -1,0 +1,47 @@
+body {
+  background-color: #efefef;
+  font-family: system-ui, sans-serif;
+}
+
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  min-height: 100vh;
+  min-width: 320px;
+  width: 50%;
+  margin: 0 auto;
+}
+
+.ic-error {
+  height: 100px;
+  width: 100px;
+  padding: 0px;
+  margin: 0px;
+  background: inline("../img/blocked.svg");
+  background-size: 100%;
+  background-repeat: no-repeat;
+}
+
+.details {
+  width: 100%;
+  margin-top: 25px;
+}
+
+.details textarea {
+  width: 100%;
+  background-color: #efefef;
+  font-size: 14px;
+  font-family: monospace;
+  text-align: center;
+
+  border: none;
+  overflow: auto;
+  outline: none;
+  -webkit-box-shadow: none;
+  -moz-box-shadow: none;
+  box-shadow: none;
+  resize: none;
+}

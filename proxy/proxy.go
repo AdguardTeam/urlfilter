@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"strings"
 
 	"github.com/AdguardTeam/golibs/log"
 	"github.com/AdguardTeam/gomitmproxy"
@@ -87,8 +86,8 @@ func (s *Server) onRequest(sess *gomitmproxy.Session) (*http.Request, *http.Resp
 	log.Debug("urlfilter: id=%s: saving session", session.ID)
 	sess.SetProp(sessionPropKey, session)
 
-	// TODO: handle it in gomitmproxy properly
 	if r.Method == http.MethodConnect {
+		// Do nothing for CONNECT requests
 		return nil, nil
 	}
 
@@ -102,14 +101,10 @@ func (s *Server) onRequest(sess *gomitmproxy.Session) (*http.Request, *http.Resp
 	if rule != nil && !rule.Whitelist {
 		log.Debug("urlfilter: id=%s: blocked by %s: %s", session.ID, rule.String(), session.Request.URL)
 
-		// TODO: Replace with a "CreateBlockedResponse" method of the urlfilter.Engine
-		body := strings.NewReader("Blocked")
-		res := proxyutil.NewResponse(http.StatusInternalServerError, body, r)
-		res.Close = true
-
 		// Mark this request as blocked so that we didn't modify it in the onResponse handler
 		sess.SetProp(requestBlockedKey, true)
-		return nil, res
+
+		return nil, newBlockedResponse(session, rule)
 	}
 
 	return r, nil
@@ -143,18 +138,15 @@ func (s *Server) onResponse(sess *gomitmproxy.Session) *http.Response {
 	rule := session.Result.GetBasicResult()
 	if rule != nil && !rule.Whitelist {
 		log.Debug("urlfilter: id=%s: blocked by %s: %s", session.ID, rule.String(), session.Request.URL)
-
-		// TODO: Replace with a "CreateBlockedResponse" method of the urlfilter.Engine
-		body := strings.NewReader("Blocked")
-		res := proxyutil.NewResponse(http.StatusInternalServerError, body, sess.Request())
-		res.Close = true
-
-		return res
+		return newBlockedResponse(session, rule)
 	}
 
 	if session.Request.RequestType == urlfilter.TypeDocument &&
 		session.Result.GetCosmeticOption() != urlfilter.CosmeticOptionNone {
-		s.filterHTML(session)
+		err := s.filterHTML(session)
+		if err != nil {
+			return proxyutil.NewErrorResponse(session.HTTPRequest, err)
+		}
 		return session.HTTPResponse
 	}
 

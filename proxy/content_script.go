@@ -8,8 +8,7 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/prometheus/common/log"
-
+	"github.com/AdguardTeam/golibs/log"
 	"github.com/AdguardTeam/gomitmproxy/proxyutil"
 	"github.com/AdguardTeam/urlfilter"
 )
@@ -93,7 +92,7 @@ func (s *Server) buildContentScript(session *Session) *http.Response {
 }
 
 func newNotFoundResponse(r *http.Request) *http.Response {
-	res := proxyutil.NewResponse(http.StatusNotFound, strings.NewReader("Not found"), r)
+	res := proxyutil.NewResponse(http.StatusNotFound, nil, r)
 	res.Header.Set("Content-Type", "text/html")
 	return res
 }

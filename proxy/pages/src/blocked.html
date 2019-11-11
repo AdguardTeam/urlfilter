@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <title>{{ .Hostname}}</title>
+</head>
+
+<body>
+    <div class="wrapper">
+        <div class="ic-error"></div>
+        <h1>Request blocked</h1>
+        <div class="description">
+            Request to <strong>{{ .Hostname }}</strong> is blocked by the content blocking rule:
+        </div>
+        <div class="details">
+            <textarea readonly rows="4">{{ .RuleText}}</textarea>
+        </div>
+    </div>
+</body>
+
+</html>

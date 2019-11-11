@@ -36,7 +36,7 @@ You can learn more about AdGuard filtering rules syntax from [this article](http
     * [ ] Unit tests coverage
     * [ ] Fix TODOs
     * [ ] Proxy - handle CSP (including <meta> tags with CSP)
-    * [ ] Proxy - proper blocking page code
+    * [X] Proxy - proper blocking page code
     * [ ] Proxy - unblocking via a temporary cookie
     * [ ] Proxy - content script caching
     * [ ] Content script - babel plugin

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <title>{{ .Hostname}}</title>
+
+<style type="text/css">
+body {
+  background-color: #efefef;
+  font-family: system-ui, sans-serif;
+}
+
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  min-height: 100vh;
+  min-width: 320px;
+  width: 50%;
+  margin: 0 auto;
+}
+
+.ic-error {
+  height: 100px;
+  width: 100px;
+  padding: 0px;
+  margin: 0px;
+  background: url('data:image/svg+xml;charset=utf-8,%3C%3Fxml%20version%3D%221.0%22%3F%3E%0A%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22%23000000%22%20viewBox%3D%220%200%20128%20128%22%20width%3D%2264px%22%20height%3D%2264px%22%3E%20%20%20%20%3Cpath%20d%3D%22M%2064%209.4003906%20C%2039.2%209.4003906%2019%2029.600391%2019%2054.400391%20C%2019%2078.200391%2037.6%2097.800781%2061%2099.300781%20L%2061%20115.59961%20C%2061%20117.29961%2062.3%20118.59961%2064%20118.59961%20C%2065.7%20118.59961%2067%20117.29961%2067%20115.59961%20L%2067%2099.300781%20C%2090.4%2097.700781%20109%2078.200391%20109%2054.400391%20C%20109%2029.600391%2088.8%209.4003906%2064%209.4003906%20z%20M%2064%2015.400391%20C%2085.5%2015.400391%20103%2032.900391%20103%2054.400391%20C%20103%2075.900391%2085.5%2093.400391%2064%2093.400391%20C%2042.5%2093.400391%2025%2075.900391%2025%2054.400391%20C%2025%2032.900391%2042.5%2015.400391%2064%2015.400391%20z%20M%2047.300781%2049.400391%20C%2044.500781%2049.400391%2042.300781%2051.600391%2042.300781%2054.400391%20C%2042.300781%2057.200391%2044.500781%2059.400391%2047.300781%2059.400391%20L%2080.699219%2059.400391%20C%2083.499219%2059.400391%2085.699219%2057.200391%2085.699219%2054.400391%20C%2085.699219%2051.600391%2083.499219%2049.400391%2080.699219%2049.400391%20L%2047.300781%2049.400391%20z%22%2F%3E%3C%2Fsvg%3E');
+  background-size: 100%;
+  background-repeat: no-repeat;
+}
+
+.details {
+  width: 100%;
+  margin-top: 25px;
+}
+
+.details textarea {
+  width: 100%;
+  background-color: #efefef;
+  font-size: 14px;
+  font-family: monospace;
+  text-align: center;
+
+  border: none;
+  overflow: auto;
+  outline: none;
+  -webkit-box-shadow: none;
+  -moz-box-shadow: none;
+  box-shadow: none;
+  resize: none;
+}
+
+</style>
+<script type="text/javascript">
+/* pages v1.0.0 Tue Nov 12 2019 */
+(function () {
+    'use strict';
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const btn = document.getElementById('details-button');
+        btn.addEventListener('click', () => {
+            btn.classList.toggle('open');
+            document.querySelector('.details').classList.toggle('hidden');
+        });
+    });
+
+}());
+
+</script>
+</head>
+
+<body>
+    <div class="wrapper">
+        <div class="ic-error"></div>
+        <h1>Request blocked</h1>
+        <div class="description">
+            Request to <strong>{{ .Hostname }}</strong> is blocked by the content blocking rule:
+        </div>
+        <div class="details">
+            <textarea readonly rows="4">{{ .RuleText}}</textarea>
+        </div>
+    </div>
+</body>
+
+</html>
