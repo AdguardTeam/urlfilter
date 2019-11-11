@@ -83,7 +83,7 @@ func (s *Server) onRequest(sess *gomitmproxy.Session) (*http.Request, *http.Resp
 	r := sess.Request()
 	session := urlfilter.NewSession(sess.ID(), r)
 
-	log.Debug("urlfilter: id=%s: saving session", session.ID)
+	log.Debugf("urlfilter: id=%s: saving session", session.ID)
 	sess.SetProp(sessionPropKey, session)
 
 	// TODO: handle it in gomitmproxy properly
@@ -99,7 +99,7 @@ func (s *Server) onRequest(sess *gomitmproxy.Session) (*http.Request, *http.Resp
 	rule := session.Result.GetBasicResult()
 
 	if rule != nil && !rule.Whitelist {
-		log.Debug("urlfilter: id=%s: blocked by %s: %s", session.ID, rule.String(), session.Request.URL)
+		log.Debugf("urlfilter: id=%s: blocked by %s: %s", session.ID, rule.String(), session.Request.URL)
 
 		// TODO: Replace with a "CreateBlockedResponse" method of the urlfilter.Engine
 		body := strings.NewReader("Blocked")
@@ -141,7 +141,7 @@ func (s *Server) onResponse(sess *gomitmproxy.Session) *http.Response {
 	session.Result = s.engine.MatchRequest(session.Request)
 	rule := session.Result.GetBasicResult()
 	if rule != nil && !rule.Whitelist {
-		log.Debug("urlfilter: id=%s: blocked by %s: %s", session.ID, rule.String(), session.Request.URL)
+		log.Debugf("urlfilter: id=%s: blocked by %s: %s", session.ID, rule.String(), session.Request.URL)
 
 		// TODO: Replace with a "CreateBlockedResponse" method of the urlfilter.Engine
 		body := strings.NewReader("Blocked")

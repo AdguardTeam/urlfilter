@@ -26,7 +26,7 @@ func (s *Server) filterHTML(session *urlfilter.Session) {
 	// Close the original body
 	_ = res.Body.Close()
 	if err != nil {
-		log.Error("urlfilter id=%s: could not read the full body: %v", session.ID, err)
+		log.Errorf("urlfilter id=%s: could not read the full body: %v", session.ID, err)
 		session.HTTPResponse = proxyutil.NewErrorResponse(req, err)
 		return
 	}
@@ -36,7 +36,7 @@ func (s *Server) filterHTML(session *urlfilter.Session) {
 	// regardless of what exactly is the encoding
 	body, err := proxyutil.DecodeLatin1(bytes.NewReader(b))
 	if err != nil {
-		log.Error("urlfilter id=%s: could not decode the body: %v", session.ID, err)
+		log.Errorf("urlfilter id=%s: could not decode the body: %v", session.ID, err)
 		session.HTTPResponse = proxyutil.NewErrorResponse(req, err)
 		return
 	}
