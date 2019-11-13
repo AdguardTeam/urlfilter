@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"strings"
 	"text/template"
-	"time"
 
 	"github.com/AdguardTeam/golibs/log"
 	"github.com/AdguardTeam/gomitmproxy/proxyutil"
@@ -18,7 +17,6 @@ const contentScriptCode = `
 <script src="//{{.InjectionHostname}}/content-script.js?hostname={{.Hostname}}&option={{.Option}}&ts={{.Timestamp}}"></script>
 `
 
-var timestamp = time.Now().Unix()
 var contentScriptURLTmpl = template.Must(template.New("contentScriptCode").Parse(contentScriptCode))
 
 type contentScriptURLParameters struct {
@@ -39,7 +37,7 @@ func (s *Server) buildInjectionCode(session *Session) string {
 		Option:            session.Result.GetCosmeticOption(),
 		Hostname:          session.Request.Hostname,
 		InjectionHostname: s.InjectionHost,
-		Timestamp:         timestamp,
+		Timestamp:         s.createdAt.Unix(),
 	}
 	var data bytes.Buffer
 	if err := contentScriptURLTmpl.Execute(&data, params); err != nil {
@@ -74,6 +72,8 @@ func (s *Server) buildContentScript(session *Session) *http.Response {
 	if r.Method != http.MethodGet {
 		return newNotFoundResponse(r)
 	}
+
+	// if r.Header.Get("If-Modified-Since")
 
 	hostname := getQueryParameter(r, "hostname")
 	option := getQueryParameterUint64(r, "option")

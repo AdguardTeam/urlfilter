@@ -39,6 +39,7 @@ You can learn more about AdGuard filtering rules syntax from [this article](http
     * [X] Proxy - proper blocking page code
     * [ ] Proxy - unblocking via a temporary cookie
     * [ ] Proxy - content script caching
+    * [ ] Proxy - content script compression
     * [ ] Content script - babel plugin
     * [ ] Content script - apply ExtCSS rules
     * [ ] Content script - styles protection

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"time"
 
 	"github.com/AdguardTeam/golibs/log"
 	"github.com/AdguardTeam/gomitmproxy"
@@ -42,6 +43,9 @@ type Server struct {
 	// filtering engine
 	engine *urlfilter.Engine
 
+	// time when the server was created
+	createdAt time.Time
+
 	Config // Server configuration
 }
 
@@ -51,8 +55,11 @@ func NewServer(config Config) (*Server, error) {
 		config.InjectionHost = defaultInjectionsHost
 	}
 
+	// TODO: add logging
+
 	s := &Server{
-		Config: config,
+		createdAt: time.Now(),
+		Config:    config,
 	}
 
 	engine, err := buildEngine(config)
