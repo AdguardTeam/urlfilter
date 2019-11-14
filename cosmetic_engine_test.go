@@ -5,6 +5,8 @@ import (
 	"log"
 	"testing"
 
+	"github.com/AdguardTeam/urlfilter/filterlist"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -96,15 +98,15 @@ func buildCosmeticEngine(t *testing.T) *CosmeticEngine {
 example.org##banner_specific
 example.org#@#banner_generic_disabled`
 
-	lists := []RuleList{
-		&StringRuleList{
+	lists := []filterlist.RuleList{
+		&filterlist.StringRuleList{
 			ID:             1,
 			RulesText:      rulesText,
 			IgnoreCosmetic: false,
 		},
 	}
 
-	ruleStorage, err := NewRuleStorage(lists)
+	ruleStorage, err := filterlist.NewRuleStorage(lists)
 	if err != nil {
 		t.Fatalf("failed to create a rule storage: %s", err)
 	}

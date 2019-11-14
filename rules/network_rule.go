@@ -1,4 +1,4 @@
-package urlfilter
+package rules
 
 import (
 	"fmt"
@@ -201,8 +201,32 @@ func (f *NetworkRule) IsOptionDisabled(option NetworkRuleOption) bool {
 	return (f.disabledOptions & option) == option
 }
 
-// isRegexRule returns true if rule's pattern is a regular expression
-func (f *NetworkRule) isRegexRule() bool {
+// GetPermittedDomains - returns an array of domains this rule is allowed on
+func (f *NetworkRule) GetPermittedDomains() []string {
+	return f.permittedDomains
+}
+
+// IsHostLevelNetworkRule checks if this rule can be used for hosts-level blocking
+func (f *NetworkRule) IsHostLevelNetworkRule() bool {
+	if len(f.permittedDomains) > 0 || len(f.restrictedDomains) > 0 {
+		return false
+	}
+
+	if f.permittedRequestTypes != 0 && f.restrictedRequestTypes != 0 {
+		return false
+	}
+
+	// TODO: FORGOT BADFILTER
+	// The only allowed option is $important
+	if f.enabledOptions != 0 && f.enabledOptions != OptionImportant {
+		return false
+	}
+
+	return true
+}
+
+// IsRegexRule returns true if rule's pattern is a regular expression
+func (f *NetworkRule) IsRegexRule() bool {
 	if strings.HasPrefix(f.pattern, maskRegexRule) &&
 		strings.HasSuffix(f.pattern, maskRegexRule) {
 		return true
@@ -210,17 +234,17 @@ func (f *NetworkRule) isRegexRule() bool {
 	return false
 }
 
-// isGeneric returns true if the rule is considered "generic"
+// IsGeneric returns true if the rule is considered "generic"
 // "generic" means that the rule is not restricted to a limited set of domains
 // Please note that it might be forbidden on some domains, though.
-func (f *NetworkRule) isGeneric() bool {
+func (f *NetworkRule) IsGeneric() bool {
 	return len(f.permittedDomains) == 0
 }
 
-// isHigherPriority checks if the rule has higher priority that the specified rule
+// IsHigherPriority checks if the rule has higher priority that the specified rule
 // whitelist + $important > $important > whitelist > basic rules
 // nolint: gocyclo
-func (f *NetworkRule) isHigherPriority(r *NetworkRule) bool {
+func (f *NetworkRule) IsHigherPriority(r *NetworkRule) bool {
 	important := f.IsOptionEnabled(OptionImportant)
 	rImportant := r.IsOptionEnabled(OptionImportant)
 
@@ -255,8 +279,8 @@ func (f *NetworkRule) isHigherPriority(r *NetworkRule) bool {
 		return true
 	}
 
-	generic := f.isGeneric()
-	rGeneric := r.isGeneric()
+	generic := f.IsGeneric()
+	rGeneric := r.IsGeneric()
 	if !generic && rGeneric {
 		// specific rules have priority over generic rules
 		return true
@@ -613,7 +637,7 @@ func (f *NetworkRule) loadOption(name string, value string) error {
 // any special characters
 func (f *NetworkRule) loadShortcut() {
 	var shortcut string
-	if f.isRegexRule() {
+	if f.IsRegexRule() {
 		shortcut = findRegexpShortcut(f.pattern)
 	} else {
 		shortcut = findShortcut(f.pattern)

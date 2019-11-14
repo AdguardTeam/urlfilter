@@ -1,14 +1,6 @@
-package urlfilter
+package rules
 
-import (
-	"bytes"
-	"io"
-	"strings"
-)
-
-// On Linux the size of the data block is usually 4KB
-// So it makes sense to use 4KB.
-const readerBufferSize = 4 * 1024
+import "strings"
 
 // splitWithEscapeCharacter splits string by the specified separator if it is not escaped
 func splitWithEscapeCharacter(str string, sep byte, escapeCharacter byte, preserveAllTokens bool) []string {
@@ -51,22 +43,6 @@ func splitWithEscapeCharacter(str string, sep byte, escapeCharacter byte, preser
 	return parts
 }
 
-// getSubdomains splits the specified hostname and returns all subdomains (including the hostname itself)
-func getSubdomains(hostname string) []string {
-	parts := strings.Split(hostname, ".")
-	var subdomains []string
-	var domain = ""
-	for i := len(parts) - 1; i >= 0; i-- {
-		if domain == "" {
-			domain = parts[i]
-		} else {
-			domain = parts[i] + "." + domain
-		}
-		subdomains = append(subdomains, domain)
-	}
-	return subdomains
-}
-
 // stringArraysEquals checks if arrays are equal
 func stringArraysEquals(l []string, r []string) bool {
 	if len(l) != len(r) {
@@ -93,26 +69,4 @@ func (s byLength) Swap(i, j int) {
 }
 func (s byLength) Less(i, j int) bool {
 	return len(s[i]) < len(s[j])
-}
-
-// readLine reads from the reader until '\n'
-// r - reader to read from
-// b - buffer to use (the idea is to reuse the same buffer when it's possible)
-func readLine(r io.Reader, b []byte) (string, error) {
-	line := ""
-
-	for {
-		n, err := r.Read(b)
-		if n > 0 {
-			idx := bytes.IndexByte(b[:n], '\n')
-			if idx == -1 {
-				line += string(b[:n])
-			} else {
-				line += string(b[:idx])
-				return line, err
-			}
-		} else {
-			return line, err
-		}
-	}
 }

@@ -1,4 +1,4 @@
-package urlfilter
+package rules
 
 import (
 	"testing"
@@ -472,5 +472,5 @@ func compareRulesPriority(t *testing.T, left string, right string, expected bool
 	assert.Nil(t, err)
 	r, err := NewNetworkRule(right, -1)
 	assert.Nil(t, err)
-	assert.Equal(t, expected, l.isHigherPriority(r))
+	assert.Equal(t, expected, l.IsHigherPriority(r))
 }

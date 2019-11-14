@@ -1,4 +1,4 @@
-package urlfilter
+package filterlist
 
 import (
 	"testing"

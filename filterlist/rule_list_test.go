@@ -1,10 +1,14 @@
-package urlfilter
+package filterlist
 
 import (
 	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+)
+
+const (
+	testResourcesDir = "../test"
 )
 
 func TestStringRuleListScanner(t *testing.T) {

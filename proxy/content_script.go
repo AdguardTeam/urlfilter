@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"text/template"
 
+	"github.com/AdguardTeam/urlfilter/rules"
+
 	"github.com/AdguardTeam/golibs/log"
 	"github.com/AdguardTeam/gomitmproxy/proxyutil"
 	"github.com/AdguardTeam/urlfilter"
@@ -20,7 +22,7 @@ const contentScriptCode = `
 var contentScriptURLTmpl = template.Must(template.New("contentScriptCode").Parse(contentScriptCode))
 
 type contentScriptURLParameters struct {
-	Option            urlfilter.CosmeticOption
+	Option            rules.CosmeticOption
 	Hostname          string
 	InjectionHostname string
 	Timestamp         int64 // just to avoid caching
@@ -93,7 +95,7 @@ func (s *Server) buildContentScript(session *Session) *http.Response {
 		return res
 	}
 
-	cosmeticResult := s.engine.GetCosmeticResult(hostname, urlfilter.CosmeticOption(option))
+	cosmeticResult := s.engine.GetCosmeticResult(hostname, rules.CosmeticOption(option))
 	bodyBytes := []byte(s.buildContentScriptCode(cosmeticResult))
 	contentLen := len(bodyBytes)
 

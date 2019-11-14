@@ -3,6 +3,10 @@ package urlfilter
 import (
 	"math"
 	"strings"
+
+	"github.com/AdguardTeam/urlfilter/filterlist"
+
+	"github.com/AdguardTeam/urlfilter/rules"
 )
 
 const (
@@ -13,7 +17,7 @@ const (
 type NetworkEngine struct {
 	RulesCount int // RulesCount -- count of rules added to the engine
 
-	ruleStorage *RuleStorage // Storage for the network filtering rules
+	ruleStorage *filterlist.RuleStorage // Storage for the network filtering rules
 
 	// Domain lookup table. Key is the domain name hash.
 	domainsLookupTable map[uint32][]int64
@@ -22,11 +26,11 @@ type NetworkEngine struct {
 	shortcutsHistogram   map[uint32]int     // Shortcuts histogram helps us choose the best shortcut for the shortcuts lookup table.
 
 	// Rules for which we could not find a shortcut and could not place it to the shortcuts lookup table.
-	otherRules []*NetworkRule
+	otherRules []*rules.NetworkRule
 }
 
 // NewNetworkEngine builds an instance of the network engine
-func NewNetworkEngine(s *RuleStorage) *NetworkEngine {
+func NewNetworkEngine(s *filterlist.RuleStorage) *NetworkEngine {
 	engine := NetworkEngine{
 		ruleStorage:          s,
 		domainsLookupTable:   map[uint32][]int64{},
@@ -38,7 +42,7 @@ func NewNetworkEngine(s *RuleStorage) *NetworkEngine {
 
 	for scanner.Scan() {
 		f, idx := scanner.Rule()
-		rule, ok := f.(*NetworkRule)
+		rule, ok := f.(*rules.NetworkRule)
 		if ok {
 			engine.addRule(rule, idx)
 		}
@@ -49,19 +53,19 @@ func NewNetworkEngine(s *RuleStorage) *NetworkEngine {
 
 // Match searches over all filtering rules loaded to the engine
 // It returns true if a match was found alongside the matching rule
-func (n *NetworkEngine) Match(r *Request) (*NetworkRule, bool) {
-	rules := n.MatchAll(r)
+func (n *NetworkEngine) Match(r *rules.Request) (*rules.NetworkRule, bool) {
+	networkRules := n.MatchAll(r)
 
-	if len(rules) == 0 {
+	if len(networkRules) == 0 {
 		return nil, false
 	}
 
-	var resultRule *NetworkRule
+	var resultRule *rules.NetworkRule
 
-	for i := range rules {
-		rule := rules[i]
+	for i := range networkRules {
+		rule := networkRules[i]
 
-		if resultRule == nil || rule.isHigherPriority(resultRule) {
+		if resultRule == nil || rule.IsHigherPriority(resultRule) {
 			resultRule = rule
 		}
 	}
@@ -71,7 +75,7 @@ func (n *NetworkEngine) Match(r *Request) (*NetworkRule, bool) {
 
 // MatchAll finds all rules matching the specified request regardless of the rule types
 // It will find both whitelist and blacklist rules
-func (n *NetworkEngine) MatchAll(r *Request) []*NetworkRule {
+func (n *NetworkEngine) MatchAll(r *rules.Request) []*rules.NetworkRule {
 	// First check by shortcuts
 	result := n.matchShortcutsLookupTable(r)
 
@@ -91,8 +95,8 @@ func (n *NetworkEngine) MatchAll(r *Request) []*NetworkRule {
 }
 
 // matchShortcutsLookupTable finds all matching rules from the shortcuts lookup table
-func (n *NetworkEngine) matchShortcutsLookupTable(r *Request) []*NetworkRule {
-	var result []*NetworkRule
+func (n *NetworkEngine) matchShortcutsLookupTable(r *rules.Request) []*rules.NetworkRule {
+	var result []*rules.NetworkRule
 	for i := 0; i <= len(r.URLLowerCase)-shortcutLength; i++ {
 		hash := fastHashBetween(r.URLLowerCase, i, i+shortcutLength)
 		if rules, ok := n.shortcutsLookupTable[hash]; ok {
@@ -110,8 +114,8 @@ func (n *NetworkEngine) matchShortcutsLookupTable(r *Request) []*NetworkRule {
 }
 
 // matchDomainsLookupTable finds all matching rules from the domains lookup table
-func (n *NetworkEngine) matchDomainsLookupTable(r *Request) []*NetworkRule {
-	var result []*NetworkRule
+func (n *NetworkEngine) matchDomainsLookupTable(r *rules.Request) []*rules.NetworkRule {
+	var result []*rules.NetworkRule
 
 	if r.SourceHostname == "" {
 		return result
@@ -134,7 +138,7 @@ func (n *NetworkEngine) matchDomainsLookupTable(r *Request) []*NetworkRule {
 }
 
 // addRule adds rule to the network engine
-func (n *NetworkEngine) addRule(f *NetworkRule, storageIdx int64) {
+func (n *NetworkEngine) addRule(f *rules.NetworkRule, storageIdx int64) {
 	if !n.addRuleToShortcutsTable(f, storageIdx) {
 		if !n.addRuleToDomainsTable(f, storageIdx) {
 			if !containsRule(n.otherRules, f) {
@@ -147,12 +151,12 @@ func (n *NetworkEngine) addRule(f *NetworkRule, storageIdx int64) {
 
 // addRuleToDomainsTable tries to add the rule to the domains lookup table.
 // returns true if it was added (the domain
-func (n *NetworkEngine) addRuleToDomainsTable(f *NetworkRule, storageIdx int64) bool {
-	if len(f.permittedDomains) == 0 {
+func (n *NetworkEngine) addRuleToDomainsTable(f *rules.NetworkRule, storageIdx int64) bool {
+	if len(f.GetPermittedDomains()) == 0 {
 		return false
 	}
 
-	for _, domain := range f.permittedDomains {
+	for _, domain := range f.GetPermittedDomains() {
 		hash := fastHash(domain)
 
 		// Add the rule to the lookup table
@@ -166,7 +170,7 @@ func (n *NetworkEngine) addRuleToDomainsTable(f *NetworkRule, storageIdx int64) 
 
 // addRuleToShortcutsTable tries to add the rule to the shortcuts table.
 // returns true if it was added or false if the shortcut is too short
-func (n *NetworkEngine) addRuleToShortcutsTable(f *NetworkRule, storageIdx int64) bool {
+func (n *NetworkEngine) addRuleToShortcutsTable(f *rules.NetworkRule, storageIdx int64) bool {
 	shortcuts := getRuleShortcuts(f)
 	if len(shortcuts) == 0 {
 		return false
@@ -199,7 +203,7 @@ func (n *NetworkEngine) addRuleToShortcutsTable(f *NetworkRule, storageIdx int64
 }
 
 // getRuleShortcuts returns a list of shortcuts that can be used for the lookup table
-func getRuleShortcuts(f *NetworkRule) []string {
+func getRuleShortcuts(f *rules.NetworkRule) []string {
 	if len(f.Shortcut) < shortcutLength {
 		return nil
 	}
@@ -219,7 +223,7 @@ func getRuleShortcuts(f *NetworkRule) []string {
 
 // isAnyURLShortcut checks if the rule potentially matches too many URLs.
 // We'd better use another type of lookup table for this kind of rules.
-func isAnyURLShortcut(f *NetworkRule) bool {
+func isAnyURLShortcut(f *rules.NetworkRule) bool {
 	// Sorry for magic numbers
 	// The numbers are basically ("PROTO://".length + 1)
 
@@ -260,7 +264,7 @@ func fastHash(str string) uint32 {
 }
 
 // helper function that checks if the specified rule is already in the array
-func containsRule(rules []*NetworkRule, r *NetworkRule) bool {
+func containsRule(rules []*rules.NetworkRule, r *rules.NetworkRule) bool {
 	if rules == nil {
 		return false
 	}
@@ -273,4 +277,20 @@ func containsRule(rules []*NetworkRule, r *NetworkRule) bool {
 	}
 
 	return false
+}
+
+// getSubdomains splits the specified hostname and returns all subdomains (including the hostname itself)
+func getSubdomains(hostname string) []string {
+	parts := strings.Split(hostname, ".")
+	var subdomains []string
+	var domain = ""
+	for i := len(parts) - 1; i >= 0; i-- {
+		if domain == "" {
+			domain = parts[i]
+		} else {
+			domain = parts[i] + "." + domain
+		}
+		subdomains = append(subdomains, domain)
+	}
+	return subdomains
 }

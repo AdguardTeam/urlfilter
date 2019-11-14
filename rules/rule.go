@@ -1,4 +1,4 @@
-package urlfilter
+package rules
 
 import (
 	"errors"
@@ -22,10 +22,6 @@ var (
 	// ErrUnsupportedRule signals that this might be a valid rule type,
 	// but it is not yet supported by this library
 	ErrUnsupportedRule = errors.New("this type of rules is unsupported")
-
-	// ErrRuleRetrieval signals that the rule cannot be retrieved by RuleList
-	// by the the specified index
-	ErrRuleRetrieval = errors.New("cannot retrieve the rule")
 )
 
 // Rule is a base interface for all filtering rules

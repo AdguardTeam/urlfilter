@@ -13,6 +13,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/AdguardTeam/urlfilter/filterlist"
+
+	"github.com/AdguardTeam/urlfilter/rules"
+
 	"github.com/AdguardTeam/golibs/log"
 	"github.com/shirou/gopsutil/process"
 	"github.com/stretchr/testify/assert"
@@ -35,7 +39,7 @@ type testRequest struct {
 func TestEmptyNetworkEngine(t *testing.T) {
 	ruleStorage := newTestRuleStorage(t, 1, "")
 	engine := NewNetworkEngine(ruleStorage)
-	r := NewRequest("http://example.org/", "", TypeOther)
+	r := rules.NewRequest("http://example.org/", "", rules.TypeOther)
 	rule, ok := engine.Match(r)
 	assert.False(t, ok)
 	assert.Nil(t, rule)
@@ -48,7 +52,7 @@ func TestMatchWhitelistRule(t *testing.T) {
 	ruleStorage := newTestRuleStorage(t, -1, rulesText)
 	engine := NewNetworkEngine(ruleStorage)
 
-	r := NewRequest("http://example.org/", "", TypeScript)
+	r := rules.NewRequest("http://example.org/", "", rules.TypeScript)
 	rule, ok := engine.Match(r)
 	assert.True(t, ok)
 	assert.NotNil(t, rule)
@@ -63,19 +67,19 @@ func TestMatchImportantRule(t *testing.T) {
 	ruleStorage := newTestRuleStorage(t, -1, rulesText)
 	engine := NewNetworkEngine(ruleStorage)
 
-	r := NewRequest("http://example.org/", "", TypeOther)
+	r := rules.NewRequest("http://example.org/", "", rules.TypeOther)
 	rule, ok := engine.Match(r)
 	assert.True(t, ok)
 	assert.NotNil(t, rule)
 	assert.Equal(t, r2, rule.String())
 
-	r = NewRequest("http://test1.example.org/", "", TypeOther)
+	r = rules.NewRequest("http://test1.example.org/", "", rules.TypeOther)
 	rule, ok = engine.Match(r)
 	assert.True(t, ok)
 	assert.NotNil(t, rule)
 	assert.Equal(t, r2, rule.String())
 
-	r = NewRequest("http://test2.example.org/", "", TypeOther)
+	r = rules.NewRequest("http://test2.example.org/", "", rules.TypeOther)
 	rule, ok = engine.Match(r)
 	assert.True(t, ok)
 	assert.NotNil(t, rule)
@@ -90,7 +94,7 @@ func TestMatchSourceRule(t *testing.T) {
 	url := "https://ci.phncdn.com/videos/201809/25/184777011/original/(m=ecuKGgaaaa)(mh=VSmV9NL_iouBcWJJ)4.jpg"
 	sourceURL := "https://www.pornhub.com/view_video.php?viewkey=ph5be89d11de4b0"
 
-	r := NewRequest(url, sourceURL, TypeImage)
+	r := rules.NewRequest(url, sourceURL, rules.TypeImage)
 	rule, ok := engine.Match(r)
 	assert.True(t, ok)
 	assert.NotNil(t, rule)
@@ -105,7 +109,7 @@ func TestMatchSimplePattern(t *testing.T) {
 	url := "https://ap.lijit.com/rtb/bid?src=prebid_prebid_1.35.0"
 	sourceURL := "https://www.drudgereport.com/"
 
-	r := NewRequest(url, sourceURL, TypeXmlhttprequest)
+	r := rules.NewRequest(url, sourceURL, rules.TypeXmlhttprequest)
 	rule, ok := engine.Match(r)
 	assert.True(t, ok)
 	assert.NotNil(t, rule)
@@ -116,9 +120,9 @@ func TestBenchNetworkEngine(t *testing.T) {
 
 	testRequests := loadRequests(t)
 	assert.True(t, len(testRequests) > 0)
-	var requests []*Request
+	var requests []*rules.Request
 	for _, req := range testRequests {
-		r := NewRequest(req.URL, req.FrameUrl, testGetRequestType(req.RequestType))
+		r := rules.NewRequest(req.URL, req.FrameUrl, testGetRequestType(req.RequestType))
 		requests = append(requests, r)
 	}
 
@@ -165,7 +169,7 @@ func TestBenchNetworkEngine(t *testing.T) {
 	log.Printf("Average per request: %v", time.Duration(int64(totalElapsed)/int64(len(requests))))
 	log.Printf("Max per request: %v", maxElapsedMatch)
 	log.Printf("Min per request: %v", minElapsedMatch)
-	log.Printf("Storage cache length: %d", len(engine.ruleStorage.cache))
+	log.Printf("Storage cache length: %d", engine.ruleStorage.GetCacheSize())
 
 	afterMatch := getRSS()
 	log.Printf("RSS after matching - %d kB (%d kB diff)\n", afterMatch/1024, (afterMatch-afterLoad)/1024)
@@ -173,28 +177,28 @@ func TestBenchNetworkEngine(t *testing.T) {
 
 // assumeRequestType converts string value from requests.json to RequestType
 // This maps puppeteer types to WebRequest types
-func testGetRequestType(t string) RequestType {
+func testGetRequestType(t string) rules.RequestType {
 	switch t {
 	case "document":
 		// Consider document requests as sub_document. This is because the request
 		// dataset does not contain sub_frame or main_frame but only 'document'.
-		return TypeSubdocument
+		return rules.TypeSubdocument
 	case "stylesheet":
-		return TypeStylesheet
+		return rules.TypeStylesheet
 	case "font":
-		return TypeFont
+		return rules.TypeFont
 	case "image":
-		return TypeImage
+		return rules.TypeImage
 	case "media":
-		return TypeMedia
+		return rules.TypeMedia
 	case "script":
-		return TypeScript
+		return rules.TypeScript
 	case "xhr", "fetch":
-		return TypeXmlhttprequest
+		return rules.TypeXmlhttprequest
 	case "websocket":
-		return TypeWebsocket
+		return rules.TypeWebsocket
 	default:
-		return TypeOther
+		return rules.TypeOther
 	}
 }
 
@@ -208,15 +212,15 @@ func buildNetworkEngine(t *testing.T) *NetworkEngine {
 	if err != nil {
 		t.Fatalf("cannot read %s", filterPath)
 	}
-	lists := []RuleList{
-		&StringRuleList{
+	lists := []filterlist.RuleList{
+		&filterlist.StringRuleList{
 			ID:             1,
 			RulesText:      string(filterBytes),
 			IgnoreCosmetic: true,
 		},
 	}
 
-	ruleStorage, err := NewRuleStorage(lists)
+	ruleStorage, err := filterlist.NewRuleStorage(lists)
 	if err != nil {
 		t.Fatalf("cannot initialize rule storage: %s", err)
 	}
@@ -226,13 +230,13 @@ func buildNetworkEngine(t *testing.T) *NetworkEngine {
 	return engine
 }
 
-func newTestRuleStorage(t *testing.T, listID int, rulesText string) *RuleStorage {
-	list := &StringRuleList{
+func newTestRuleStorage(t *testing.T, listID int, rulesText string) *filterlist.RuleStorage {
+	list := &filterlist.StringRuleList{
 		ID:             listID,
 		RulesText:      rulesText,
 		IgnoreCosmetic: false,
 	}
-	ruleStorage, err := NewRuleStorage([]RuleList{list})
+	ruleStorage, err := filterlist.NewRuleStorage([]filterlist.RuleList{list})
 	if err != nil {
 		t.Fatalf("cannot initialize rule storage: %s", err)
 	}

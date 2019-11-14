@@ -7,7 +7,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/AdguardTeam/urlfilter"
+	"github.com/AdguardTeam/urlfilter/rules"
 )
 
 // Session contains all the necessary data to filter requests and responses.
@@ -30,8 +30,8 @@ import (
 // 2.3. This is an HTML response so we need to filter the response body and apply cosmetic filters.
 // 2.4. We should continue execution and do nothing with the response.
 type Session struct {
-	ID      string             // Session identifier
-	Request *urlfilter.Request // Request data
+	ID      string         // Session identifier
+	Request *rules.Request // Request data
 
 	HTTPRequest  *http.Request  // HTTP request data
 	HTTPResponse *http.Response // HTTP response data
@@ -39,7 +39,7 @@ type Session struct {
 	MediaType string // Mime media type
 	Charset   string // Response charset (if it's possible to parse it from content-type)
 
-	Result urlfilter.MatchingResult // Filtering engine result
+	Result rules.MatchingResult // Filtering engine result
 }
 
 // NewSession creates a new instance of the Session struct and initializes it.
@@ -50,7 +50,7 @@ func NewSession(id string, req *http.Request) *Session {
 
 	s := Session{
 		ID:          id,
-		Request:     urlfilter.NewRequest(req.URL.String(), req.Referer(), requestType),
+		Request:     rules.NewRequest(req.URL.String(), req.Referer(), requestType),
 		HTTPRequest: req,
 	}
 
@@ -77,7 +77,7 @@ func (s *Session) SetResponse(res *http.Response) {
 // assumeRequestType assumes request type from what we know at this point.
 // req -- HTTP request
 // res -- HTTP response or null if we don't know it at the moment
-func assumeRequestType(req *http.Request, res *http.Response) urlfilter.RequestType {
+func assumeRequestType(req *http.Request, res *http.Response) rules.RequestType {
 	if res != nil {
 		contentType := res.Header.Get("Content-Type")
 		mediaType, _, _ := mime.ParseMediaType(contentType)
@@ -87,7 +87,7 @@ func assumeRequestType(req *http.Request, res *http.Response) urlfilter.RequestT
 	acceptHeader := req.Header.Get("Accept")
 	requestType := assumeRequestTypeFromMediaType(acceptHeader)
 
-	if requestType == urlfilter.TypeOther {
+	if requestType == rules.TypeOther {
 		// Try to get it from the URL
 		requestType = assumeRequestTypeFromURL(req.URL)
 	}
@@ -96,112 +96,112 @@ func assumeRequestType(req *http.Request, res *http.Response) urlfilter.RequestT
 }
 
 // assumeRequestTypeFromMediaType tries to detect the content type from the specified media type
-func assumeRequestTypeFromMediaType(mediaType string) urlfilter.RequestType {
+func assumeRequestTypeFromMediaType(mediaType string) rules.RequestType {
 	switch {
 	// $document
 	case strings.Index(mediaType, "application/xhtml") == 0:
-		return urlfilter.TypeDocument
+		return rules.TypeDocument
 	// We should recognize m3u file as html (in terms of filtering), because m3u play list can contains refs to video ads.
 	// So if we recognize it as html we can filter it and in particular apply replace rules
 	// for more details see https://github.com/AdguardTeam/AdguardForWindows/issues/1428
 	// TODO: Change this -- save media type to session parameters
 	case strings.Index(mediaType, "audio/x-mpegURL") == 0:
-		return urlfilter.TypeDocument
+		return rules.TypeDocument
 	case strings.Index(mediaType, "text/html") == 0:
-		return urlfilter.TypeDocument
+		return rules.TypeDocument
 	// $stylesheet
 	case strings.Index(mediaType, "text/css") == 0:
-		return urlfilter.TypeStylesheet
+		return rules.TypeStylesheet
 	// $script
 	case strings.Index(mediaType, "application/javascript") == 0:
-		return urlfilter.TypeScript
+		return rules.TypeScript
 	case strings.Index(mediaType, "application/x-javascript") == 0:
-		return urlfilter.TypeScript
+		return rules.TypeScript
 	case strings.Index(mediaType, "text/javascript") == 0:
-		return urlfilter.TypeScript
+		return rules.TypeScript
 	// $image
 	case strings.Index(mediaType, "image/") == 0:
-		return urlfilter.TypeImage
+		return rules.TypeImage
 	// $object
 	case strings.Index(mediaType, "application/x-shockwave-flash") == 0:
-		return urlfilter.TypeObject
+		return rules.TypeObject
 	// $font
 	case strings.Index(mediaType, "application/font") == 0:
-		return urlfilter.TypeFont
+		return rules.TypeFont
 	case strings.Index(mediaType, "application/vnd.ms-fontobject") == 0:
-		return urlfilter.TypeFont
+		return rules.TypeFont
 	case strings.Index(mediaType, "application/x-font-") == 0:
-		return urlfilter.TypeFont
+		return rules.TypeFont
 	case strings.Index(mediaType, "font/") == 0:
-		return urlfilter.TypeFont
+		return rules.TypeFont
 	// $media
 	case strings.Index(mediaType, "audio/") == 0:
-		return urlfilter.TypeMedia
+		return rules.TypeMedia
 	case strings.Index(mediaType, "video/") == 0:
-		return urlfilter.TypeMedia
+		return rules.TypeMedia
 	// $json
 	case strings.Index(mediaType, "application/json") == 0:
-		return urlfilter.TypeXmlhttprequest
+		return rules.TypeXmlhttprequest
 	}
 
-	return urlfilter.TypeOther
+	return rules.TypeOther
 }
 
-var fileExtensions = map[string]urlfilter.RequestType{
+var fileExtensions = map[string]rules.RequestType{
 	// $script
-	".js":     urlfilter.TypeScript,
-	".vbs":    urlfilter.TypeScript,
-	".coffee": urlfilter.TypeScript,
+	".js":     rules.TypeScript,
+	".vbs":    rules.TypeScript,
+	".coffee": rules.TypeScript,
 	// $image
-	".jpg":  urlfilter.TypeImage,
-	".jpeg": urlfilter.TypeImage,
-	".gif":  urlfilter.TypeImage,
-	".png":  urlfilter.TypeImage,
-	".tiff": urlfilter.TypeImage,
-	".psd":  urlfilter.TypeImage,
-	".ico":  urlfilter.TypeImage,
+	".jpg":  rules.TypeImage,
+	".jpeg": rules.TypeImage,
+	".gif":  rules.TypeImage,
+	".png":  rules.TypeImage,
+	".tiff": rules.TypeImage,
+	".psd":  rules.TypeImage,
+	".ico":  rules.TypeImage,
 	// $stylesheet
-	".css":  urlfilter.TypeStylesheet,
-	".less": urlfilter.TypeStylesheet,
+	".css":  rules.TypeStylesheet,
+	".less": rules.TypeStylesheet,
 	// $object
-	".jar": urlfilter.TypeObject,
-	".swf": urlfilter.TypeObject,
+	".jar": rules.TypeObject,
+	".swf": rules.TypeObject,
 	// $media
-	".wav":   urlfilter.TypeMedia,
-	".mp3":   urlfilter.TypeMedia,
-	".mp4":   urlfilter.TypeMedia,
-	".avi":   urlfilter.TypeMedia,
-	".flv":   urlfilter.TypeMedia,
-	".m3u":   urlfilter.TypeMedia,
-	".webm":  urlfilter.TypeMedia,
-	".mpeg":  urlfilter.TypeMedia,
-	".3gp":   urlfilter.TypeMedia,
-	".3g2":   urlfilter.TypeMedia,
-	".3gpp":  urlfilter.TypeMedia,
-	".3gpp2": urlfilter.TypeMedia,
-	".ogg":   urlfilter.TypeMedia,
-	".mov":   urlfilter.TypeMedia,
-	".qt":    urlfilter.TypeMedia,
-	".vbm":   urlfilter.TypeMedia,
-	".mkv":   urlfilter.TypeMedia,
-	".gifv":  urlfilter.TypeMedia,
+	".wav":   rules.TypeMedia,
+	".mp3":   rules.TypeMedia,
+	".mp4":   rules.TypeMedia,
+	".avi":   rules.TypeMedia,
+	".flv":   rules.TypeMedia,
+	".m3u":   rules.TypeMedia,
+	".webm":  rules.TypeMedia,
+	".mpeg":  rules.TypeMedia,
+	".3gp":   rules.TypeMedia,
+	".3g2":   rules.TypeMedia,
+	".3gpp":  rules.TypeMedia,
+	".3gpp2": rules.TypeMedia,
+	".ogg":   rules.TypeMedia,
+	".mov":   rules.TypeMedia,
+	".qt":    rules.TypeMedia,
+	".vbm":   rules.TypeMedia,
+	".mkv":   rules.TypeMedia,
+	".gifv":  rules.TypeMedia,
 	// $font
-	".ttf":   urlfilter.TypeFont,
-	".otf":   urlfilter.TypeFont,
-	".woff":  urlfilter.TypeFont,
-	".woff2": urlfilter.TypeFont,
-	".eot":   urlfilter.TypeFont,
+	".ttf":   rules.TypeFont,
+	".otf":   rules.TypeFont,
+	".woff":  rules.TypeFont,
+	".woff2": rules.TypeFont,
+	".eot":   rules.TypeFont,
 	// $xmlhttprequest
-	".json": urlfilter.TypeXmlhttprequest,
+	".json": rules.TypeXmlhttprequest,
 }
 
 // assumeRequestTypeFromURL assumes the request type from the file extension
-func assumeRequestTypeFromURL(url *url.URL) urlfilter.RequestType {
+func assumeRequestTypeFromURL(url *url.URL) rules.RequestType {
 	ext := path.Ext(url.Path)
 
 	requestType, ok := fileExtensions[ext]
 	if !ok {
-		return urlfilter.TypeOther
+		return rules.TypeOther
 	}
 
 	return requestType

@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/AdguardTeam/urlfilter"
+	"github.com/AdguardTeam/urlfilter/rules"
 )
 
 // Suppress cache during the first minutes from the startup
@@ -23,11 +23,11 @@ func (s *Server) shouldSuppressCache(session *Session) bool {
 	r := session.Request
 
 	// Don't suppress cache for static resources
-	if r.RequestType == urlfilter.TypeImage ||
-		r.RequestType == urlfilter.TypeFont ||
-		r.RequestType == urlfilter.TypeScript ||
-		r.RequestType == urlfilter.TypeStylesheet ||
-		r.RequestType == urlfilter.TypeMedia {
+	if r.RequestType == rules.TypeImage ||
+		r.RequestType == rules.TypeFont ||
+		r.RequestType == rules.TypeScript ||
+		r.RequestType == rules.TypeStylesheet ||
+		r.RequestType == rules.TypeMedia {
 		return false
 	}
 

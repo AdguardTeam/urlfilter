@@ -1,8 +1,10 @@
-package urlfilter
+package filterlist
 
 import (
 	"fmt"
 	"sync"
+
+	"github.com/AdguardTeam/urlfilter/rules"
 
 	"github.com/AdguardTeam/golibs/log"
 	"github.com/joomcode/errorx"
@@ -25,8 +27,8 @@ type RuleStorage struct {
 	// using this RuleStorage
 	Lists []RuleList
 
-	listsMap map[int]RuleList // map with rule lists. map key is the list ID.
-	cache    map[int64]Rule   // cache with the rules which were retrieved.
+	listsMap map[int]RuleList     // map with rule lists. map key is the list ID.
+	cache    map[int64]rules.Rule // cache with the rules which were retrieved.
 
 	sync.Mutex
 }
@@ -51,7 +53,7 @@ func NewRuleStorage(lists []RuleList) (*RuleStorage, error) {
 	return &RuleStorage{
 		Lists:    lists,
 		listsMap: listsMap,
-		cache:    map[int64]Rule{},
+		cache:    map[int64]rules.Rule{},
 	}, nil
 }
 
@@ -71,7 +73,7 @@ func (s *RuleStorage) NewRuleStorageScanner() *RuleStorageScanner {
 
 // RetrieveRule looks for the filtering rule in this storage
 // storageIdx is the lookup index that you can get from the rule storage scanner
-func (s *RuleStorage) RetrieveRule(storageIdx int64) (Rule, error) {
+func (s *RuleStorage) RetrieveRule(storageIdx int64) (rules.Rule, error) {
 	s.Lock()
 	defer s.Unlock()
 
@@ -97,14 +99,14 @@ func (s *RuleStorage) RetrieveRule(storageIdx int64) (Rule, error) {
 
 // RetrieveNetworkRule is a helper method that retrieves a network rule from the storage
 // It returns a pointer to the rule or nil in any other case (not found or error)
-func (s *RuleStorage) RetrieveNetworkRule(idx int64) *NetworkRule {
+func (s *RuleStorage) RetrieveNetworkRule(idx int64) *rules.NetworkRule {
 	r, err := s.RetrieveRule(idx)
 	if err != nil {
 		log.Error("Cannot retrieve rule %d: %s", idx, err)
 		return nil
 	}
 
-	v, ok := r.(*NetworkRule)
+	v, ok := r.(*rules.NetworkRule)
 	if ok {
 		return v
 	}
@@ -114,14 +116,14 @@ func (s *RuleStorage) RetrieveNetworkRule(idx int64) *NetworkRule {
 
 // RetrieveHostRule is a helper method that retrieves a host rule from the storage
 // It returns a pointer to the rule or nil in any other case (not found or error)
-func (s *RuleStorage) RetrieveHostRule(idx int64) *HostRule {
+func (s *RuleStorage) RetrieveHostRule(idx int64) *rules.HostRule {
 	r, err := s.RetrieveRule(idx)
 	if err != nil {
 		log.Error("Cannot retrieve rule %d: %s", idx, err)
 		return nil
 	}
 
-	v, ok := r.(*HostRule)
+	v, ok := r.(*rules.HostRule)
 	if ok {
 		return v
 	}
@@ -149,4 +151,9 @@ func (s *RuleStorage) Close() error {
 	}
 
 	return nil
+}
+
+// GetCacheSize returns the size of the in-memory rules cache
+func (s *RuleStorage) GetCacheSize() int {
+	return len(s.cache)
 }

@@ -1,4 +1,4 @@
-package urlfilter
+package filterlist
 
 import (
 	"os"
@@ -7,6 +7,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 )
+
+const hostsPath = testResourcesDir + "/hosts"
 
 func TestRuleScannerOfStringReader(t *testing.T) {
 	filterList := "||example.org\n! test\n##banner"

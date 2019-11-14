@@ -5,10 +5,11 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/AdguardTeam/urlfilter/rules"
+
 	"github.com/AdguardTeam/gomitmproxy/proxyutil"
 
 	"github.com/AdguardTeam/golibs/log"
-	"github.com/AdguardTeam/urlfilter"
 )
 
 type blockedPageParameters struct {
@@ -17,7 +18,7 @@ type blockedPageParameters struct {
 }
 
 // buildBlockedPage builds blocked page content
-func buildBlockedPage(session *Session, f *urlfilter.NetworkRule) string {
+func buildBlockedPage(session *Session, f *rules.NetworkRule) string {
 	params := blockedPageParameters{
 		Hostname: session.Request.Hostname,
 		RuleText: f.Text(),
@@ -33,7 +34,7 @@ func buildBlockedPage(session *Session, f *urlfilter.NetworkRule) string {
 }
 
 // newBlockedResponse creates an HTTP response for blocked request
-func newBlockedResponse(session *Session, f *urlfilter.NetworkRule) *http.Response {
+func newBlockedResponse(session *Session, f *rules.NetworkRule) *http.Response {
 	html := buildBlockedPage(session, f)
 	body := strings.NewReader(html)
 	res := proxyutil.NewResponse(http.StatusInternalServerError, body, session.HTTPRequest)

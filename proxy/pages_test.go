@@ -4,16 +4,16 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/AdguardTeam/urlfilter/rules"
 
-	"github.com/AdguardTeam/urlfilter"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestBuildBlockedPage(t *testing.T) {
 	s := &Session{
-		Request: urlfilter.NewRequest("https://example.org/", "", urlfilter.TypeDocument),
+		Request: rules.NewRequest("https://example.org/", "", rules.TypeDocument),
 	}
-	f, err := urlfilter.NewNetworkRule("||example.org^", 0)
+	f, err := rules.NewNetworkRule("||example.org^", 0)
 	assert.Nil(t, err)
 
 	page := buildBlockedPage(s, f)

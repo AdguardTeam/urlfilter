@@ -1,19 +1,33 @@
-package urlfilter
+package filterlist
 
 import (
+	"bytes"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
+
+	"github.com/AdguardTeam/urlfilter/rules"
+)
+
+// On Linux the size of the data block is usually 4KB
+// So it makes sense to use 4KB.
+const readerBufferSize = 4 * 1024
+
+var (
+	// ErrRuleRetrieval signals that the rule cannot be retrieved by RuleList
+	// by the the specified index
+	ErrRuleRetrieval = errors.New("cannot retrieve the rule")
 )
 
 // RuleList represents a set of filtering rules
 type RuleList interface {
-	GetID() int                             // GetID returns the rule list identifier
-	NewScanner() *RuleScanner               // Creates a new scanner that reads the list contents
-	RetrieveRule(ruleIdx int) (Rule, error) // Retrieves a rule by its index
-	io.Closer                               // Closes the rules list
+	GetID() int                                   // GetID returns the rule list identifier
+	NewScanner() *RuleScanner                     // Creates a new scanner that reads the list contents
+	RetrieveRule(ruleIdx int) (rules.Rule, error) // Retrieves a rule by its index
+	io.Closer                                     // Closes the rules list
 }
 
 // StringRuleList represents a string-based rule list
@@ -37,7 +51,7 @@ func (l *StringRuleList) NewScanner() *RuleScanner {
 
 // RetrieveRule finds and deserializes rule by its index.
 // If there's no rule by that index or rule is invalid, it will return an error.
-func (l *StringRuleList) RetrieveRule(ruleIdx int) (Rule, error) {
+func (l *StringRuleList) RetrieveRule(ruleIdx int) (rules.Rule, error) {
 	if ruleIdx < 0 || ruleIdx >= len(l.RulesText) {
 		return nil, ErrRuleRetrieval
 	}
@@ -54,7 +68,7 @@ func (l *StringRuleList) RetrieveRule(ruleIdx int) (Rule, error) {
 		return nil, ErrRuleRetrieval
 	}
 
-	return NewRule(line, l.ID)
+	return rules.NewRule(line, l.ID)
 }
 
 // Close does nothing as there's nothing to close in the StringRuleList
@@ -102,7 +116,7 @@ func (l *FileRuleList) NewScanner() *RuleScanner {
 
 // RetrieveRule finds and deserializes rule by its index.
 // If there's no rule by that index or rule is invalid, it will return an error.
-func (l *FileRuleList) RetrieveRule(ruleIdx int) (Rule, error) {
+func (l *FileRuleList) RetrieveRule(ruleIdx int) (rules.Rule, error) {
 	l.Lock()
 	defer l.Unlock()
 
@@ -131,10 +145,32 @@ func (l *FileRuleList) RetrieveRule(ruleIdx int) (Rule, error) {
 		return nil, ErrRuleRetrieval
 	}
 
-	return NewRule(line, l.ID)
+	return rules.NewRule(line, l.ID)
 }
 
 // Close closes the underlying file
 func (l *FileRuleList) Close() error {
 	return l.File.Close()
+}
+
+// readLine reads from the reader until '\n'
+// r - reader to read from
+// b - buffer to use (the idea is to reuse the same buffer when it's possible)
+func readLine(r io.Reader, b []byte) (string, error) {
+	line := ""
+
+	for {
+		n, err := r.Read(b)
+		if n > 0 {
+			idx := bytes.IndexByte(b[:n], '\n')
+			if idx == -1 {
+				line += string(b[:n])
+			} else {
+				line += string(b[:idx])
+				return line, err
+			}
+		} else {
+			return line, err
+		}
+	}
 }

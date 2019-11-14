@@ -5,6 +5,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/AdguardTeam/urlfilter/filterlist"
+
+	"github.com/AdguardTeam/urlfilter/rules"
+
+	"github.com/AdguardTeam/urlfilter/filterutil"
+
 	"github.com/AdguardTeam/golibs/log"
 	"github.com/stretchr/testify/assert"
 )
@@ -17,21 +23,21 @@ const (
 func TestBenchDNSEngine(t *testing.T) {
 	debug.SetGCPercent(10)
 
-	filterRuleList, err := NewFileRuleList(1, networkFilterPath, true)
+	filterRuleList, err := filterlist.NewFileRuleList(1, networkFilterPath, true)
 	if err != nil {
 		t.Fatalf("cannot read %s", networkFilterPath)
 	}
 
-	hostsRuleList, err := NewFileRuleList(2, hostsPath, true)
+	hostsRuleList, err := filterlist.NewFileRuleList(2, hostsPath, true)
 	if err != nil {
 		t.Fatalf("cannot read %s", hostsPath)
 	}
 
-	ruleLists := []RuleList{
+	ruleLists := []filterlist.RuleList{
 		filterRuleList,
 		hostsRuleList,
 	}
-	ruleStorage, err := NewRuleStorage(ruleLists)
+	ruleStorage, err := filterlist.NewRuleStorage(ruleLists)
 	if err != nil {
 		t.Fatalf("cannot create rule storage: %s", err)
 	}
@@ -41,7 +47,7 @@ func TestBenchDNSEngine(t *testing.T) {
 	assert.True(t, len(testRequests) > 0)
 	var testHostnames []string
 	for _, req := range testRequests {
-		h := extractHostname(req.URL)
+		h := filterutil.ExtractHostname(req.URL)
 		if h != "" {
 			testHostnames = append(testHostnames, h)
 		}
@@ -71,7 +77,7 @@ func TestBenchDNSEngine(t *testing.T) {
 		}
 
 		startMatch := time.Now()
-		rules, found := dnsEngine.Match(reqHostname)
+		matchingRules, found := dnsEngine.Match(reqHostname)
 		elapsedMatch := time.Since(startMatch)
 		totalElapsed += elapsedMatch
 		if elapsedMatch > maxElapsedMatch {
@@ -82,10 +88,10 @@ func TestBenchDNSEngine(t *testing.T) {
 		}
 
 		if found {
-			switch v := rules[0].(type) {
-			case *HostRule:
+			switch v := matchingRules[0].(type) {
+			case *rules.HostRule:
 				totalMatches++
-			case *NetworkRule:
+			case *rules.NetworkRule:
 				if !v.Whitelist {
 					totalMatches++
 				}
@@ -98,7 +104,7 @@ func TestBenchDNSEngine(t *testing.T) {
 	log.Printf("Average per request: %v", time.Duration(int64(totalElapsed)/int64(len(testHostnames))))
 	log.Printf("Max per request: %v", maxElapsedMatch)
 	log.Printf("Min per request: %v", minElapsedMatch)
-	log.Printf("Storage cache length: %d", len(ruleStorage.cache))
+	log.Printf("Storage cache length: %d", ruleStorage.GetCacheSize())
 
 	afterMatch := getRSS()
 	log.Printf("RSS after matching - %d kB (%d kB diff)\n", afterMatch/1024, (afterMatch-afterLoad)/1024)
@@ -114,20 +120,20 @@ func TestDNSEngineMatchHostname(t *testing.T) {
 	assert.True(t, ok)
 	assert.True(t, len(r) == 1)
 
-	_, ok = r[0].(*NetworkRule)
+	_, ok = r[0].(*rules.NetworkRule)
 	assert.True(t, ok)
 
 	r, ok = dnsEngine.Match("example2.org")
 	assert.True(t, ok)
 	assert.True(t, len(r) == 1)
-	_, ok = r[0].(*NetworkRule)
+	_, ok = r[0].(*rules.NetworkRule)
 	assert.True(t, ok)
 
 	r, ok = dnsEngine.Match("example.com")
 	assert.True(t, ok)
 	assert.True(t, len(r) == 1)
 
-	_, ok = r[0].(*HostRule)
+	_, ok = r[0].(*rules.HostRule)
 	assert.True(t, ok)
 
 	_, ok = dnsEngine.Match("example.net")
@@ -150,14 +156,14 @@ func TestRegexp(t *testing.T) {
 	ruleStorage := newTestRuleStorage(t, 1, text)
 	dnsEngine := NewDNSEngine(ruleStorage)
 
-	rules, ok := dnsEngine.Match("stats.test.com")
-	assert.True(t, ok && rules[0].Text() == text)
+	matchingRules, ok := dnsEngine.Match("stats.test.com")
+	assert.True(t, ok && matchingRules[0].Text() == text)
 
 	text = "@@/^stats?\\./"
 	ruleStorage = newTestRuleStorage(t, 1, "||stats.test.com^\n"+text)
 	dnsEngine = NewDNSEngine(ruleStorage)
 
-	rules, ok = dnsEngine.Match("stats.test.com")
-	nr := rules[0].(*NetworkRule)
-	assert.True(t, ok && rules[0].Text() == text && nr.Whitelist)
+	matchingRules, ok = dnsEngine.Match("stats.test.com")
+	nr := matchingRules[0].(*rules.NetworkRule)
+	assert.True(t, ok && matchingRules[0].Text() == text && nr.Whitelist)
 }

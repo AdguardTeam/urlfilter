@@ -1,4 +1,4 @@
-package urlfilter
+package rules
 
 // CosmeticOption is the enumeration of various content script options.
 // Depending on the set of enabled flags the content script will contain different set of settings.
@@ -81,7 +81,7 @@ func NewMatchingResult(rules []*NetworkRule, sourceRules []*NetworkRule) Matchin
 	// First of all, find document-level whitelist rules
 	for _, rule := range sourceRules {
 		if rule.isDocumentWhitelistRule() {
-			if result.DocumentRule == nil || rule.isHigherPriority(result.DocumentRule) {
+			if result.DocumentRule == nil || rule.IsHigherPriority(result.DocumentRule) {
 				result.DocumentRule = rule
 			}
 		}
@@ -121,12 +121,12 @@ func NewMatchingResult(rules []*NetworkRule, sourceRules []*NetworkRule) Matchin
 				if !basicAllowed {
 					continue
 				}
-				if !genericAllowed && rule.isGeneric() {
+				if !genericAllowed && rule.IsGeneric() {
 					continue
 				}
 			}
 
-			if result.BasicRule == nil || rule.isHigherPriority(result.BasicRule) {
+			if result.BasicRule == nil || rule.IsHigherPriority(result.BasicRule) {
 				result.BasicRule = rule
 			}
 		}

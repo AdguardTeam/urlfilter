@@ -1,4 +1,4 @@
-package urlfilter
+package rules
 
 import (
 	"testing"

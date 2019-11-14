@@ -4,10 +4,11 @@ import (
 	"net"
 	"net/http"
 
+	"github.com/AdguardTeam/urlfilter/rules"
+
 	"github.com/AdguardTeam/golibs/log"
 	"github.com/AdguardTeam/gomitmproxy"
 	"github.com/AdguardTeam/gomitmproxy/proxyutil"
-	"github.com/AdguardTeam/urlfilter"
 )
 
 // onRequest handles the outgoing HTTP requests
@@ -77,8 +78,8 @@ func (s *Server) onResponse(sess *gomitmproxy.Session) *http.Response {
 		return newBlockedResponse(session, rule)
 	}
 
-	if session.Request.RequestType == urlfilter.TypeDocument &&
-		session.Result.GetCosmeticOption() != urlfilter.CosmeticOptionNone {
+	if session.Request.RequestType == rules.TypeDocument &&
+		session.Result.GetCosmeticOption() != rules.CosmeticOptionNone {
 		err := s.filterHTML(session)
 		if err != nil {
 			return proxyutil.NewErrorResponse(session.HTTPRequest, err)

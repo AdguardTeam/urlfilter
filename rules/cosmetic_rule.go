@@ -1,4 +1,4 @@
-package urlfilter
+package rules
 
 import (
 	"bytes"
@@ -156,6 +156,11 @@ func (f *CosmeticRule) GetFilterListID() int {
 // String returns original rule text
 func (f *CosmeticRule) String() string {
 	return f.RuleText
+}
+
+// GetPermittedDomains returns a list of permitted domains
+func (f *CosmeticRule) GetPermittedDomains() []string {
+	return f.permittedDomains
 }
 
 // IsGeneric returns true if rule can be considered generic (is not limited to a specific domain)

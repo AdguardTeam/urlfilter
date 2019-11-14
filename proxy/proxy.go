@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/AdguardTeam/urlfilter/filterlist"
+
 	"github.com/AdguardTeam/golibs/log"
 	"github.com/AdguardTeam/gomitmproxy"
 	"github.com/AdguardTeam/urlfilter"
@@ -113,17 +115,17 @@ func (s *Server) Close() {
 
 // buildEngine builds a new network engine
 func buildEngine(config Config) (*urlfilter.Engine, error) {
-	var lists []urlfilter.RuleList
+	var lists []filterlist.RuleList
 
 	for filterID, path := range config.FiltersPaths {
-		list, err := urlfilter.NewFileRuleList(filterID, path, false)
+		list, err := filterlist.NewFileRuleList(filterID, path, false)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create rule list %d: %s", filterID, err)
 		}
 		lists = append(lists, list)
 	}
 
-	ruleStorage, err := urlfilter.NewRuleStorage(lists)
+	ruleStorage, err := filterlist.NewRuleStorage(lists)
 	if err != nil {
 		return nil, fmt.Errorf("cannot initialize rule storage: %s", err)
 	}
