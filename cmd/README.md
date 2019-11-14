@@ -2,6 +2,15 @@
 
 This is a MITM proxy that is able to apply AdGuard content blocking rules to the web pages.
 
+Here's what you'll need to build and run the proxy:
+
+* go v1.13 or newer
+* openssl (or any other tool to generate the root CA)
+
+> **Limitations**
+> Please note, that at the time of writing, the library is limited to a subset of AdGuard content blocking rules.
+Check out the TODO list in the main README to find out what exactly is missing. 
+
 ## How to build
 
 ```bash
