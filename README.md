@@ -20,7 +20,7 @@ You can learn more about AdGuard filtering rules syntax from [this article](http
 * [X] Benchmark basic rules matching
 * [X] Hosts matching rules
     * [X] /etc/hosts matching
-    * [ ] $badfilter support for host-blocking network rules
+    * [X] $badfilter support for host-blocking network rules
 * [X] Memory optimization
 * [ ] Tech document
 * [ ] Cosmetic rules

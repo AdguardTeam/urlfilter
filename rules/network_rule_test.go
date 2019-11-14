@@ -455,6 +455,36 @@ func TestBadfilterRule(t *testing.T) {
 	assertBadfilterNegates(t, "@@*$image,domain=example.org", "*$image,domain=example.org,badfilter", false)
 }
 
+func TestIsHostLevelNetworkRule(t *testing.T) {
+	r, err := NewNetworkRule("||example.org^$important", -1)
+	assert.Nil(t, err)
+	assert.True(t, r.IsHostLevelNetworkRule())
+
+	r, err = NewNetworkRule("||example.org^$important,badfilter", -1)
+	assert.Nil(t, err)
+	assert.True(t, r.IsHostLevelNetworkRule())
+
+	r, err = NewNetworkRule("||example.org^$badfilter", -1)
+	assert.Nil(t, err)
+	assert.True(t, r.IsHostLevelNetworkRule())
+
+	r, err = NewNetworkRule("||example.org^", -1)
+	assert.Nil(t, err)
+	assert.True(t, r.IsHostLevelNetworkRule())
+
+	r, err = NewNetworkRule("||example.org^$~third-party", -1)
+	assert.Nil(t, err)
+	assert.False(t, r.IsHostLevelNetworkRule())
+
+	r, err = NewNetworkRule("||example.org^$third-party", -1)
+	assert.Nil(t, err)
+	assert.False(t, r.IsHostLevelNetworkRule())
+
+	r, err = NewNetworkRule("||example.org^$domain=example.com", -1)
+	assert.Nil(t, err)
+	assert.False(t, r.IsHostLevelNetworkRule())
+}
+
 func assertBadfilterNegates(t *testing.T, rule string, badfilter string, expected bool) {
 	r, err := NewNetworkRule(rule, -1)
 	assert.Nil(t, err)

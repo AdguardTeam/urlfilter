@@ -11,6 +11,11 @@ import (
 
 const (
 	shortcutLength = 5
+
+	// Limit the URL length with 4KB
+	// It appears that there can be URLs longer than a megabyte
+	// and it makes no sense to go through the whole URL
+	maxURLLength = 4 * 1024
 )
 
 // NetworkEngine is the engine that supports quick search over network rules
@@ -60,17 +65,9 @@ func (n *NetworkEngine) Match(r *rules.Request) (*rules.NetworkRule, bool) {
 		return nil, false
 	}
 
-	var resultRule *rules.NetworkRule
-
-	for i := range networkRules {
-		rule := networkRules[i]
-
-		if resultRule == nil || rule.IsHigherPriority(resultRule) {
-			resultRule = rule
-		}
-	}
-
-	return resultRule, true
+	result := rules.NewMatchingResult(networkRules, nil)
+	resultRule := result.GetBasicResult()
+	return resultRule, resultRule != nil
 }
 
 // MatchAll finds all rules matching the specified request regardless of the rule types
@@ -97,11 +94,16 @@ func (n *NetworkEngine) MatchAll(r *rules.Request) []*rules.NetworkRule {
 // matchShortcutsLookupTable finds all matching rules from the shortcuts lookup table
 func (n *NetworkEngine) matchShortcutsLookupTable(r *rules.Request) []*rules.NetworkRule {
 	var result []*rules.NetworkRule
-	for i := 0; i <= len(r.URLLowerCase)-shortcutLength; i++ {
+	urlLen := len(r.URLLowerCase)
+	if urlLen > maxURLLength {
+		urlLen = maxURLLength
+	}
+
+	for i := 0; i <= urlLen-shortcutLength; i++ {
 		hash := fastHashBetween(r.URLLowerCase, i, i+shortcutLength)
-		if rules, ok := n.shortcutsLookupTable[hash]; ok {
-			for i := range rules {
-				ruleIdx := rules[i]
+		if matchingRules, ok := n.shortcutsLookupTable[hash]; ok {
+			for i := range matchingRules {
+				ruleIdx := matchingRules[i]
 				rule := n.ruleStorage.RetrieveNetworkRule(ruleIdx)
 				if rule != nil && rule.Match(r) {
 					result = append(result, rule)
@@ -124,9 +126,9 @@ func (n *NetworkEngine) matchDomainsLookupTable(r *rules.Request) []*rules.Netwo
 	domains := getSubdomains(r.SourceHostname)
 	for _, domain := range domains {
 		hash := fastHash(domain)
-		if rules, ok := n.domainsLookupTable[hash]; ok {
-			for i := range rules {
-				ruleIdx := rules[i]
+		if matchingRules, ok := n.domainsLookupTable[hash]; ok {
+			for i := range matchingRules {
+				ruleIdx := matchingRules[i]
 				rule := n.ruleStorage.RetrieveNetworkRule(ruleIdx)
 				if rule != nil && rule.Match(r) {
 					result = append(result, rule)

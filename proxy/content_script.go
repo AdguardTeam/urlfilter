@@ -68,14 +68,10 @@ func (s *Server) buildContentScriptCode(result urlfilter.CosmeticResult) string 
 
 // buildContentScript builds the content script content
 func (s *Server) buildContentScript(session *Session) *http.Response {
-	// TODO: Handle cache
-
 	r := session.HTTPRequest
 	if r.Method != http.MethodGet {
 		return newNotFoundResponse(r)
 	}
-
-	// if r.Header.Get("If-Modified-Since")
 
 	hostname := getQueryParameter(r, "hostname")
 	option := getQueryParameterUint64(r, "option")

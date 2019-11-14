@@ -167,3 +167,14 @@ func TestRegexp(t *testing.T) {
 	nr := matchingRules[0].(*rules.NetworkRule)
 	assert.True(t, ok && matchingRules[0].Text() == text && nr.Whitelist)
 }
+
+func TestBadfilterRules(t *testing.T) {
+	rulesText := "||example.org^\n||example.org^$badfilter"
+	ruleStorage := newTestRuleStorage(t, 1, rulesText)
+	dnsEngine := NewDNSEngine(ruleStorage)
+	assert.NotNil(t, dnsEngine)
+
+	r, ok := dnsEngine.Match("example.org")
+	assert.False(t, ok)
+	assert.Nil(t, r)
+}

@@ -69,6 +69,9 @@ const (
 	OptionWhitelistOnly = OptionElemhide | OptionGenericblock | OptionGenerichide |
 		OptionJsinject | OptionUrlblock | OptionContent | OptionExtension |
 		OptionStealth
+
+	// Options supported by host-level network rules
+	OptionHostLevelRulesOnly = OptionImportant | OptionBadfilter
 )
 
 // Count returns the count of enabled options
@@ -216,9 +219,15 @@ func (f *NetworkRule) IsHostLevelNetworkRule() bool {
 		return false
 	}
 
-	// TODO: FORGOT BADFILTER
-	// The only allowed option is $important
-	if f.enabledOptions != 0 && f.enabledOptions != OptionImportant {
+	if f.disabledOptions != 0 {
+		return false
+	}
+
+	if f.enabledOptions != 0 {
+		if ((f.enabledOptions & OptionHostLevelRulesOnly) | (f.enabledOptions ^ OptionHostLevelRulesOnly)) == OptionHostLevelRulesOnly {
+			return true
+		}
+
 		return false
 	}
 
