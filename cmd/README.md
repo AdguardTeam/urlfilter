@@ -14,6 +14,8 @@ Check out the TODO list in the main README to find out what exactly is missing.
 ## How to build
 
 ```bash
+git clone https://github.com/AdguardTeam/urlfilter
+cd urlfilter/cmd
 go build -o adguard
 ```
 
