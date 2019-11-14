@@ -2,13 +2,10 @@ package proxy
 
 import (
 	"fmt"
-	"net"
-	"net/http"
 	"time"
 
 	"github.com/AdguardTeam/golibs/log"
 	"github.com/AdguardTeam/gomitmproxy"
-	"github.com/AdguardTeam/gomitmproxy/proxyutil"
 	"github.com/AdguardTeam/urlfilter"
 )
 
@@ -33,6 +30,35 @@ type Config struct {
 	// * Proxy handles requests to this host
 	// * The content script content depends on the FLAGS value
 	InjectionHost string
+
+	// If true, we will serve the content-script compressed
+	// This is useful for the case when the proxy is on a public server,
+	// as it saves some data.
+	CompressContentScript bool
+}
+
+// String - server's configuration description
+func (c *Config) String() string {
+	str := ""
+	str += fmt.Sprintf("Listen addr: %s\n", c.ProxyConfig.ListenAddr.String())
+	str += fmt.Sprintf("MITM status: %v\n", c.ProxyConfig.MITMConfig != nil)
+	str += fmt.Sprintf("Run as HTTPS proxy: %v\n", c.ProxyConfig.TLSConfig != nil)
+
+	if c.ProxyConfig.Username != "" {
+		str += fmt.Sprintf("Proxy auth: %s/%s\n", c.ProxyConfig.Username, c.ProxyConfig.Password)
+	}
+	if c.ProxyConfig.APIHost != "" {
+		str += fmt.Sprintf("API host: %s\n", c.ProxyConfig.APIHost)
+	}
+
+	if len(c.FiltersPaths) > 0 {
+		str += fmt.Sprintf("Filter lists: %d\n", len(c.FiltersPaths))
+		for i, v := range c.FiltersPaths {
+			str += fmt.Sprintf("%d: %s\n", i, v)
+		}
+	}
+
+	return str
 }
 
 // Server contains the current server state
@@ -51,11 +77,11 @@ type Server struct {
 
 // NewServer creates a new instance of the MITM server
 func NewServer(config Config) (*Server, error) {
+	log.Info("Initializing the proxy server:\n%s", config.String())
+
 	if config.InjectionHost == "" {
 		config.InjectionHost = defaultInjectionsHost
 	}
-
-	// TODO: add logging
 
 	s := &Server{
 		createdAt: time.Now(),
@@ -83,92 +109,6 @@ func (s *Server) Start() error {
 // Close stops the proxy server
 func (s *Server) Close() {
 	s.proxyServer.Close()
-}
-
-// onRequest handles the outgoing HTTP requests
-func (s *Server) onRequest(sess *gomitmproxy.Session) (*http.Request, *http.Response) {
-	r := sess.Request()
-	session := NewSession(sess.ID(), r)
-
-	log.Debug("urlfilter: id=%s: saving session", session.ID)
-	sess.SetProp(sessionPropKey, session)
-
-	if r.Method == http.MethodConnect {
-		// Do nothing for CONNECT requests
-		return nil, nil
-	}
-
-	if session.Request.Hostname == s.InjectionHost {
-		return r, s.buildContentScript(session)
-	}
-
-	session.Result = s.engine.MatchRequest(session.Request)
-	rule := session.Result.GetBasicResult()
-
-	if rule != nil && !rule.Whitelist {
-		log.Debug("urlfilter: id=%s: blocked by %s: %s", session.ID, rule.String(), session.Request.URL)
-
-		// Mark this request as blocked so that we didn't modify it in the onResponse handler
-		sess.SetProp(requestBlockedKey, true)
-
-		return nil, newBlockedResponse(session, rule)
-	}
-
-	return r, nil
-}
-
-// onResponse handles all the responses
-func (s *Server) onResponse(sess *gomitmproxy.Session) *http.Response {
-	if _, ok := sess.GetProp(requestBlockedKey); ok {
-		// request was already blocked
-		return nil
-	}
-
-	v, ok := sess.GetProp(sessionPropKey)
-	if !ok {
-		log.Error("urlfilter: id=%s: session not found", sess.ID())
-		return nil
-	}
-
-	session, ok := v.(*Session)
-
-	if !ok {
-		log.Error("urlfilter: id=%s: session not found (wrong type)", sess.ID())
-		return nil
-	}
-
-	// Update the session -- this will cause requestType re-calc
-	session.SetResponse(sess.Response())
-
-	// Now once we received the response, we must re-calculate the result
-	session.Result = s.engine.MatchRequest(session.Request)
-	rule := session.Result.GetBasicResult()
-	if rule != nil && !rule.Whitelist {
-		log.Debug("urlfilter: id=%s: blocked by %s: %s", session.ID, rule.String(), session.Request.URL)
-		return newBlockedResponse(session, rule)
-	}
-
-	if session.Request.RequestType == urlfilter.TypeDocument &&
-		session.Result.GetCosmeticOption() != urlfilter.CosmeticOptionNone {
-		err := s.filterHTML(session)
-		if err != nil {
-			return proxyutil.NewErrorResponse(session.HTTPRequest, err)
-		}
-		return session.HTTPResponse
-	}
-
-	return nil
-}
-
-// onConnect - the only purpose is to intercept and suppress connections to InjectionHost
-func (s *Server) onConnect(session *gomitmproxy.Session, proto string, addr string) net.Conn {
-	host, _, err := net.SplitHostPort(addr)
-
-	if err == nil && host == s.InjectionHost {
-		return &proxyutil.NoopConn{}
-	}
-
-	return nil
 }
 
 // buildEngine builds a new network engine

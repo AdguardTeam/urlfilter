@@ -2,9 +2,9 @@ package proxy
 
 import (
 	"bytes"
+	"io"
+	"io/ioutil"
 	"net/http"
-	"strconv"
-	"strings"
 	"text/template"
 
 	"github.com/AdguardTeam/golibs/log"
@@ -83,33 +83,43 @@ func (s *Server) buildContentScript(session *Session) *http.Response {
 		return newNotFoundResponse(r)
 	}
 
+	if ts == s.createdAt.Unix() && r.Header.Get("If-Modified-Since") != "" {
+		// Simply return a 304 Not-Modified response
+		res := proxyutil.NewResponse(http.StatusNotModified, nil, r)
+		res.Header.Set("Content-Type", "text/javascript; charset=utf-8")
+
+		// re-enable the cache
+		enableCache(res)
+		return res
+	}
+
 	cosmeticResult := s.engine.GetCosmeticResult(hostname, urlfilter.CosmeticOption(option))
-	body := s.buildContentScriptCode(cosmeticResult)
+	bodyBytes := []byte(s.buildContentScriptCode(cosmeticResult))
+	contentLen := len(bodyBytes)
 
-	res := proxyutil.NewResponse(http.StatusOK, strings.NewReader(body), r)
+	var bodyReader io.Reader
+
+	if s.CompressContentScript {
+		b, err := compressGzip(bodyBytes)
+		if err != nil {
+			log.Error("failed to compress content script: %v", err)
+			return proxyutil.NewErrorResponse(r, err)
+		}
+		contentLen = b.Len()
+		bodyReader = ioutil.NopCloser(b)
+	} else {
+		bodyReader = bytes.NewReader(bodyBytes)
+	}
+
+	res := proxyutil.NewResponse(http.StatusOK, bodyReader, r)
 	res.Header.Set("Content-Type", "text/javascript; charset=utf-8")
-	return res
-}
+	res.ContentLength = int64(contentLen)
 
-func newNotFoundResponse(r *http.Request) *http.Response {
-	res := proxyutil.NewResponse(http.StatusNotFound, nil, r)
-	res.Header.Set("Content-Type", "text/html")
-	return res
-}
-
-func getQueryParameter(r *http.Request, name string) string {
-	params, ok := r.URL.Query()[name]
-	if !ok || len(params) != 1 {
-		return ""
+	if s.CompressContentScript {
+		res.Header.Set("Content-Encoding", "gzip")
 	}
-	return params[0]
-}
 
-func getQueryParameterUint64(r *http.Request, name string) uint64 {
-	str := getQueryParameter(r, name)
-	val, err := strconv.ParseUint(str, 10, 64)
-	if err != nil {
-		return 0
-	}
-	return val
+	// make the browser cache the response
+	enableCache(res)
+	return res
 }

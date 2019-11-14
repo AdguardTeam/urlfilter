@@ -58,7 +58,9 @@ func main() {
 		Port: 3333,
 	}
 
-	config := proxy.Config{}
+	config := proxy.Config{
+		CompressContentScript: true,
+	}
 	config.ProxyConfig = gomitmproxy.Config{
 		ListenAddr: addr,
 		TLSConfig:  tlsConfig,

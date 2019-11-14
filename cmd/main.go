@@ -129,7 +129,8 @@ func createServerConfig(options Options) proxy.Config {
 	}
 
 	config := proxy.Config{
-		FiltersPaths: map[int]string{},
+		FiltersPaths:          map[int]string{},
+		CompressContentScript: true,
 	}
 	for i, v := range options.FilterLists {
 		config.FiltersPaths[i] = v
@@ -160,12 +161,12 @@ func createMITMConfig(options Options) *mitm.Config {
 
 	x509c, err := x509.ParseCertificate(tlsCert.Certificate[0])
 	if err != nil {
-		log.Fatal("invalid certificate: %v", err)
+		log.Fatalf("invalid certificate: %v", err)
 	}
 
 	mitmConfig, err := mitm.NewConfig(x509c, privateKey, nil)
 	if err != nil {
-		log.Fatal("failed to create MITM config: %v", err)
+		log.Fatalf("failed to create MITM config: %v", err)
 	}
 
 	mitmConfig.SetValidity(time.Hour * 24 * 7) // generate certs valid for 7 days

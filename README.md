@@ -38,8 +38,9 @@ You can learn more about AdGuard filtering rules syntax from [this article](http
     * [ ] Proxy - handle CSP (including <meta> tags with CSP)
     * [X] Proxy - proper blocking page code
     * [ ] Proxy - unblocking via a temporary cookie
-    * [ ] Proxy - content script caching
-    * [ ] Proxy - content script compression
+    * [X] Proxy - content script caching
+    * [X] Proxy - content script compression
+    * [ ] Proxy - brotli support (see [here](https://github.com/andybalholm/brotli))
     * [ ] Content script - babel plugin
     * [ ] Content script - apply ExtCSS rules
     * [ ] Content script - styles protection
