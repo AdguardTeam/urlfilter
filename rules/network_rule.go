@@ -384,10 +384,30 @@ func (f *NetworkRule) matchPattern(r *Request) bool {
 	}
 	f.Unlock()
 
-	if r.IsHostnameRequest && !strings.HasPrefix(f.pattern, MaskStartURL) {
+	if f.shouldMatchHostname(r) {
 		return f.regex.MatchString(r.Hostname)
 	}
 	return f.regex.MatchString(r.URL)
+}
+
+// shouldMatchHostname checks if we should match hostnames and not the URL
+// this is important for the cases when we use urlfilter for DNS-level blocking
+// Note, that even though we may work on a DNS-level, we should still sometimes
+// match full URL instead:
+// https://github.com/AdguardTeam/AdGuardHome/issues/1249
+func (f *NetworkRule) shouldMatchHostname(r *Request) bool {
+	if !r.IsHostnameRequest {
+		return false
+	}
+
+	if strings.HasPrefix(f.pattern, MaskStartURL) ||
+		strings.HasPrefix(f.pattern, "http://") ||
+		strings.HasPrefix(f.pattern, "https://") ||
+		strings.HasPrefix(f.pattern, "://") {
+		return false
+	}
+
+	return true
 }
 
 // matchShortcut simply checks if shortcut is a substring of the URL

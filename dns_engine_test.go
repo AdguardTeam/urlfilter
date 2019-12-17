@@ -151,6 +151,17 @@ func TestDNSEngineMatchIP6(t *testing.T) {
 	assert.True(t, len(r) == 2)
 }
 
+func TestHostLevelNetworkRuleWithProtocol(t *testing.T) {
+	rulesText := "://example.org"
+	ruleStorage := newTestRuleStorage(t, 1, rulesText)
+	dnsEngine := NewDNSEngine(ruleStorage)
+	assert.NotNil(t, dnsEngine)
+
+	r, ok := dnsEngine.Match("example.org")
+	assert.True(t, ok)
+	assert.True(t, len(r) == 1)
+}
+
 func TestRegexp(t *testing.T) {
 	text := "/^stats?\\./"
 	ruleStorage := newTestRuleStorage(t, 1, text)
