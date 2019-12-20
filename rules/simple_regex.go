@@ -32,7 +32,7 @@ const (
 	RegexAnyCharacter = ".*"
 
 	// RegexSeparator corresponds to MaskSeparator.
-	RegexSeparator = "([^ a-zA-Z0-9.%]|$)"
+	RegexSeparator = "([^ a-zA-Z0-9.%_-]|$)"
 
 	// RegexStartURL corresponds to MaskStartURL.
 	RegexStartURL = "^(http|https|ws|wss)://([a-z0-9-_.]+\\.)?"

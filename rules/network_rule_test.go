@@ -222,6 +222,13 @@ func TestSimpleBasicRules(t *testing.T) {
 	r = NewRequest("https://ap.lijit.com/rtb/bid?src=prebid_prebid_1.35.0", "https://www.drudgereport.com/", TypeXmlhttprequest)
 	assert.Nil(t, err)
 	assert.True(t, f.Match(r))
+
+	// ^ special character
+	// See https://github.com/AdguardTeam/AdGuardHome/issues/1282
+	f, err = NewNetworkRule("||www.us^", 0)
+	r = NewRequestForHostname("www.us-connection.com")
+	assert.Nil(t, err)
+	assert.False(t, f.Match(r))
 }
 
 func TestInvalidModifiers(t *testing.T) {
