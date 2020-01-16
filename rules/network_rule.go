@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"sort"
 	"sync"
 )
 
@@ -99,6 +100,8 @@ type NetworkRule struct {
 	Whitelist    bool   // true if this is an exception rule
 	FilterListID int    // Filter list identifier
 	Shortcut     string // the longest substring of the rule pattern with no special characters
+
+	clientTags []string // List of clients for which this rule applies
 
 	permittedDomains  []string // a list of permitted domains from the $domain modifier
 	restrictedDomains []string // a list of restricted domains from the $domain modifier
@@ -207,6 +210,11 @@ func (f *NetworkRule) IsOptionDisabled(option NetworkRuleOption) bool {
 // GetPermittedDomains - returns an array of domains this rule is allowed on
 func (f *NetworkRule) GetPermittedDomains() []string {
 	return f.permittedDomains
+}
+
+// GetClientTags - return client tags
+func (f *NetworkRule) GetClientTags() []string {
+	return f.clientTags
 }
 
 // IsHostLevelNetworkRule checks if this rule can be used for hosts-level blocking
@@ -655,6 +663,11 @@ func (f *NetworkRule) loadOption(name string, value string) error {
 		return nil
 	case "~other":
 		f.setRequestType(TypeOther, false)
+		return nil
+
+	case "ctag": //client tag
+		f.clientTags = strings.Split(value, "|")
+		sort.Strings(f.clientTags)
 		return nil
 	}
 
