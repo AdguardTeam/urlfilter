@@ -3,8 +3,8 @@ package rules
 import (
 	"fmt"
 	"regexp"
-	"strings"
 	"sort"
+	"strings"
 	"sync"
 )
 
