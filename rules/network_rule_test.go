@@ -422,6 +422,14 @@ func TestNetworkRulePriority(t *testing.T) {
 
 	// more modifiers -> less modifiers
 	compareRulesPriority(t, "||example.org$script,stylesheet", "||example.org$script", true)
+
+	// without $ctag -> with $ctag
+	compareRulesPriority(t, "||example.org", "||example.org$ctag=pc", true)
+	compareRulesPriority(t, "||example.org$ctag=pc", "||example.org", false)
+
+	// 2 $ctag -> 1 $ctag
+	compareRulesPriority(t, "||example.org$ctag=pc|phone", "||example.org$ctag=pc", true)
+	compareRulesPriority(t, "||example.org$ctag=pc", "||example.org$ctag=pc|phone", false)
 }
 
 func TestMatchSource(t *testing.T) {

@@ -259,7 +259,7 @@ func (f *NetworkRule) IsGeneric() bool {
 }
 
 // IsHigherPriority checks if the rule has higher priority that the specified rule
-// whitelist + $important > $important > whitelist > basic rules
+// whitelist + $important > $important > whitelist > basic rules > $ctag rules
 // nolint: gocyclo
 func (f *NetworkRule) IsHigherPriority(r *NetworkRule) bool {
 	important := f.IsOptionEnabled(OptionImportant)
@@ -301,6 +301,16 @@ func (f *NetworkRule) IsHigherPriority(r *NetworkRule) bool {
 	if !generic && rGeneric {
 		// specific rules have priority over generic rules
 		return true
+	}
+
+	if len(f.clientTags) != len(r.clientTags) {
+		if len(f.clientTags) == 0 {
+			return true
+		}
+		if len(r.clientTags) == 0 {
+			return false
+		}
+		return len(f.clientTags) > len(r.clientTags)
 	}
 
 	// More specific rules (i.e. with more modifiers) have higher priority
