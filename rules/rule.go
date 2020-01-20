@@ -115,6 +115,9 @@ func loadDomains(domains string, sep string) (permittedDomains []string, restric
 	return
 }
 
+// loadCTags loads $ctag modifier
+// value: value of $ctag
+// sep: separator character; for network rules it is '|'
 func loadCTags(value string, sep string) (permittedCTags []string, restrictedCTags []string, err error) {
 	if value == "" {
 		err = errors.New("value is empty")

@@ -104,6 +104,7 @@ type NetworkRule struct {
 	permittedDomains  []string // a list of permitted domains from the $domain modifier
 	restrictedDomains []string // a list of restricted domains from the $domain modifier
 
+	// https://github.com/AdguardTeam/AdGuardHome/issues/1081#issuecomment-575142737
 	permittedClientTags  []string // a list of permitted client tags from the $ctag modifier
 	restrictedClientTags []string // a list of restricted client tags from the $ctag modifier
 
