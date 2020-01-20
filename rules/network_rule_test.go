@@ -385,12 +385,17 @@ func TestInvalidDomainRestrictions(t *testing.T) {
 func TestClientTags(t *testing.T) {
 	f, err := NewNetworkRule("||example.org^$ctag=pc", 0)
 	assert.True(t, err == nil)
-	ctags := f.GetClientTags()
+	ctags := f.permittedClientTags
 	assert.True(t, len(ctags) == 1 && ctags[0] == "pc")
 
-	f, _ = NewNetworkRule("||example.org^$ctag=pc|phone", 0)
-	ctags = f.GetClientTags()
+	f, _ = NewNetworkRule("||example.org^$ctag=phone|pc", 0)
+	ctags = f.permittedClientTags
 	assert.True(t, len(ctags) == 2 && ctags[0] == "pc" && ctags[1] == "phone")
+	f, _ = NewNetworkRule("||example.org^$ctag=~phone|pc", 0)
+	ctags = f.permittedClientTags
+	assert.True(t, len(ctags) == 1 && ctags[0] == "pc")
+	ctags = f.restrictedClientTags
+	assert.True(t, len(ctags) == 1 && ctags[0] == "phone")
 }
 
 func TestNetworkRulePriority(t *testing.T) {
@@ -422,14 +427,6 @@ func TestNetworkRulePriority(t *testing.T) {
 
 	// more modifiers -> less modifiers
 	compareRulesPriority(t, "||example.org$script,stylesheet", "||example.org$script", true)
-
-	// without $ctag -> with $ctag
-	compareRulesPriority(t, "||example.org", "||example.org$ctag=pc", true)
-	compareRulesPriority(t, "||example.org$ctag=pc", "||example.org", false)
-
-	// 2 $ctag -> 1 $ctag
-	compareRulesPriority(t, "||example.org$ctag=pc|phone", "||example.org$ctag=pc", true)
-	compareRulesPriority(t, "||example.org$ctag=pc", "||example.org$ctag=pc|phone", false)
 }
 
 func TestMatchSource(t *testing.T) {

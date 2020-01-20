@@ -86,6 +86,23 @@ func (d *DNSEngine) Match(hostname string) ([]rules.Rule, bool) {
 	return d.matchLookupTable(hostname)
 }
 
+// MatchWithClientTags - same as Match() with client tags list
+func (d *DNSEngine) MatchWithClientTags(hostname string, clientTags []string) ([]rules.Rule, bool) {
+	if hostname == "" {
+		return nil, false
+	}
+
+	r := rules.NewRequestForHostname(hostname)
+	r.ClientTags = clientTags
+	networkRule, ok := d.networkEngine.Match(r)
+	if ok {
+		// Network rules always have higher priority
+		return []rules.Rule{networkRule}, true
+	}
+
+	return d.matchLookupTable(hostname)
+}
+
 // matchLookupTable looks for matching rules in the d.lookupTable
 func (d *DNSEngine) matchLookupTable(hostname string) ([]rules.Rule, bool) {
 	hash := fastHash(hostname)

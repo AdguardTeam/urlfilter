@@ -179,6 +179,60 @@ func TestRegexp(t *testing.T) {
 	assert.True(t, ok && matchingRules[0].Text() == text && nr.Whitelist)
 }
 
+func TestClientTags(t *testing.T) {
+	rulesText := `||host1^$ctag=pc|printer
+||host2^$ctag=pc|printer
+||host2^$ctag=pc|printer|router
+||host3^$ctag=~pc|~router
+||host4^$ctag=~pc|router
+||host1^
+||host1^$ctag=pc|printer
+`
+	ruleStorage := newTestRuleStorage(t, 1, rulesText)
+	dnsEngine := NewDNSEngine(ruleStorage)
+	assert.NotNil(t, dnsEngine)
+
+	// global rule
+	rules, ok := dnsEngine.MatchWithClientTags("host1", []string{"phone"})
+	assert.True(t, ok)
+	assert.True(t, len(rules) == 1)
+	assert.True(t, rules[0].Text() == "||host1^")
+
+	// 1 tag matches
+	rules, ok = dnsEngine.MatchWithClientTags("host2", []string{"phone", "router"})
+	assert.True(t, ok)
+	assert.True(t, len(rules) == 1)
+	assert.True(t, rules[0].Text() == "||host2^$ctag=pc|printer|router")
+
+	// tags don't match
+	rules, ok = dnsEngine.MatchWithClientTags("host2", []string{"phone"})
+	assert.True(t, !ok)
+
+	// tags don't match
+	rules, ok = dnsEngine.MatchWithClientTags("host2", []string{})
+	assert.True(t, !ok)
+
+	// 1 tag matches (exclusion)
+	rules, ok = dnsEngine.MatchWithClientTags("host3", []string{"phone", "printer"})
+	assert.True(t, ok)
+	assert.True(t, len(rules) == 1)
+	assert.True(t, rules[0].Text() == "||host3^$ctag=~pc|~router")
+
+	// 1 tag matches (exclusion)
+	rules, ok = dnsEngine.MatchWithClientTags("host4", []string{"phone", "router"})
+	assert.True(t, ok)
+	assert.True(t, len(rules) == 1)
+	assert.True(t, rules[0].Text() == "||host4^$ctag=~pc|router")
+
+	// tags don't match (exclusion)
+	rules, ok = dnsEngine.MatchWithClientTags("host3", []string{"pc"})
+	assert.True(t, !ok)
+
+	// tags don't match (exclusion)
+	rules, ok = dnsEngine.MatchWithClientTags("host4", []string{"pc", "router"})
+	assert.True(t, !ok)
+}
+
 func TestBadfilterRules(t *testing.T) {
 	rulesText := "||example.org^\n||example.org^$badfilter"
 	ruleStorage := newTestRuleStorage(t, 1, rulesText)

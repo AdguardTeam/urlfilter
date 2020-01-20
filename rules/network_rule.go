@@ -101,10 +101,11 @@ type NetworkRule struct {
 	FilterListID int    // Filter list identifier
 	Shortcut     string // the longest substring of the rule pattern with no special characters
 
-	clientTags []string // List of clients for which this rule applies
-
 	permittedDomains  []string // a list of permitted domains from the $domain modifier
 	restrictedDomains []string // a list of restricted domains from the $domain modifier
+
+	permittedClientTags  []string // a list of permitted client tags from the $ctag modifier
+	restrictedClientTags []string // a list of restricted client tags from the $ctag modifier
 
 	enabledOptions  NetworkRuleOption // Flag with all enabled rule options
 	disabledOptions NetworkRuleOption // Flag with all disabled rule options
@@ -194,6 +195,10 @@ func (f *NetworkRule) Match(r *Request) bool {
 		return false
 	}
 
+	if !f.matchClientTags(r.ClientTags) {
+		return false
+	}
+
 	return f.matchPattern(r)
 }
 
@@ -210,11 +215,6 @@ func (f *NetworkRule) IsOptionDisabled(option NetworkRuleOption) bool {
 // GetPermittedDomains - returns an array of domains this rule is allowed on
 func (f *NetworkRule) GetPermittedDomains() []string {
 	return f.permittedDomains
-}
-
-// GetClientTags - return client tags
-func (f *NetworkRule) GetClientTags() []string {
-	return f.clientTags
 }
 
 // IsHostLevelNetworkRule checks if this rule can be used for hosts-level blocking
@@ -259,7 +259,7 @@ func (f *NetworkRule) IsGeneric() bool {
 }
 
 // IsHigherPriority checks if the rule has higher priority that the specified rule
-// whitelist + $important > $important > whitelist > basic rules > $ctag rules
+// whitelist + $important > $important > whitelist > basic rules
 // nolint: gocyclo
 func (f *NetworkRule) IsHigherPriority(r *NetworkRule) bool {
 	important := f.IsOptionEnabled(OptionImportant)
@@ -301,16 +301,6 @@ func (f *NetworkRule) IsHigherPriority(r *NetworkRule) bool {
 	if !generic && rGeneric {
 		// specific rules have priority over generic rules
 		return true
-	}
-
-	if len(f.clientTags) != len(r.clientTags) {
-		if len(f.clientTags) == 0 {
-			return true
-		}
-		if len(r.clientTags) == 0 {
-			return false
-		}
-		return len(f.clientTags) > len(r.clientTags)
 	}
 
 	// More specific rules (i.e. with more modifiers) have higher priority
@@ -455,6 +445,41 @@ func (f *NetworkRule) matchDomain(domain string) bool {
 		}
 	}
 
+	return true
+}
+
+func matchClientTagsSpecific(ruleTags, ctags []string) bool {
+	iRule := 0
+	iClient := 0
+	for iRule != len(ruleTags) && iClient != len(ctags) {
+		r := strings.Compare(ruleTags[iRule], ctags[iClient])
+		if r == 0 {
+			return true
+		} else if r < 0 {
+			iRule++
+		} else {
+			iClient++
+		}
+	}
+	return false
+}
+
+func (f *NetworkRule) matchClientTags(tags []string) bool {
+	if len(f.restrictedClientTags) == 0 && len(f.permittedClientTags) == 0 {
+		return true // the rule doesn't contain $ctag extension
+	}
+	if len(tags) == 0 {
+		return false // client has no tags
+	}
+	if matchClientTagsSpecific(f.restrictedClientTags, tags) {
+		return false // matched by restricted client tag
+	}
+	if len(f.permittedClientTags) != 0 {
+		if matchClientTagsSpecific(f.permittedClientTags, tags) {
+			return true // matched by permitted client tag
+		}
+		return false
+	}
 	return true
 }
 
@@ -676,9 +701,14 @@ func (f *NetworkRule) loadOption(name string, value string) error {
 		return nil
 
 	case "ctag": //client tag
-		f.clientTags = strings.Split(value, "|")
-		sort.Strings(f.clientTags)
-		return nil
+		permitted, restricted, err := loadCTags(value, "|")
+		if err == nil {
+			sort.Strings(permitted)
+			sort.Strings(restricted)
+			f.permittedClientTags = permitted
+			f.restrictedClientTags = restricted
+		}
+		return err
 	}
 
 	return fmt.Errorf("unknown filter modifier: %s=%s", name, value)
