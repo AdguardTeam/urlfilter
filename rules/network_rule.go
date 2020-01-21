@@ -449,11 +449,13 @@ func (f *NetworkRule) matchDomain(domain string) bool {
 	return true
 }
 
-func matchClientTagsSpecific(ruleTags, ctags []string) bool {
+// Find an identical entry (case-sensitive) in two sorted arrays
+// Return TRUE if found
+func matchClientTagsSpecific(sortedRuleTags, sortedClientTags []string) bool {
 	iRule := 0
 	iClient := 0
-	for iRule != len(ruleTags) && iClient != len(ctags) {
-		r := strings.Compare(ruleTags[iRule], ctags[iClient])
+	for iRule != len(sortedRuleTags) && iClient != len(sortedClientTags) {
+		r := strings.Compare(sortedRuleTags[iRule], sortedClientTags[iClient])
 		if r == 0 {
 			return true
 		} else if r < 0 {
@@ -465,6 +467,7 @@ func matchClientTagsSpecific(ruleTags, ctags []string) bool {
 	return false
 }
 
+// Return TRUE if this rule matches with the tags associated with a client
 func (f *NetworkRule) matchClientTags(tags []string) bool {
 	if len(f.restrictedClientTags) == 0 && len(f.permittedClientTags) == 0 {
 		return true // the rule doesn't contain $ctag extension

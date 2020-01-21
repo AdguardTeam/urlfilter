@@ -77,7 +77,7 @@ func TestBenchDNSEngine(t *testing.T) {
 		}
 
 		startMatch := time.Now()
-		matchingRules, found := dnsEngine.Match(reqHostname)
+		matchingRules, found := dnsEngine.Match(reqHostname, nil)
 		elapsedMatch := time.Since(startMatch)
 		totalElapsed += elapsedMatch
 		if elapsedMatch > maxElapsedMatch {
@@ -116,27 +116,27 @@ func TestDNSEngineMatchHostname(t *testing.T) {
 	dnsEngine := NewDNSEngine(ruleStorage)
 	assert.NotNil(t, dnsEngine)
 
-	r, ok := dnsEngine.Match("example.org")
+	r, ok := dnsEngine.Match("example.org", nil)
 	assert.True(t, ok)
 	assert.True(t, len(r) == 1)
 
 	_, ok = r[0].(*rules.NetworkRule)
 	assert.True(t, ok)
 
-	r, ok = dnsEngine.Match("example2.org")
+	r, ok = dnsEngine.Match("example2.org", nil)
 	assert.True(t, ok)
 	assert.True(t, len(r) == 1)
 	_, ok = r[0].(*rules.NetworkRule)
 	assert.True(t, ok)
 
-	r, ok = dnsEngine.Match("example.com")
+	r, ok = dnsEngine.Match("example.com", nil)
 	assert.True(t, ok)
 	assert.True(t, len(r) == 1)
 
 	_, ok = r[0].(*rules.HostRule)
 	assert.True(t, ok)
 
-	_, ok = dnsEngine.Match("example.net")
+	_, ok = dnsEngine.Match("example.net", nil)
 	assert.False(t, ok)
 }
 
@@ -146,7 +146,7 @@ func TestDNSEngineMatchIP6(t *testing.T) {
 	dnsEngine := NewDNSEngine(ruleStorage)
 	assert.NotNil(t, dnsEngine)
 
-	r, ok := dnsEngine.Match("example.org")
+	r, ok := dnsEngine.Match("example.org", nil)
 	assert.True(t, ok)
 	assert.True(t, len(r) == 2)
 }
@@ -157,7 +157,7 @@ func TestHostLevelNetworkRuleWithProtocol(t *testing.T) {
 	dnsEngine := NewDNSEngine(ruleStorage)
 	assert.NotNil(t, dnsEngine)
 
-	r, ok := dnsEngine.Match("example.org")
+	r, ok := dnsEngine.Match("example.org", nil)
 	assert.True(t, ok)
 	assert.True(t, len(r) == 1)
 }
@@ -167,14 +167,14 @@ func TestRegexp(t *testing.T) {
 	ruleStorage := newTestRuleStorage(t, 1, text)
 	dnsEngine := NewDNSEngine(ruleStorage)
 
-	matchingRules, ok := dnsEngine.Match("stats.test.com")
+	matchingRules, ok := dnsEngine.Match("stats.test.com", nil)
 	assert.True(t, ok && matchingRules[0].Text() == text)
 
 	text = "@@/^stats?\\./"
 	ruleStorage = newTestRuleStorage(t, 1, "||stats.test.com^\n"+text)
 	dnsEngine = NewDNSEngine(ruleStorage)
 
-	matchingRules, ok = dnsEngine.Match("stats.test.com")
+	matchingRules, ok = dnsEngine.Match("stats.test.com", nil)
 	nr := matchingRules[0].(*rules.NetworkRule)
 	assert.True(t, ok && matchingRules[0].Text() == text && nr.Whitelist)
 }
@@ -239,7 +239,7 @@ func TestBadfilterRules(t *testing.T) {
 	dnsEngine := NewDNSEngine(ruleStorage)
 	assert.NotNil(t, dnsEngine)
 
-	r, ok := dnsEngine.Match("example.org")
+	r, ok := dnsEngine.Match("example.org", nil)
 	assert.False(t, ok)
 	assert.Nil(t, r)
 }
