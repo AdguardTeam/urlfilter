@@ -187,49 +187,55 @@ func TestClientTags(t *testing.T) {
 ||host4^$ctag=~pc|router
 ||host1^
 ||host1^$ctag=pc|printer
+||host5^$ctag=pc|printer
+||host5^$ctag=pc|printer,badfilter
 `
 	ruleStorage := newTestRuleStorage(t, 1, rulesText)
 	dnsEngine := NewDNSEngine(ruleStorage)
 	assert.NotNil(t, dnsEngine)
 
 	// global rule
-	rules, ok := dnsEngine.MatchWithClientTags("host1", []string{"phone"})
+	rules, ok := dnsEngine.Match("host1", []string{"phone"})
 	assert.True(t, ok)
 	assert.True(t, len(rules) == 1)
 	assert.True(t, rules[0].Text() == "||host1^")
 
 	// 1 tag matches
-	rules, ok = dnsEngine.MatchWithClientTags("host2", []string{"phone", "router"})
+	rules, ok = dnsEngine.Match("host2", []string{"phone", "printer"})
 	assert.True(t, ok)
 	assert.True(t, len(rules) == 1)
-	assert.True(t, rules[0].Text() == "||host2^$ctag=pc|printer|router")
+	assert.True(t, rules[0].Text() == "||host2^$ctag=pc|printer")
 
 	// tags don't match
-	rules, ok = dnsEngine.MatchWithClientTags("host2", []string{"phone"})
+	rules, ok = dnsEngine.Match("host2", []string{"phone"})
 	assert.True(t, !ok)
 
 	// tags don't match
-	rules, ok = dnsEngine.MatchWithClientTags("host2", []string{})
+	rules, ok = dnsEngine.Match("host2", []string{})
 	assert.True(t, !ok)
 
 	// 1 tag matches (exclusion)
-	rules, ok = dnsEngine.MatchWithClientTags("host3", []string{"phone", "printer"})
+	rules, ok = dnsEngine.Match("host3", []string{"phone", "printer"})
 	assert.True(t, ok)
 	assert.True(t, len(rules) == 1)
 	assert.True(t, rules[0].Text() == "||host3^$ctag=~pc|~router")
 
 	// 1 tag matches (exclusion)
-	rules, ok = dnsEngine.MatchWithClientTags("host4", []string{"phone", "router"})
+	rules, ok = dnsEngine.Match("host4", []string{"phone", "router"})
 	assert.True(t, ok)
 	assert.True(t, len(rules) == 1)
 	assert.True(t, rules[0].Text() == "||host4^$ctag=~pc|router")
 
 	// tags don't match (exclusion)
-	rules, ok = dnsEngine.MatchWithClientTags("host3", []string{"pc"})
+	rules, ok = dnsEngine.Match("host3", []string{"pc"})
 	assert.True(t, !ok)
 
 	// tags don't match (exclusion)
-	rules, ok = dnsEngine.MatchWithClientTags("host4", []string{"pc", "router"})
+	rules, ok = dnsEngine.Match("host4", []string{"pc", "router"})
+	assert.True(t, !ok)
+
+	// tags match but it's a $badfilter
+	rules, ok = dnsEngine.Match("host5", []string{"pc"})
 	assert.True(t, !ok)
 }
 
