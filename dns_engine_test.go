@@ -181,12 +181,11 @@ func TestRegexp(t *testing.T) {
 
 func TestClientTags(t *testing.T) {
 	rulesText := `||host1^$ctag=pc|printer
+||host1^
 ||host2^$ctag=pc|printer
 ||host2^$ctag=pc|printer|router
 ||host3^$ctag=~pc|~router
 ||host4^$ctag=~pc|router
-||host1^
-||host1^$ctag=pc|printer
 ||host5^$ctag=pc|printer
 ||host5^$ctag=pc|printer,badfilter
 ||host6^$ctag=pc|printer
@@ -202,11 +201,17 @@ func TestClientTags(t *testing.T) {
 	assert.True(t, len(rules) == 1)
 	assert.True(t, rules[0].Text() == "||host1^")
 
+	// $ctag rule overrides global rule
+	rules, ok = dnsEngine.Match("host1", []string{"pc"})
+	assert.True(t, ok)
+	assert.True(t, len(rules) == 1)
+	assert.True(t, rules[0].Text() == "||host1^$ctag=pc|printer")
+
 	// 1 tag matches
 	rules, ok = dnsEngine.Match("host2", []string{"phone", "printer"})
 	assert.True(t, ok)
 	assert.True(t, len(rules) == 1)
-	assert.True(t, rules[0].Text() == "||host2^$ctag=pc|printer")
+	assert.True(t, rules[0].Text() == "||host2^$ctag=pc|printer|router")
 
 	// tags don't match
 	rules, ok = dnsEngine.Match("host2", []string{"phone"})

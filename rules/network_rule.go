@@ -305,8 +305,12 @@ func (f *NetworkRule) IsHigherPriority(r *NetworkRule) bool {
 	}
 
 	// More specific rules (i.e. with more modifiers) have higher priority
-	count := f.enabledOptions.Count() + f.disabledOptions.Count() + f.permittedRequestTypes.Count() + f.restrictedRequestTypes.Count()
-	rCount := r.enabledOptions.Count() + r.disabledOptions.Count() + r.permittedRequestTypes.Count() + r.restrictedRequestTypes.Count()
+	count := f.enabledOptions.Count() + f.disabledOptions.Count() +
+		f.permittedRequestTypes.Count() + f.restrictedRequestTypes.Count() +
+		len(f.permittedClientTags) + len(f.restrictedClientTags)
+	rCount := r.enabledOptions.Count() + r.disabledOptions.Count() +
+		r.permittedRequestTypes.Count() + r.restrictedRequestTypes.Count() +
+		len(r.permittedClientTags) + len(r.restrictedClientTags)
 	return count > rCount
 }
 
