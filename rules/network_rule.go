@@ -196,7 +196,7 @@ func (f *NetworkRule) Match(r *Request) bool {
 		return false
 	}
 
-	if !f.matchClientTags(r.ClientTags) {
+	if !f.matchClientTags(r.SortedClientTags) {
 		return false
 	}
 
@@ -346,6 +346,11 @@ func (f *NetworkRule) negatesBadfilter(r *NetworkRule) bool {
 	}
 
 	if !stringArraysEquals(f.restrictedDomains, r.restrictedDomains) {
+		return false
+	}
+
+	if !stringArraysEquals(f.permittedClientTags, r.permittedClientTags) ||
+		!stringArraysEquals(f.restrictedClientTags, r.restrictedClientTags) {
 		return false
 	}
 

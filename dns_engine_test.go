@@ -189,6 +189,8 @@ func TestClientTags(t *testing.T) {
 ||host1^$ctag=pc|printer
 ||host5^$ctag=pc|printer
 ||host5^$ctag=pc|printer,badfilter
+||host6^$ctag=pc|printer
+||host6^$badfilter
 `
 	ruleStorage := newTestRuleStorage(t, 1, rulesText)
 	dnsEngine := NewDNSEngine(ruleStorage)
@@ -237,6 +239,12 @@ func TestClientTags(t *testing.T) {
 	// tags match but it's a $badfilter
 	rules, ok = dnsEngine.Match("host5", []string{"pc"})
 	assert.True(t, !ok)
+
+	// tags match and $badfilter rule disables global rule
+	rules, ok = dnsEngine.Match("host6", []string{"pc"})
+	assert.True(t, ok)
+	assert.True(t, len(rules) == 1)
+	assert.True(t, rules[0].Text() == "||host6^$ctag=pc|printer")
 }
 
 func TestBadfilterRules(t *testing.T) {
