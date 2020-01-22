@@ -382,6 +382,22 @@ func TestInvalidDomainRestrictions(t *testing.T) {
 	assert.NotNil(t, err)
 }
 
+func TestClientTags(t *testing.T) {
+	f, err := NewNetworkRule("||example.org^$ctag=pc", 0)
+	assert.True(t, err == nil)
+	ctags := f.permittedClientTags
+	assert.True(t, len(ctags) == 1 && ctags[0] == "pc")
+
+	f, _ = NewNetworkRule("||example.org^$ctag=phone|pc", 0)
+	ctags = f.permittedClientTags
+	assert.True(t, len(ctags) == 2 && ctags[0] == "pc" && ctags[1] == "phone")
+	f, _ = NewNetworkRule("||example.org^$ctag=~phone|pc", 0)
+	ctags = f.permittedClientTags
+	assert.True(t, len(ctags) == 1 && ctags[0] == "pc")
+	ctags = f.restrictedClientTags
+	assert.True(t, len(ctags) == 1 && ctags[0] == "phone")
+}
+
 func TestNetworkRulePriority(t *testing.T) {
 	// whitelist+$important --> every other
 	compareRulesPriority(t, "@@||example.org$important", "@@||example.org$important", false)

@@ -66,17 +66,19 @@ func NewDNSEngine(s *filterlist.RuleStorage) *DNSEngine {
 }
 
 // Match finds a matching rule for the specified hostname.
+// clientTags: client tags list
 // It returns true and the list of rules found or false and nil.
 // The list of rules can be found when there're multiple host rules matching the same domain.
 // For instance:
 // 192.168.0.1 example.local
 // 2000::1 example.local
-func (d *DNSEngine) Match(hostname string) ([]rules.Rule, bool) {
+func (d *DNSEngine) Match(hostname string, sortedClientTags []string) ([]rules.Rule, bool) {
 	if hostname == "" {
 		return nil, false
 	}
 
 	r := rules.NewRequestForHostname(hostname)
+	r.SortedClientTags = sortedClientTags
 	networkRule, ok := d.networkEngine.Match(r)
 	if ok {
 		// Network rules always have higher priority

@@ -114,3 +114,36 @@ func loadDomains(domains string, sep string) (permittedDomains []string, restric
 
 	return
 }
+
+// loadCTags loads $ctag modifier
+// value: value of $ctag
+// sep: separator character; for network rules it is '|'
+func loadCTags(value string, sep string) (permittedCTags []string, restrictedCTags []string, err error) {
+	if value == "" {
+		err = errors.New("value is empty")
+		return
+	}
+
+	list := strings.Split(value, sep)
+	for i := 0; i < len(list); i++ {
+		d := list[i]
+		restricted := false
+		if strings.HasPrefix(d, "~") {
+			restricted = true
+			d = d[1:]
+		}
+
+		if !govalidator.IsAlphanumeric(d) {
+			err = fmt.Errorf("invalid ctag specified: %s", value)
+			return
+		}
+
+		if restricted {
+			restrictedCTags = append(restrictedCTags, d)
+		} else {
+			permittedCTags = append(permittedCTags, d)
+		}
+	}
+
+	return
+}

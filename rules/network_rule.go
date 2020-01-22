@@ -3,6 +3,7 @@ package rules
 import (
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 )
@@ -103,6 +104,10 @@ type NetworkRule struct {
 	permittedDomains  []string // a list of permitted domains from the $domain modifier
 	restrictedDomains []string // a list of restricted domains from the $domain modifier
 
+	// https://github.com/AdguardTeam/AdGuardHome/issues/1081#issuecomment-575142737
+	permittedClientTags  []string // a list of permitted client tags from the $ctag modifier
+	restrictedClientTags []string // a list of restricted client tags from the $ctag modifier
+
 	enabledOptions  NetworkRuleOption // Flag with all enabled rule options
 	disabledOptions NetworkRuleOption // Flag with all disabled rule options
 
@@ -188,6 +193,10 @@ func (f *NetworkRule) Match(r *Request) bool {
 	}
 
 	if !f.matchDomain(r.SourceHostname) {
+		return false
+	}
+
+	if !f.matchClientTags(r.SortedClientTags) {
 		return false
 	}
 
@@ -296,8 +305,22 @@ func (f *NetworkRule) IsHigherPriority(r *NetworkRule) bool {
 	}
 
 	// More specific rules (i.e. with more modifiers) have higher priority
-	count := f.enabledOptions.Count() + f.disabledOptions.Count() + f.permittedRequestTypes.Count() + f.restrictedRequestTypes.Count()
-	rCount := r.enabledOptions.Count() + r.disabledOptions.Count() + r.permittedRequestTypes.Count() + r.restrictedRequestTypes.Count()
+	count := f.enabledOptions.Count() + f.disabledOptions.Count() +
+		f.permittedRequestTypes.Count() + f.restrictedRequestTypes.Count()
+	if len(f.permittedDomains) != 0 || len(f.restrictedDomains) != 0 {
+		count++
+	}
+	if len(f.permittedClientTags) != 0 || len(f.restrictedClientTags) != 0 {
+		count++
+	}
+	rCount := r.enabledOptions.Count() + r.disabledOptions.Count() +
+		r.permittedRequestTypes.Count() + r.restrictedRequestTypes.Count()
+	if len(r.permittedDomains) != 0 || len(r.restrictedDomains) != 0 {
+		rCount++
+	}
+	if len(r.permittedClientTags) != 0 || len(r.restrictedClientTags) != 0 {
+		rCount++
+	}
 	return count > rCount
 }
 
@@ -337,6 +360,11 @@ func (f *NetworkRule) negatesBadfilter(r *NetworkRule) bool {
 	}
 
 	if !stringArraysEquals(f.restrictedDomains, r.restrictedDomains) {
+		return false
+	}
+
+	if !stringArraysEquals(f.permittedClientTags, r.permittedClientTags) ||
+		!stringArraysEquals(f.restrictedClientTags, r.restrictedClientTags) {
 		return false
 	}
 
@@ -437,6 +465,44 @@ func (f *NetworkRule) matchDomain(domain string) bool {
 		}
 	}
 
+	return true
+}
+
+// Find an identical entry (case-sensitive) in two sorted arrays
+// Return TRUE if found
+func matchClientTagsSpecific(sortedRuleTags, sortedClientTags []string) bool {
+	iRule := 0
+	iClient := 0
+	for iRule != len(sortedRuleTags) && iClient != len(sortedClientTags) {
+		r := strings.Compare(sortedRuleTags[iRule], sortedClientTags[iClient])
+		if r == 0 {
+			return true
+		} else if r < 0 {
+			iRule++
+		} else {
+			iClient++
+		}
+	}
+	return false
+}
+
+// Return TRUE if this rule matches with the tags associated with a client
+func (f *NetworkRule) matchClientTags(tags []string) bool {
+	if len(f.restrictedClientTags) == 0 && len(f.permittedClientTags) == 0 {
+		return true // the rule doesn't contain $ctag extension
+	}
+	if len(tags) == 0 {
+		return false // client has no tags
+	}
+	if matchClientTagsSpecific(f.restrictedClientTags, tags) {
+		return false // matched by restricted client tag
+	}
+	if len(f.permittedClientTags) != 0 {
+		if matchClientTagsSpecific(f.permittedClientTags, tags) {
+			return true // matched by permitted client tag
+		}
+		return false
+	}
 	return true
 }
 
@@ -656,6 +722,16 @@ func (f *NetworkRule) loadOption(name string, value string) error {
 	case "~other":
 		f.setRequestType(TypeOther, false)
 		return nil
+
+	case "ctag": //client tag
+		permitted, restricted, err := loadCTags(value, "|")
+		if err == nil {
+			sort.Strings(permitted)
+			sort.Strings(restricted)
+			f.permittedClientTags = permitted
+			f.restrictedClientTags = restricted
+		}
+		return err
 	}
 
 	return fmt.Errorf("unknown filter modifier: %s=%s", name, value)

@@ -72,6 +72,8 @@ type Request struct {
 	SourceURL      string // Source URL
 	SourceHostname string // Source hostname
 	SourceDomain   string // Source domain (eTLD+1)
+
+	SortedClientTags []string // Sorted list of client tags ($ctag)
 }
 
 // NewRequest creates a new instance of "Request" and populates it's fields
