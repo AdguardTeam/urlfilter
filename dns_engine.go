@@ -72,13 +72,13 @@ func NewDNSEngine(s *filterlist.RuleStorage) *DNSEngine {
 // For instance:
 // 192.168.0.1 example.local
 // 2000::1 example.local
-func (d *DNSEngine) Match(hostname string, clientTags []string) ([]rules.Rule, bool) {
+func (d *DNSEngine) Match(hostname string, sortedClientTags []string) ([]rules.Rule, bool) {
 	if hostname == "" {
 		return nil, false
 	}
 
 	r := rules.NewRequestForHostname(hostname)
-	r.SortedClientTags = clientTags
+	r.SortedClientTags = sortedClientTags
 	networkRule, ok := d.networkEngine.Match(r)
 	if ok {
 		// Network rules always have higher priority
