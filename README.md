@@ -27,6 +27,7 @@ You can learn more about AdGuard filtering rules syntax from [this article](http
     * [X] Basic element hiding and CSS rules
         * [ ] Proper CSS rules validation
     * [ ] ExtCSS rules
+        * [ ] ExtCSS rules validation
     * [ ] Scriptlet rules
     * [ ] JS rules
 * [ ] Proxy implementation
@@ -34,6 +35,7 @@ You can learn more about AdGuard filtering rules syntax from [this article](http
     * [X] Add cosmetic filters to the proxy example
     * [X] Handling cosmetic modifiers $elemhide, $generichide, $jsinject
     * [X] (!) Server certificate verification - it should pass badssl.com/dashboard/
+    * [ ] Use fetch metadata to detect the content type: https://www.w3.org/TR/fetch-metadata/
     * [ ] Unit tests coverage
     * [ ] Fix TODOs
     * [ ] Proxy - handle CSP (including <meta> tags with CSP)
@@ -55,6 +57,7 @@ You can learn more about AdGuard filtering rules syntax from [this article](http
     * [ ] $cookie
     * [ ] $redirect
     * [X] $badfilter
+    * [ ] $badfilter (https://github.com/AdguardTeam/CoreLibs/issues/1241)
     
 #### How to use
 

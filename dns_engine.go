@@ -66,7 +66,7 @@ func NewDNSEngine(s *filterlist.RuleStorage) *DNSEngine {
 }
 
 // Match finds a matching rule for the specified hostname.
-// clientTags: client tags list
+// sortedClientTags: client tags list
 // It returns true and the list of rules found or false and nil.
 // The list of rules can be found when there're multiple host rules matching the same domain.
 // For instance:
