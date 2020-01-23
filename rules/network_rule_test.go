@@ -396,6 +396,21 @@ func TestClientTags(t *testing.T) {
 	assert.True(t, len(ctags) == 1 && ctags[0] == "pc")
 	ctags = f.restrictedClientTags
 	assert.True(t, len(ctags) == 1 && ctags[0] == "phone")
+
+	perm, rest, err := loadCTags("pc|phone|~printer", "|")
+	assert.True(t, err == nil)
+	assert.True(t, len(perm) == 2 && perm[0] == "pc")
+	assert.True(t, perm[1] == "phone")
+	assert.True(t, len(rest) == 1 && rest[0] == "printer")
+
+	perm, rest, err = loadCTags("device_pc0123", "|")
+	assert.True(t, len(perm) == 1 && perm[0] == "device_pc0123")
+	assert.True(t, len(rest) == 0)
+
+	perm, rest, err = loadCTags("pc|~phone|bad.", "|")
+	assert.True(t, err != nil)
+	assert.True(t, len(perm) == 1)
+	assert.True(t, len(rest) == 1)
 }
 
 func TestNetworkRulePriority(t *testing.T) {
