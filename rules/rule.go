@@ -115,6 +115,18 @@ func loadDomains(domains string, sep string) (permittedDomains []string, restric
 	return
 }
 
+// Return TRUE if ctag value format is correct: a-z0-9_
+func isValidCTag(s string) bool {
+	for _, ch := range s {
+		if !((ch >= 'a' && ch <= 'z') ||
+			(ch >= '0' && ch <= '9') ||
+			ch == '_') {
+			return false
+		}
+	}
+	return true
+}
+
 // loadCTags loads $ctag modifier
 // value: value of $ctag
 // sep: separator character; for network rules it is '|'
@@ -133,7 +145,7 @@ func loadCTags(value string, sep string) (permittedCTags []string, restrictedCTa
 			d = d[1:]
 		}
 
-		if !govalidator.IsAlphanumeric(d) {
+		if !isValidCTag(d) {
 			err = fmt.Errorf("invalid ctag specified: %s", value)
 			return
 		}
