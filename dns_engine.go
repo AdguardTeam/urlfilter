@@ -65,6 +65,13 @@ func NewDNSEngine(s *filterlist.RuleStorage) *DNSEngine {
 	return &d
 }
 
+// DNSResult - the return value of Match() function
+type DNSResult struct {
+	networkRule *rules.NetworkRule
+	hostRuleV4  *rules.HostRule
+	hostRuleV6  *rules.HostRule
+}
+
 // Match finds a matching rule for the specified hostname.
 // sortedClientTags: client tags list
 // It returns true and the list of rules found or false and nil.
@@ -72,9 +79,9 @@ func NewDNSEngine(s *filterlist.RuleStorage) *DNSEngine {
 // For instance:
 // 192.168.0.1 example.local
 // 2000::1 example.local
-func (d *DNSEngine) Match(hostname string, sortedClientTags []string) ([]rules.Rule, bool) {
+func (d *DNSEngine) Match(hostname string, sortedClientTags []string) (DNSResult, bool) {
 	if hostname == "" {
-		return nil, false
+		return DNSResult{}, false
 	}
 
 	r := rules.NewRequestForHostname(hostname)
@@ -82,10 +89,26 @@ func (d *DNSEngine) Match(hostname string, sortedClientTags []string) ([]rules.R
 	networkRule, ok := d.networkEngine.Match(r)
 	if ok {
 		// Network rules always have higher priority
-		return []rules.Rule{networkRule}, true
+		return DNSResult{networkRule: networkRule}, true
 	}
 
-	return d.matchLookupTable(hostname)
+	rr, ok := d.matchLookupTable(hostname)
+	if !ok {
+		return DNSResult{}, false
+	}
+	res := DNSResult{}
+	for _, rule := range rr {
+		hostRule, ok := rule.(*rules.HostRule)
+		if !ok {
+			continue
+		}
+		if res.hostRuleV4 == nil && hostRule.IP.To4() != nil {
+			res.hostRuleV4 = hostRule
+		} else if res.hostRuleV6 == nil {
+			res.hostRuleV6 = hostRule
+		}
+	}
+	return res, true
 }
 
 // matchLookupTable looks for matching rules in the d.lookupTable
