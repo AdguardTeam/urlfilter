@@ -67,9 +67,9 @@ func NewDNSEngine(s *filterlist.RuleStorage) *DNSEngine {
 
 // DNSResult - the return value of Match() function
 type DNSResult struct {
-	networkRule *rules.NetworkRule
-	hostRuleV4  *rules.HostRule
-	hostRuleV6  *rules.HostRule
+	NetworkRule *rules.NetworkRule // a network rule or nil
+	HostRuleV4  *rules.HostRule    // a host rule for IPv4 or nil
+	HostRuleV6  *rules.HostRule    // a host rule for IPv6 or nil
 }
 
 // Match finds a matching rule for the specified hostname.
@@ -89,7 +89,7 @@ func (d *DNSEngine) Match(hostname string, sortedClientTags []string) (DNSResult
 	networkRule, ok := d.networkEngine.Match(r)
 	if ok {
 		// Network rules always have higher priority
-		return DNSResult{networkRule: networkRule}, true
+		return DNSResult{NetworkRule: networkRule}, true
 	}
 
 	rr, ok := d.matchLookupTable(hostname)
@@ -102,10 +102,10 @@ func (d *DNSEngine) Match(hostname string, sortedClientTags []string) (DNSResult
 		if !ok {
 			continue
 		}
-		if res.hostRuleV4 == nil && hostRule.IP.To4() != nil {
-			res.hostRuleV4 = hostRule
-		} else if res.hostRuleV6 == nil {
-			res.hostRuleV6 = hostRule
+		if res.HostRuleV4 == nil && hostRule.IP.To4() != nil {
+			res.HostRuleV4 = hostRule
+		} else if res.HostRuleV6 == nil {
+			res.HostRuleV6 = hostRule
 		}
 	}
 	return res, true
