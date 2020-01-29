@@ -7,8 +7,6 @@ import (
 
 	"github.com/AdguardTeam/urlfilter/filterlist"
 
-	"github.com/AdguardTeam/urlfilter/rules"
-
 	"github.com/AdguardTeam/urlfilter/filterutil"
 
 	"github.com/AdguardTeam/golibs/log"
@@ -77,7 +75,7 @@ func TestBenchDNSEngine(t *testing.T) {
 		}
 
 		startMatch := time.Now()
-		matchingRules, found := dnsEngine.Match(reqHostname, nil)
+		res, found := dnsEngine.Match(reqHostname, nil)
 		elapsedMatch := time.Since(startMatch)
 		totalElapsed += elapsedMatch
 		if elapsedMatch > maxElapsedMatch {
@@ -88,13 +86,12 @@ func TestBenchDNSEngine(t *testing.T) {
 		}
 
 		if found {
-			switch v := matchingRules[0].(type) {
-			case *rules.HostRule:
-				totalMatches++
-			case *rules.NetworkRule:
-				if !v.Whitelist {
+			if res.NetworkRule != nil {
+				if !res.NetworkRule.Whitelist {
 					totalMatches++
 				}
+			} else if res.HostRuleV4 != nil || res.HostRuleV6 != nil {
+				totalMatches++
 			}
 		}
 	}
@@ -111,30 +108,26 @@ func TestBenchDNSEngine(t *testing.T) {
 }
 
 func TestDNSEngineMatchHostname(t *testing.T) {
-	rulesText := "||example.org^\n||example2.org/*\n0.0.0.0 example.com"
+	rulesText := "||example.org^\n||example2.org/*\n0.0.0.0 v4.com\n:: v6.com"
 	ruleStorage := newTestRuleStorage(t, 1, rulesText)
 	dnsEngine := NewDNSEngine(ruleStorage)
 	assert.NotNil(t, dnsEngine)
 
 	r, ok := dnsEngine.Match("example.org", nil)
 	assert.True(t, ok)
-	assert.True(t, len(r) == 1)
-
-	_, ok = r[0].(*rules.NetworkRule)
-	assert.True(t, ok)
+	assert.True(t, r.NetworkRule != nil)
 
 	r, ok = dnsEngine.Match("example2.org", nil)
 	assert.True(t, ok)
-	assert.True(t, len(r) == 1)
-	_, ok = r[0].(*rules.NetworkRule)
-	assert.True(t, ok)
+	assert.True(t, r.NetworkRule != nil)
 
-	r, ok = dnsEngine.Match("example.com", nil)
+	r, ok = dnsEngine.Match("v4.com", nil)
 	assert.True(t, ok)
-	assert.True(t, len(r) == 1)
+	assert.True(t, r.HostRuleV4 != nil)
 
-	_, ok = r[0].(*rules.HostRule)
+	r, ok = dnsEngine.Match("v6.com", nil)
 	assert.True(t, ok)
+	assert.True(t, r.HostRuleV6 != nil)
 
 	_, ok = dnsEngine.Match("example.net", nil)
 	assert.False(t, ok)
@@ -148,7 +141,7 @@ func TestDNSEngineMatchIP6(t *testing.T) {
 
 	r, ok := dnsEngine.Match("example.org", nil)
 	assert.True(t, ok)
-	assert.True(t, len(r) == 2)
+	assert.True(t, r.HostRuleV4 != nil && r.HostRuleV6 != nil)
 }
 
 func TestHostLevelNetworkRuleWithProtocol(t *testing.T) {
@@ -159,7 +152,7 @@ func TestHostLevelNetworkRuleWithProtocol(t *testing.T) {
 
 	r, ok := dnsEngine.Match("example.org", nil)
 	assert.True(t, ok)
-	assert.True(t, len(r) == 1)
+	assert.True(t, r.NetworkRule != nil)
 }
 
 func TestRegexp(t *testing.T) {
@@ -167,16 +160,15 @@ func TestRegexp(t *testing.T) {
 	ruleStorage := newTestRuleStorage(t, 1, text)
 	dnsEngine := NewDNSEngine(ruleStorage)
 
-	matchingRules, ok := dnsEngine.Match("stats.test.com", nil)
-	assert.True(t, ok && matchingRules[0].Text() == text)
+	res, ok := dnsEngine.Match("stats.test.com", nil)
+	assert.True(t, ok && res.NetworkRule.Text() == text)
 
 	text = "@@/^stats?\\./"
 	ruleStorage = newTestRuleStorage(t, 1, "||stats.test.com^\n"+text)
 	dnsEngine = NewDNSEngine(ruleStorage)
 
-	matchingRules, ok = dnsEngine.Match("stats.test.com", nil)
-	nr := matchingRules[0].(*rules.NetworkRule)
-	assert.True(t, ok && matchingRules[0].Text() == text && nr.Whitelist)
+	res, ok = dnsEngine.Match("stats.test.com", nil)
+	assert.True(t, res.NetworkRule.Text() == text && res.NetworkRule.Whitelist)
 }
 
 func TestClientTags(t *testing.T) {
@@ -200,20 +192,20 @@ func TestClientTags(t *testing.T) {
 	// global rule
 	rules, ok := dnsEngine.Match("host1", []string{"phone"})
 	assert.True(t, ok)
-	assert.True(t, len(rules) == 1)
-	assert.True(t, rules[0].Text() == "||host1^")
+	assert.True(t, rules.NetworkRule != nil)
+	assert.True(t, rules.NetworkRule.Text() == "||host1^")
 
 	// $ctag rule overrides global rule
 	rules, ok = dnsEngine.Match("host1", []string{"pc"})
 	assert.True(t, ok)
-	assert.True(t, len(rules) == 1)
-	assert.True(t, rules[0].Text() == "||host1^$ctag=pc|printer")
+	assert.True(t, rules.NetworkRule != nil)
+	assert.True(t, rules.NetworkRule.Text() == "||host1^$ctag=pc|printer")
 
 	// 1 tag matches
 	rules, ok = dnsEngine.Match("host2", []string{"phone", "printer"})
 	assert.True(t, ok)
-	assert.True(t, len(rules) == 1)
-	assert.True(t, rules[0].Text() == "||host2^$ctag=pc|printer")
+	assert.True(t, rules.NetworkRule != nil)
+	assert.True(t, rules.NetworkRule.Text() == "||host2^$ctag=pc|printer")
 
 	// tags don't match
 	rules, ok = dnsEngine.Match("host2", []string{"phone"})
@@ -226,14 +218,14 @@ func TestClientTags(t *testing.T) {
 	// 1 tag matches (exclusion)
 	rules, ok = dnsEngine.Match("host3", []string{"phone", "printer"})
 	assert.True(t, ok)
-	assert.True(t, len(rules) == 1)
-	assert.True(t, rules[0].Text() == "||host3^$ctag=~pc|~router")
+	assert.True(t, rules.NetworkRule != nil)
+	assert.True(t, rules.NetworkRule.Text() == "||host3^$ctag=~pc|~router")
 
 	// 1 tag matches (exclusion)
 	rules, ok = dnsEngine.Match("host4", []string{"phone", "router"})
 	assert.True(t, ok)
-	assert.True(t, len(rules) == 1)
-	assert.True(t, rules[0].Text() == "||host4^$ctag=~pc|router")
+	assert.True(t, rules.NetworkRule != nil)
+	assert.True(t, rules.NetworkRule.Text() == "||host4^$ctag=~pc|router")
 
 	// tags don't match (exclusion)
 	rules, ok = dnsEngine.Match("host3", []string{"pc"})
@@ -250,8 +242,8 @@ func TestClientTags(t *testing.T) {
 	// tags match and $badfilter rule disables global rule
 	rules, ok = dnsEngine.Match("host6", []string{"pc"})
 	assert.True(t, ok)
-	assert.True(t, len(rules) == 1)
-	assert.True(t, rules[0].Text() == "||host6^$ctag=pc|printer")
+	assert.True(t, rules.NetworkRule != nil)
+	assert.True(t, rules.NetworkRule.Text() == "||host6^$ctag=pc|printer")
 
 	// tags match (exclusion) but it's a $badfilter
 	rules, ok = dnsEngine.Match("host7", []string{"phone"})
@@ -266,5 +258,5 @@ func TestBadfilterRules(t *testing.T) {
 
 	r, ok := dnsEngine.Match("example.org", nil)
 	assert.False(t, ok)
-	assert.Nil(t, r)
+	assert.True(t, r.NetworkRule == nil && r.HostRuleV4 == nil && r.HostRuleV6 == nil)
 }
