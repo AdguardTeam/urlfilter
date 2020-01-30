@@ -104,7 +104,7 @@ func (d *DNSEngine) Match(hostname string, sortedClientTags []string) (DNSResult
 		}
 		if res.HostRuleV4 == nil && hostRule.IP.To4() != nil {
 			res.HostRuleV4 = hostRule
-		} else if res.HostRuleV6 == nil {
+		} else if res.HostRuleV6 == nil && hostRule.IP.To4() == nil {
 			res.HostRuleV6 = hostRule
 		}
 	}

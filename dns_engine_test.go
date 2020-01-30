@@ -108,7 +108,12 @@ func TestBenchDNSEngine(t *testing.T) {
 }
 
 func TestDNSEngineMatchHostname(t *testing.T) {
-	rulesText := "||example.org^\n||example2.org/*\n0.0.0.0 v4.com\n:: v6.com"
+	rulesText := `||example.org^
+||example2.org/*
+0.0.0.0 v4.com
+127.0.0.1 v4.com
+:: v6.com
+`
 	ruleStorage := newTestRuleStorage(t, 1, rulesText)
 	dnsEngine := NewDNSEngine(ruleStorage)
 	assert.NotNil(t, dnsEngine)
