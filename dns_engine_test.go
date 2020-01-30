@@ -1,6 +1,7 @@
 package urlfilter
 
 import (
+	"net"
 	"runtime/debug"
 	"testing"
 	"time"
@@ -113,6 +114,9 @@ func TestDNSEngineMatchHostname(t *testing.T) {
 0.0.0.0 v4.com
 127.0.0.1 v4.com
 :: v6.com
+0.0.0.0 v4and6.com
+127.0.0.1 v4and6.com
+::1 v4and6.com
 `
 	ruleStorage := newTestRuleStorage(t, 1, rulesText)
 	dnsEngine := NewDNSEngine(ruleStorage)
@@ -128,11 +132,16 @@ func TestDNSEngineMatchHostname(t *testing.T) {
 
 	r, ok = dnsEngine.Match("v4.com", nil)
 	assert.True(t, ok)
-	assert.True(t, r.HostRuleV4 != nil)
+	assert.True(t, r.HostRuleV4.IP.Equal(net.ParseIP("0.0.0.0")))
 
 	r, ok = dnsEngine.Match("v6.com", nil)
 	assert.True(t, ok)
-	assert.True(t, r.HostRuleV6 != nil)
+	assert.True(t, r.HostRuleV6.IP.Equal(net.ParseIP("::")))
+
+	r, ok = dnsEngine.Match("v4and6.com", nil)
+	assert.True(t, ok)
+	assert.True(t, r.HostRuleV4.IP.Equal(net.ParseIP("0.0.0.0")))
+	assert.True(t, r.HostRuleV6.IP.Equal(net.ParseIP("::1")))
 
 	_, ok = dnsEngine.Match("example.net", nil)
 	assert.False(t, ok)
