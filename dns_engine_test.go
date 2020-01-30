@@ -91,7 +91,7 @@ func TestBenchDNSEngine(t *testing.T) {
 				if !res.NetworkRule.Whitelist {
 					totalMatches++
 				}
-			} else if res.HostRuleV4 != nil || res.HostRuleV6 != nil {
+			} else if res.HostRulesV4 != nil || res.HostRulesV6 != nil {
 				totalMatches++
 			}
 		}
@@ -114,9 +114,10 @@ func TestDNSEngineMatchHostname(t *testing.T) {
 0.0.0.0 v4.com
 127.0.0.1 v4.com
 :: v6.com
-0.0.0.0 v4and6.com
 127.0.0.1 v4and6.com
+127.0.0.2 v4and6.com
 ::1 v4and6.com
+::2 v4and6.com
 `
 	ruleStorage := newTestRuleStorage(t, 1, rulesText)
 	dnsEngine := NewDNSEngine(ruleStorage)
@@ -132,30 +133,26 @@ func TestDNSEngineMatchHostname(t *testing.T) {
 
 	r, ok = dnsEngine.Match("v4.com", nil)
 	assert.True(t, ok)
-	assert.True(t, r.HostRuleV4.IP.Equal(net.ParseIP("0.0.0.0")))
+	assert.True(t, len(r.HostRulesV4) == 2)
+	assert.True(t, r.HostRulesV4[0].IP.Equal(net.ParseIP("0.0.0.0")))
+	assert.True(t, r.HostRulesV4[1].IP.Equal(net.ParseIP("127.0.0.1")))
 
 	r, ok = dnsEngine.Match("v6.com", nil)
 	assert.True(t, ok)
-	assert.True(t, r.HostRuleV6.IP.Equal(net.ParseIP("::")))
+	assert.True(t, len(r.HostRulesV6) == 1)
+	assert.True(t, r.HostRulesV6[0].IP.Equal(net.ParseIP("::")))
 
 	r, ok = dnsEngine.Match("v4and6.com", nil)
 	assert.True(t, ok)
-	assert.True(t, r.HostRuleV4.IP.Equal(net.ParseIP("0.0.0.0")))
-	assert.True(t, r.HostRuleV6.IP.Equal(net.ParseIP("::1")))
+	assert.True(t, len(r.HostRulesV4) == 2)
+	assert.True(t, len(r.HostRulesV6) == 2)
+	assert.True(t, r.HostRulesV4[0].IP.Equal(net.ParseIP("127.0.0.1")))
+	assert.True(t, r.HostRulesV4[1].IP.Equal(net.ParseIP("127.0.0.2")))
+	assert.True(t, r.HostRulesV6[0].IP.Equal(net.ParseIP("::1")))
+	assert.True(t, r.HostRulesV6[1].IP.Equal(net.ParseIP("::2")))
 
 	_, ok = dnsEngine.Match("example.net", nil)
 	assert.False(t, ok)
-}
-
-func TestDNSEngineMatchIP6(t *testing.T) {
-	rulesText := "192.168.1.1 example.org\n2000:: example.org"
-	ruleStorage := newTestRuleStorage(t, 1, rulesText)
-	dnsEngine := NewDNSEngine(ruleStorage)
-	assert.NotNil(t, dnsEngine)
-
-	r, ok := dnsEngine.Match("example.org", nil)
-	assert.True(t, ok)
-	assert.True(t, r.HostRuleV4 != nil && r.HostRuleV6 != nil)
 }
 
 func TestHostLevelNetworkRuleWithProtocol(t *testing.T) {
@@ -272,5 +269,5 @@ func TestBadfilterRules(t *testing.T) {
 
 	r, ok := dnsEngine.Match("example.org", nil)
 	assert.False(t, ok)
-	assert.True(t, r.NetworkRule == nil && r.HostRuleV4 == nil && r.HostRuleV6 == nil)
+	assert.True(t, r.NetworkRule == nil && r.HostRulesV4 == nil && r.HostRulesV6 == nil)
 }

@@ -68,8 +68,8 @@ func NewDNSEngine(s *filterlist.RuleStorage) *DNSEngine {
 // DNSResult - the return value of Match() function
 type DNSResult struct {
 	NetworkRule *rules.NetworkRule // a network rule or nil
-	HostRuleV4  *rules.HostRule    // a host rule for IPv4 or nil
-	HostRuleV6  *rules.HostRule    // a host rule for IPv6 or nil
+	HostRulesV4 []*rules.HostRule  // host rules for IPv4 or nil
+	HostRulesV6 []*rules.HostRule  // host rules for IPv6 or nil
 }
 
 // Match finds a matching rule for the specified hostname.
@@ -102,10 +102,10 @@ func (d *DNSEngine) Match(hostname string, sortedClientTags []string) (DNSResult
 		if !ok {
 			continue
 		}
-		if res.HostRuleV4 == nil && hostRule.IP.To4() != nil {
-			res.HostRuleV4 = hostRule
-		} else if res.HostRuleV6 == nil && hostRule.IP.To4() == nil {
-			res.HostRuleV6 = hostRule
+		if hostRule.IP.To4() != nil {
+			res.HostRulesV4 = append(res.HostRulesV4, hostRule)
+		} else {
+			res.HostRulesV6 = append(res.HostRulesV6, hostRule)
 		}
 	}
 	return res, true
