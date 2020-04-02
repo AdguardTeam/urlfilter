@@ -58,7 +58,8 @@ You can learn more about AdGuard filtering rules syntax from [this article](http
     * [ ] $redirect
     * [X] $badfilter
     * [ ] $badfilter (https://github.com/AdguardTeam/CoreLibs/issues/1241)
-    
+    * [ ] $ping modifier (https://github.com/AdguardTeam/CoreLibs/issues/1258)
+
 #### How to use
 
 TODO

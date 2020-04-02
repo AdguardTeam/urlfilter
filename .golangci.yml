@@ -42,6 +42,11 @@ linters:
     - godox
     - funlen
     - goconst # disabled until it's possible to configure
+    - gocognit
+    - wsl
+    - gomnd
+    - gosimple
+    - unparam
   fast: true
 
 issues:

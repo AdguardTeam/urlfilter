@@ -516,6 +516,18 @@ func TestIsHostLevelNetworkRule(t *testing.T) {
 	assert.False(t, r.IsHostLevelNetworkRule())
 }
 
+func TestMatchIPAddress(t *testing.T) {
+	f, err := NewNetworkRule("://104.154.", -1)
+	assert.Nil(t, err)
+	assert.True(t, f.IsHostLevelNetworkRule())
+
+	r := NewRequestForHostname("104.154.1.1")
+	assert.True(t, f.Match(r))
+
+	r = NewRequestForHostname("1.104.154.1")
+	assert.False(t, f.Match(r))
+}
+
 func assertBadfilterNegates(t *testing.T, rule string, badfilter string, expected bool) {
 	r, err := NewNetworkRule(rule, -1)
 	assert.Nil(t, err)

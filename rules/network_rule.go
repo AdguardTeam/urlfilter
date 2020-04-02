@@ -840,16 +840,15 @@ func parseRuleText(ruleText string) (pattern string, options string, whitelist b
 		return
 	}
 
-	// Avoid parsing options inside of a regex rule
-	if strings.HasPrefix(ruleText, maskRegexRule) &&
-		strings.HasSuffix(ruleText, maskRegexRule) &&
-		!strings.Contains(ruleText, replaceOption+"=") {
-		pattern = ruleText
-		return
-	}
-
 	// Setting pattern to rule text (for the case of empty options)
 	pattern = ruleText[startIndex:]
+
+	// Avoid parsing options inside of a regex rule
+	if strings.HasPrefix(pattern, maskRegexRule) &&
+		strings.HasSuffix(pattern, maskRegexRule) &&
+		!strings.Contains(pattern, replaceOption+"=") {
+		return
+	}
 
 	foundEscaped := false
 	for i := len(ruleText) - 2; i >= startIndex; i-- {
@@ -863,6 +862,7 @@ func parseRuleText(ruleText string) (pattern string, options string, whitelist b
 				options = ruleText[i+1:]
 
 				if foundEscaped {
+					// Find and replace escaped options delimiter
 					options = reEscapedOptionsDelimiter.ReplaceAllString(options, string(optionsDelimiter))
 				}
 
