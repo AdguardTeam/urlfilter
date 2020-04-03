@@ -11,7 +11,6 @@ require (
 	github.com/jessevdk/go-flags v1.4.0
 	github.com/joomcode/errorx v1.0.1
 	github.com/shirou/gopsutil v2.20.3+incompatible
-	github.com/shirou/w32 v0.0.0-20160930032740-bb4de0191aa4 // indirect
 	github.com/stretchr/testify v1.5.1
 	golang.org/x/net v0.0.0-20200324143707-d3edc9973b7e
 	golang.org/x/sys v0.0.0-20200331124033-c3d80250170d // indirect
