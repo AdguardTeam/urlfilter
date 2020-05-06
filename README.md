@@ -17,6 +17,7 @@ You can learn more about AdGuard filtering rules syntax from [this article](http
     * [X] Basic engine
     * [X] Basic rules validation (don't match everything, unexpected modifiers, etc)
     * [ ] Domain modifier semantics: https://github.com/AdguardTeam/AdguardBrowserExtension/issues/1474
+    * [ ] TLD support: https://kb.adguard.com/en/general/how-to-create-your-own-ad-filters#wildcard-for-tld
 * [X] Benchmark basic rules matching
 * [X] Hosts matching rules
     * [X] /etc/hosts matching
