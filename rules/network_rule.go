@@ -491,9 +491,6 @@ func (f *NetworkRule) matchClientTags(tags []string) bool {
 	if len(f.restrictedClientTags) == 0 && len(f.permittedClientTags) == 0 {
 		return true // the rule doesn't contain $ctag extension
 	}
-	if len(tags) == 0 {
-		return false // client has no tags
-	}
 	if matchClientTagsSpecific(f.restrictedClientTags, tags) {
 		return false // matched by restricted client tag
 	}

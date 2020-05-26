@@ -226,6 +226,10 @@ func TestClientTags(t *testing.T) {
 	rules, ok = dnsEngine.Match("host2", []string{})
 	assert.True(t, !ok)
 
+	// tags match (exclusion)
+	rules, ok = dnsEngine.Match("host3", []string{})
+	assert.True(t, ok)
+
 	// 1 tag matches (exclusion)
 	rules, ok = dnsEngine.Match("host3", []string{"phone", "printer"})
 	assert.True(t, ok)
