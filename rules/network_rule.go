@@ -1,9 +1,9 @@
 package rules
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
-	"sort"
 	"strings"
 	"sync"
 )
@@ -15,6 +15,9 @@ const (
 	optionsDelimiter = '$'
 	escapeCharacter  = '\\'
 )
+
+// ErrTooWideRule - returned if the rule matches all urls but has no domain, client or ctag restrictions
+var ErrTooWideRule = errors.New("the rule is too wide, add domain, client or ctag restrictions or make it more specific")
 
 var (
 	reEscapedOptionsDelimiter = regexp.MustCompile(regexp.QuoteMeta("\\$"))
@@ -105,8 +108,12 @@ type NetworkRule struct {
 	restrictedDomains []string // a list of restricted domains from the $domain modifier
 
 	// https://github.com/AdguardTeam/AdGuardHome/issues/1081#issuecomment-575142737
-	permittedClientTags  []string // a list of permitted client tags from the $ctag modifier
-	restrictedClientTags []string // a list of restricted client tags from the $ctag modifier
+	permittedClientTags  []string // a sorted list of permitted client tags from the $ctag modifier
+	restrictedClientTags []string // a sorted list of restricted client tags from the $ctag modifier
+
+	// https://github.com/AdguardTeam/AdGuardHome/issues/1761
+	permittedClients  []string // a list of permitted clients from the $client modifier
+	restrictedClients []string // a list of restricted clients from the $client modifier
 
 	enabledOptions  NetworkRuleOption // Flag with all enabled rule options
 	disabledOptions NetworkRuleOption // Flag with all disabled rule options
@@ -147,10 +154,12 @@ func NewNetworkRule(ruleText string, filterListID int) (*NetworkRule, error) {
 	if pattern == MaskStartURL || pattern == MaskPipe ||
 		pattern == MaskAnyCharacter || pattern == "" ||
 		len(pattern) < 3 {
-		if len(rule.permittedDomains) == 0 {
-			// Rule matches too much and does not have any domain restriction
+		if len(rule.permittedDomains) == 0 &&
+			len(rule.permittedClients) == 0 &&
+			len(rule.permittedClientTags) == 0 {
+			// Rule matches too much and does not have any domain, client or ctag restrictions
 			// We should not allow this kind of rules
-			return nil, fmt.Errorf("the rule is too wide, add domain restriction or make it more specific")
+			return nil, ErrTooWideRule
 		}
 	}
 
@@ -197,6 +206,10 @@ func (f *NetworkRule) Match(r *Request) bool {
 	}
 
 	if !f.matchClientTags(r.SortedClientTags) {
+		return false
+	}
+
+	if !f.matchClient(r.ClientIP) || !f.matchClient(r.ClientName) {
 		return false
 	}
 
@@ -313,6 +326,9 @@ func (f *NetworkRule) IsHigherPriority(r *NetworkRule) bool {
 	if len(f.permittedClientTags) != 0 || len(f.restrictedClientTags) != 0 {
 		count++
 	}
+	if len(f.permittedClients) != 0 || len(f.restrictedClients) != 0 {
+		count++
+	}
 	rCount := r.enabledOptions.Count() + r.disabledOptions.Count() +
 		r.permittedRequestTypes.Count() + r.restrictedRequestTypes.Count()
 	if len(r.permittedDomains) != 0 || len(r.restrictedDomains) != 0 {
@@ -365,6 +381,11 @@ func (f *NetworkRule) negatesBadfilter(r *NetworkRule) bool {
 
 	if !stringArraysEquals(f.permittedClientTags, r.permittedClientTags) ||
 		!stringArraysEquals(f.restrictedClientTags, r.restrictedClientTags) {
+		return false
+	}
+
+	if !stringArraysEquals(f.permittedClients, r.permittedClients) ||
+		!stringArraysEquals(f.restrictedClients, r.restrictedClients) {
 		return false
 	}
 
@@ -487,19 +508,46 @@ func matchClientTagsSpecific(sortedRuleTags, sortedClientTags []string) bool {
 }
 
 // Return TRUE if this rule matches with the tags associated with a client
-func (f *NetworkRule) matchClientTags(tags []string) bool {
+func (f *NetworkRule) matchClientTags(sortedTags []string) bool {
 	if len(f.restrictedClientTags) == 0 && len(f.permittedClientTags) == 0 {
-		return true // the rule doesn't contain $ctag extension
+		// the rule doesn't contain $ctag extension
+		return true
 	}
-	if matchClientTagsSpecific(f.restrictedClientTags, tags) {
-		return false // matched by restricted client tag
-	}
-	if len(f.permittedClientTags) != 0 {
-		if matchClientTagsSpecific(f.permittedClientTags, tags) {
-			return true // matched by permitted client tag
-		}
+	if matchClientTagsSpecific(f.restrictedClientTags, sortedTags) {
+		// matched by restricted client tag
 		return false
 	}
+	if len(f.permittedClientTags) != 0 {
+		// If the rule is permitted for specific tags only,
+		// we should check whether our tag is among permitted or not
+		// and return the result the result immediately
+		return matchClientTagsSpecific(f.permittedClientTags, sortedTags)
+	}
+	return true
+}
+
+// matchClient returns TRUE if the rule matches with the specified client
+// client can be client name or IP address
+func (f *NetworkRule) matchClient(client string) bool {
+	if len(f.restrictedClients) == 0 && len(f.permittedClients) == 0 {
+		return true // the rule doesn't contain $client modifier
+	}
+	if client == "" {
+		return true // no client specified
+	}
+
+	if findSorted(f.restrictedClients, client) != -1 {
+		// the client is in the list of restricted
+		return false
+	}
+
+	if len(f.permittedClients) != 0 {
+		// If the rule is permitted for specific tags only,
+		// we should check whether our client is among permitted or not
+		// and return the result the result immediately
+		return findSorted(f.permittedClients, client) != -1
+	}
+
 	return true
 }
 
@@ -604,10 +652,29 @@ func (f *NetworkRule) loadOption(name string, value string) error {
 	case "badfilter":
 		return f.setOptionEnabled(OptionBadfilter, true)
 
+	// $domain -- limits the rule for selected domains
 	case "domain":
 		permitted, restricted, err := loadDomains(value, "|")
 		f.permittedDomains = permitted
 		f.restrictedDomains = restricted
+		return err
+
+	// $ctag - limits the rule for selected "Client tags"
+	case "ctag":
+		permitted, restricted, err := loadCTags(value, "|")
+		if err == nil {
+			f.permittedClientTags = permitted
+			f.restrictedClientTags = restricted
+		}
+		return err
+
+	// $client - limits the rule for selected "Clients" (either IP or client name)
+	case "client":
+		permitted, restricted, err := loadClients(value, '|')
+		if err == nil {
+			f.permittedClients = permitted
+			f.restrictedClients = restricted
+		}
 		return err
 
 	// Document-level whitelist rules
@@ -719,16 +786,6 @@ func (f *NetworkRule) loadOption(name string, value string) error {
 	case "~other":
 		f.setRequestType(TypeOther, false)
 		return nil
-
-	case "ctag": //client tag
-		permitted, restricted, err := loadCTags(value, "|")
-		if err == nil {
-			sort.Strings(permitted)
-			sort.Strings(restricted)
-			f.permittedClientTags = permitted
-			f.restrictedClientTags = restricted
-		}
-		return err
 	}
 
 	return fmt.Errorf("unknown filter modifier: %s=%s", name, value)

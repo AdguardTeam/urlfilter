@@ -16,6 +16,23 @@ type DNSEngine struct {
 	rulesStorage  *filterlist.RuleStorage
 }
 
+// DNSResult - the return value of Match() function
+type DNSResult struct {
+	NetworkRule *rules.NetworkRule // a network rule or nil
+	HostRulesV4 []*rules.HostRule  // host rules for IPv4 or nil
+	HostRulesV6 []*rules.HostRule  // host rules for IPv6 or nil
+}
+
+// DNSRequest represents a DNS query with associated metadata.
+type DNSRequest struct {
+	Hostname string // Hostname (or IP address)
+
+	Answer           bool     // If true - this hostname or IP is from a DNS response
+	SortedClientTags []string // Sorted list of client tags ($ctag)
+	ClientIP         string   // Client IP address
+	ClientName       string   // Client name
+}
+
 // NewDNSEngine parses the specified filter lists and returns a DNSEngine built from them.
 // key of the map is the filter list ID, value is the raw content of the filter list.
 func NewDNSEngine(s *filterlist.RuleStorage) *DNSEngine {
@@ -65,34 +82,41 @@ func NewDNSEngine(s *filterlist.RuleStorage) *DNSEngine {
 	return &d
 }
 
-// DNSResult - the return value of Match() function
-type DNSResult struct {
-	NetworkRule *rules.NetworkRule // a network rule or nil
-	HostRulesV4 []*rules.HostRule  // host rules for IPv4 or nil
-	HostRulesV6 []*rules.HostRule  // host rules for IPv6 or nil
-}
-
 // Match finds a matching rule for the specified hostname.
-// sortedClientTags: client tags list
+//
 // It returns true and the list of rules found or false and nil.
 // The list of rules can be found when there're multiple host rules matching the same domain.
 // For instance:
 // 192.168.0.1 example.local
 // 2000::1 example.local
-func (d *DNSEngine) Match(hostname string, sortedClientTags []string) (DNSResult, bool) {
-	if hostname == "" {
+func (d *DNSEngine) Match(hostname string) (DNSResult, bool) {
+	return d.MatchRequest(DNSRequest{Hostname: hostname})
+}
+
+// MatchRequest - matches the specified DNS request
+//
+// It returns true and the list of rules found or false and nil.
+// The list of rules can be found when there're multiple host rules matching the same domain.
+// For instance:
+// 192.168.0.1 example.local
+// 2000::1 example.local
+func (d *DNSEngine) MatchRequest(dReq DNSRequest) (DNSResult, bool) {
+	if dReq.Hostname == "" {
 		return DNSResult{}, false
 	}
 
-	r := rules.NewRequestForHostname(hostname)
-	r.SortedClientTags = sortedClientTags
+	r := rules.NewRequestForHostname(dReq.Hostname)
+	r.SortedClientTags = dReq.SortedClientTags
+	r.ClientIP = dReq.ClientIP
+	r.ClientName = dReq.ClientName
+
 	networkRule, ok := d.networkEngine.Match(r)
 	if ok {
 		// Network rules always have higher priority
 		return DNSResult{NetworkRule: networkRule}, true
 	}
 
-	rr, ok := d.matchLookupTable(hostname)
+	rr, ok := d.matchLookupTable(dReq.Hostname)
 	if !ok {
 		return DNSResult{}, false
 	}
@@ -119,15 +143,15 @@ func (d *DNSEngine) matchLookupTable(hostname string) ([]rules.Rule, bool) {
 		return nil, false
 	}
 
-	var rules []rules.Rule
+	var matchingRules []rules.Rule
 	for _, idx := range rulesIndexes {
 		rule := d.rulesStorage.RetrieveHostRule(idx)
 		if rule != nil && rule.Match(hostname) {
-			rules = append(rules, rule)
+			matchingRules = append(matchingRules, rule)
 		}
 	}
 
-	return rules, len(rules) > 0
+	return matchingRules, len(matchingRules) > 0
 }
 
 // addRule adds rule to the index

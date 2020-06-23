@@ -1,6 +1,19 @@
 package rules
 
-import "strings"
+import (
+	"sort"
+	"strings"
+)
+
+// findSorted - finds value in a sorted array
+// returns value index or -1 if nothing found
+func findSorted(sortedArray []string, val string) int {
+	i := sort.SearchStrings(sortedArray, val)
+	if i == len(sortedArray) || sortedArray[i] != val {
+		return -1
+	}
+	return i
+}
 
 // splitWithEscapeCharacter splits string by the specified separator if it is not escaped
 func splitWithEscapeCharacter(str string, sep byte, escapeCharacter byte, preserveAllTokens bool) []string {

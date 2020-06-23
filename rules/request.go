@@ -74,6 +74,8 @@ type Request struct {
 	SourceDomain   string // Source domain (eTLD+1)
 
 	SortedClientTags []string // Sorted list of client tags ($ctag)
+	ClientIP         string   // Client IP address
+	ClientName       string   // Client name
 }
 
 // NewRequest creates a new instance of "Request" and populates it's fields

@@ -21,7 +21,7 @@ const (
 
 	// MaskSeparator definition:
 	// Separator character mark. Separator character is any character,
-	// but a letter, a digit, or one of the following: _ - .
+	// but a letter, a digit, or one of the following: _ - . %
 	MaskSeparator = "^"
 
 	// MaskAnyCharacter is a wildcard character. It is used to represent "any set of characters".
@@ -32,7 +32,7 @@ const (
 	RegexAnyCharacter = ".*"
 
 	// RegexSeparator corresponds to MaskSeparator.
-	RegexSeparator = "([^ a-zA-Z0-9.%]|$)"
+	RegexSeparator = "([^ a-zA-Z0-9.%_-]|$)"
 
 	// RegexStartURL corresponds to MaskStartURL.
 	RegexStartURL = "^(http|https|ws|wss)://([a-z0-9-_.]+\\.)?"

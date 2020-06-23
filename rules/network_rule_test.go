@@ -211,6 +211,16 @@ func TestSimpleBasicRules(t *testing.T) {
 	assert.Nil(t, err)
 	assert.True(t, f.Match(r))
 
+	// Subdomains / domains
+	f, err = NewNetworkRule("||github.com^", 0)
+	r = NewRequestForHostname("dualstack.log.github.com-east-1.elb.amazonaws.com")
+	assert.Nil(t, err)
+	assert.False(t, f.Match(r))
+
+	r = NewRequestForHostname("dualstack.log.github.com1-east-1.elb.amazonaws.com")
+	assert.Nil(t, err)
+	assert.False(t, f.Match(r))
+
 	// Simple regex rule
 	f, err = NewNetworkRule("/example\\.org/", 0)
 	r = NewRequest("https://example.org/", "", TypeOther)
@@ -382,35 +392,131 @@ func TestInvalidDomainRestrictions(t *testing.T) {
 	assert.NotNil(t, err)
 }
 
-func TestClientTags(t *testing.T) {
-	f, err := NewNetworkRule("||example.org^$ctag=pc", 0)
-	assert.True(t, err == nil)
-	ctags := f.permittedClientTags
-	assert.True(t, len(ctags) == 1 && ctags[0] == "pc")
-
-	f, _ = NewNetworkRule("||example.org^$ctag=phone|pc", 0)
-	ctags = f.permittedClientTags
-	assert.True(t, len(ctags) == 2 && ctags[0] == "pc" && ctags[1] == "phone")
-	f, _ = NewNetworkRule("||example.org^$ctag=~phone|pc", 0)
-	ctags = f.permittedClientTags
-	assert.True(t, len(ctags) == 1 && ctags[0] == "pc")
-	ctags = f.restrictedClientTags
-	assert.True(t, len(ctags) == 1 && ctags[0] == "phone")
-
-	perm, rest, err := loadCTags("pc|phone|~printer", "|")
-	assert.True(t, err == nil)
-	assert.True(t, len(perm) == 2 && perm[0] == "pc")
-	assert.True(t, perm[1] == "phone")
-	assert.True(t, len(rest) == 1 && rest[0] == "printer")
+func TestLoadCTags(t *testing.T) {
+	perm, rest, err := loadCTags("phone|pc|~printer", "|")
+	assert.Nil(t, err)
+	assert.Equal(t, []string{"pc", "phone"}, perm)
+	assert.Equal(t, []string{"printer"}, rest)
 
 	perm, rest, err = loadCTags("device_pc0123", "|")
-	assert.True(t, len(perm) == 1 && perm[0] == "device_pc0123")
-	assert.True(t, len(rest) == 0)
+	assert.Nil(t, err)
+	assert.Equal(t, []string{"device_pc0123"}, perm)
+	assert.Nil(t, rest)
 
 	perm, rest, err = loadCTags("pc|~phone|bad.", "|")
-	assert.True(t, err != nil)
-	assert.True(t, len(perm) == 1)
-	assert.True(t, len(rest) == 1)
+	assert.NotNil(t, err)
+	assert.Equal(t, []string{"pc"}, perm)
+	assert.Equal(t, []string{"phone"}, rest)
+}
+
+func TestClientTagRules(t *testing.T) {
+	f, err := NewNetworkRule("||example.org^$ctag=pc", 0)
+	assert.Nil(t, err)
+	assert.NotNil(t, f)
+	assert.Equal(t, []string{"pc"}, f.permittedClientTags)
+
+	r := NewRequestForHostname("example.org")
+	r.SortedClientTags = []string{"pc"}
+	assert.True(t, f.Match(r))
+
+	r.SortedClientTags = nil
+	assert.False(t, f.Match(r))
+
+	f, _ = NewNetworkRule("||example.org^$ctag=phone|pc", 0)
+	assert.Equal(t, []string{"pc", "phone"}, f.permittedClientTags)
+
+	r.SortedClientTags = []string{"phone", "other"}
+	assert.True(t, f.Match(r))
+
+	r.SortedClientTags = nil
+	assert.False(t, f.Match(r))
+
+	f, _ = NewNetworkRule("||example.org^$ctag=~phone|pc", 0)
+	assert.Equal(t, []string{"pc"}, f.permittedClientTags)
+	assert.Equal(t, []string{"phone"}, f.restrictedClientTags)
+
+	r.SortedClientTags = []string{"phone", "pc"}
+	assert.False(t, f.Match(r))
+
+	r.SortedClientTags = []string{"pc"}
+	assert.True(t, f.Match(r))
+
+	r.SortedClientTags = []string{"phone"}
+	assert.False(t, f.Match(r))
+}
+
+func TestLoadClients(t *testing.T) {
+	p, r, err := loadClients("127.0.0.1", '|')
+	assert.Nil(t, err)
+	assert.Equal(t, []string{"127.0.0.1"}, p)
+	assert.Nil(t, r)
+
+	p, r, err = loadClients("127.0.0.1|127.0.0.2", '|')
+	assert.Nil(t, err)
+	assert.Equal(t, []string{"127.0.0.1", "127.0.0.2"}, p)
+	assert.Nil(t, r)
+
+	p, r, err = loadClients("127.0.0.1|~127.0.0.2", '|')
+	assert.Nil(t, err)
+	assert.Equal(t, []string{"127.0.0.1"}, p)
+	assert.Equal(t, []string{"127.0.0.2"}, r)
+
+	p, r, err = loadClients("'Frank\\'s laptop'", '|')
+	assert.Nil(t, err)
+	assert.Equal(t, []string{"Frank's laptop"}, p)
+	assert.Nil(t, r)
+
+	p, r, err = loadClients("~\"Frank's phone\"", '|')
+	assert.Nil(t, err)
+	assert.Nil(t, p)
+	assert.Equal(t, []string{"Frank's phone"}, r)
+
+	p, r, err = loadClients("~'Mary\\'s\\, John\\'s\\, and Boris\\'s laptops'", '|')
+	assert.Nil(t, err)
+	assert.Nil(t, p)
+	assert.Equal(t, []string{"Mary's, John's, and Boris's laptops"}, r)
+
+	p, r, err = loadClients("~Mom|~Dad|\"Kids\"", '|')
+	assert.Nil(t, err)
+	assert.Equal(t, []string{"Kids"}, p)
+	assert.Equal(t, []string{"Dad", "Mom"}, r)
+}
+
+func TestLoadInvalidClients(t *testing.T) {
+	_, _, err := loadClients("", '|')
+	assert.NotNil(t, err)
+
+	_, _, err = loadClients("''", '|')
+	assert.NotNil(t, err)
+
+	_, _, err = loadClients("~''", '|')
+	assert.NotNil(t, err)
+
+	_, _, err = loadClients("~", '|')
+	assert.NotNil(t, err)
+}
+
+func TestMatchClients(t *testing.T) {
+	f, err := NewNetworkRule("||example.org^$client=127.0.0.1", 0)
+	assert.Nil(t, err)
+	assert.NotNil(t, f)
+
+	r := NewRequestForHostname("example.org")
+	r.ClientIP = "127.0.0.1"
+	assert.True(t, f.Match(r))
+
+	r.ClientIP = "127.0.0.2"
+	assert.False(t, f.Match(r))
+
+	f, err = NewNetworkRule("||example.org^$client=~'Frank\\'s laptop'", 0)
+	assert.Nil(t, err)
+	assert.NotNil(t, f)
+
+	r.ClientName = "Frank's laptop"
+	assert.False(t, f.Match(r))
+
+	r.ClientName = "Frank's phone"
+	assert.True(t, f.Match(r))
 }
 
 func TestNetworkRulePriority(t *testing.T) {
@@ -442,6 +548,7 @@ func TestNetworkRulePriority(t *testing.T) {
 
 	// more modifiers -> less modifiers
 	compareRulesPriority(t, "||example.org$script,stylesheet", "||example.org$script", true)
+	compareRulesPriority(t, "||example.org$ctag=123,client=123", "||example.org$script", true)
 }
 
 func TestMatchSource(t *testing.T) {
@@ -461,18 +568,28 @@ func TestMatchSource(t *testing.T) {
 func TestInvalidRule(t *testing.T) {
 	r, err := NewNetworkRule("*$third-party", -1)
 	assert.Nil(t, r)
-	assert.NotNil(t, err)
+	assert.Equal(t, ErrTooWideRule, err)
 
 	r, err = NewNetworkRule("$third-party", -1)
 	assert.Nil(t, r)
-	assert.NotNil(t, err)
+	assert.Equal(t, ErrTooWideRule, err)
 
 	r, err = NewNetworkRule("ad$third-party", -1)
 	assert.Nil(t, r)
-	assert.NotNil(t, err)
+	assert.Equal(t, ErrTooWideRule, err)
 
 	// This one is valid because it has domain restriction
 	r, err = NewNetworkRule("$domain=ya.ru", -1)
+	assert.NotNil(t, r)
+	assert.Nil(t, err)
+
+	// This one is valid because it has $ctag restriction
+	r, err = NewNetworkRule("$ctag=pc", -1)
+	assert.NotNil(t, r)
+	assert.Nil(t, err)
+
+	// This one is valid because it has $client restriction
+	r, err = NewNetworkRule("$client=127.0.0.1", -1)
 	assert.NotNil(t, r)
 	assert.Nil(t, err)
 }
@@ -484,6 +601,10 @@ func TestBadfilterRule(t *testing.T) {
 	assertBadfilterNegates(t, "*$image,domain=example.org|example.com", "*$image,domain=example.org,badfilter", false)
 	assertBadfilterNegates(t, "@@*$image,domain=example.org", "@@*$image,domain=example.org,badfilter", true)
 	assertBadfilterNegates(t, "@@*$image,domain=example.org", "*$image,domain=example.org,badfilter", false)
+	assertBadfilterNegates(t, "*$ctag=phone", "*$ctag=pc,badfilter", false)
+	assertBadfilterNegates(t, "*$ctag=phone|pc", "*$ctag=pc|phone,badfilter", true)
+	assertBadfilterNegates(t, "*$client=127.0.0.1", "*$client=127.0.0.2,badfilter", false)
+	assertBadfilterNegates(t, "*$client=127.0.0.1", "*$client=127.0.0.1,badfilter", true)
 }
 
 func TestIsHostLevelNetworkRule(t *testing.T) {

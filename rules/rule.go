@@ -3,6 +3,7 @@ package rules
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/asaskevich/govalidator"
@@ -115,7 +116,7 @@ func loadDomains(domains string, sep string) (permittedDomains []string, restric
 	return
 }
 
-// Return TRUE if ctag value format is correct: a-z0-9_
+// isValidCTag - returns TRUE if ctag value format is correct: a-z0-9_
 func isValidCTag(s string) bool {
 	for _, ch := range s {
 		if !((ch >= 'a' && ch <= 'z') ||
@@ -127,9 +128,10 @@ func isValidCTag(s string) bool {
 	return true
 }
 
-// loadCTags loads $ctag modifier
-// value: value of $ctag
+// loadCTags loads tags from the $ctag modifier
+// value: string value of the $ctag modifier
 // sep: separator character; for network rules it is '|'
+// returns sorted arrays with permitted and restricted $ctag
 func loadCTags(value string, sep string) (permittedCTags []string, restrictedCTags []string, err error) {
 	if value == "" {
 		err = errors.New("value is empty")
@@ -156,6 +158,93 @@ func loadCTags(value string, sep string) (permittedCTags []string, restrictedCTa
 			permittedCTags = append(permittedCTags, d)
 		}
 	}
+
+	// Sorting tags so that we could use binary search
+	sort.Strings(permittedCTags)
+	sort.Strings(restrictedCTags)
+
+	return
+}
+
+// The $client modifier allows specifying clients this rule will be working for.
+// It accepts both client names or IP addresses.
+//
+// The syntax is:
+//
+// $client=value1|value2|...
+// You can also specify "restricted" clients by adding a ~ character before the client IP or name.
+// In this case, the rule will not be applied to this client's requests.
+//
+// $client=~value1
+//
+// ## Specifying client names
+// Client names usually contain spaces or other special characters, that's why you
+// should enclose the name in quotes (both double-quotes and single-quotes are supported).
+// If the client name contains quotes, use `\` to escape them.
+// Also, you need to escape commas (`,`) and pipes (`|`).
+//
+// Please note, that when specifying a "restricted" client, you must keep `~` out of the quotes.
+//
+// Examples of the input value:
+// 127.0.0.1
+// 'Frank\'s laptop'
+// "Frank's phone"
+// ~'Mary\'s\, John\'s\, and Boris\'s laptops'
+// ~Mom|~Dad|"Kids"
+//
+// Returns sorted arrays of permitted and restricted clients
+func loadClients(value string, sep byte) (permittedClients []string, restrictedClients []string, err error) {
+	if value == "" {
+		err = errors.New("value is empty")
+		return
+	}
+
+	// First of all, split by the specified separator
+	list := splitWithEscapeCharacter(value, sep, '\\', false)
+	for _, s := range list {
+		restricted := false
+		client := s
+
+		// 1. Check if this is a restricted or permitted client
+		if strings.HasPrefix(client, "~") {
+			restricted = true
+			client = client[1:]
+		}
+
+		// 2. Check if quoted
+		quoteChar := uint8(0)
+		if len(client) >= 2 &&
+			(client[0] == '\'' || client[0] == '"') &&
+			client[0] == client[len(client)-1] {
+			quoteChar = client[0]
+		}
+
+		// 3. If quoted, remove quotes
+		if quoteChar > 0 {
+			client = client[1 : len(client)-1]
+		}
+
+		// 4. Unescape commas and quotes
+		client = strings.ReplaceAll(client, "\\,", ",")
+		if quoteChar > 0 {
+			client = strings.ReplaceAll(client, "\\"+string(quoteChar), string(quoteChar))
+		}
+
+		if client == "" {
+			err = fmt.Errorf("invalid $client value %s", value)
+			return
+		}
+
+		if restricted {
+			restrictedClients = append(restrictedClients, client)
+		} else {
+			permittedClients = append(permittedClients, client)
+		}
+	}
+
+	// Sorting clients so that we could use binary search
+	sort.Strings(permittedClients)
+	sort.Strings(restrictedClients)
 
 	return
 }

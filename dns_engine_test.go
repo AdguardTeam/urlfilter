@@ -76,7 +76,7 @@ func TestBenchDNSEngine(t *testing.T) {
 		}
 
 		startMatch := time.Now()
-		res, found := dnsEngine.Match(reqHostname, nil)
+		res, found := dnsEngine.Match(reqHostname)
 		elapsedMatch := time.Since(startMatch)
 		totalElapsed += elapsedMatch
 		if elapsedMatch > maxElapsedMatch {
@@ -123,26 +123,26 @@ func TestDNSEngineMatchHostname(t *testing.T) {
 	dnsEngine := NewDNSEngine(ruleStorage)
 	assert.NotNil(t, dnsEngine)
 
-	r, ok := dnsEngine.Match("example.org", nil)
+	r, ok := dnsEngine.Match("example.org")
 	assert.True(t, ok)
 	assert.True(t, r.NetworkRule != nil)
 
-	r, ok = dnsEngine.Match("example2.org", nil)
+	r, ok = dnsEngine.Match("example2.org")
 	assert.True(t, ok)
 	assert.True(t, r.NetworkRule != nil)
 
-	r, ok = dnsEngine.Match("v4.com", nil)
+	r, ok = dnsEngine.Match("v4.com")
 	assert.True(t, ok)
 	assert.True(t, len(r.HostRulesV4) == 2)
 	assert.True(t, r.HostRulesV4[0].IP.Equal(net.ParseIP("0.0.0.0")))
 	assert.True(t, r.HostRulesV4[1].IP.Equal(net.ParseIP("127.0.0.1")))
 
-	r, ok = dnsEngine.Match("v6.com", nil)
+	r, ok = dnsEngine.Match("v6.com")
 	assert.True(t, ok)
 	assert.True(t, len(r.HostRulesV6) == 1)
 	assert.True(t, r.HostRulesV6[0].IP.Equal(net.ParseIP("::")))
 
-	r, ok = dnsEngine.Match("v4and6.com", nil)
+	r, ok = dnsEngine.Match("v4and6.com")
 	assert.True(t, ok)
 	assert.True(t, len(r.HostRulesV4) == 2)
 	assert.True(t, len(r.HostRulesV6) == 2)
@@ -151,7 +151,7 @@ func TestDNSEngineMatchHostname(t *testing.T) {
 	assert.True(t, r.HostRulesV6[0].IP.Equal(net.ParseIP("::1")))
 	assert.True(t, r.HostRulesV6[1].IP.Equal(net.ParseIP("::2")))
 
-	_, ok = dnsEngine.Match("example.net", nil)
+	_, ok = dnsEngine.Match("example.net")
 	assert.False(t, ok)
 }
 
@@ -161,7 +161,7 @@ func TestHostLevelNetworkRuleWithProtocol(t *testing.T) {
 	dnsEngine := NewDNSEngine(ruleStorage)
 	assert.NotNil(t, dnsEngine)
 
-	r, ok := dnsEngine.Match("example.org", nil)
+	r, ok := dnsEngine.Match("example.org")
 	assert.True(t, ok)
 	assert.True(t, r.NetworkRule != nil)
 }
@@ -171,14 +171,14 @@ func TestRegexp(t *testing.T) {
 	ruleStorage := newTestRuleStorage(t, 1, text)
 	dnsEngine := NewDNSEngine(ruleStorage)
 
-	res, ok := dnsEngine.Match("stats.test.com", nil)
+	res, ok := dnsEngine.Match("stats.test.com")
 	assert.True(t, ok && res.NetworkRule.Text() == text)
 
 	text = "@@/^stats?\\./"
 	ruleStorage = newTestRuleStorage(t, 1, "||stats.test.com^\n"+text)
 	dnsEngine = NewDNSEngine(ruleStorage)
 
-	res, ok = dnsEngine.Match("stats.test.com", nil)
+	res, ok = dnsEngine.Match("stats.test.com")
 	assert.True(t, res.NetworkRule.Text() == text && res.NetworkRule.Whitelist)
 }
 
@@ -201,68 +201,97 @@ func TestClientTags(t *testing.T) {
 	assert.NotNil(t, dnsEngine)
 
 	// global rule
-	rules, ok := dnsEngine.Match("host1", []string{"phone"})
+	rules, ok := dnsEngine.MatchRequest(DNSRequest{Hostname: "host1", SortedClientTags: []string{"phone"}})
 	assert.True(t, ok)
-	assert.True(t, rules.NetworkRule != nil)
-	assert.True(t, rules.NetworkRule.Text() == "||host1^")
+	assert.NotNil(t, rules.NetworkRule)
+	assert.Equal(t, "||host1^", rules.NetworkRule.Text())
 
 	// $ctag rule overrides global rule
-	rules, ok = dnsEngine.Match("host1", []string{"pc"})
+	rules, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host1", SortedClientTags: []string{"pc"}})
 	assert.True(t, ok)
-	assert.True(t, rules.NetworkRule != nil)
-	assert.True(t, rules.NetworkRule.Text() == "||host1^$ctag=pc|printer")
+	assert.NotNil(t, rules.NetworkRule)
+	assert.Equal(t, "||host1^$ctag=pc|printer", rules.NetworkRule.Text())
 
 	// 1 tag matches
-	rules, ok = dnsEngine.Match("host2", []string{"phone", "printer"})
+	rules, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host2", SortedClientTags: []string{"phone", "printer"}})
 	assert.True(t, ok)
-	assert.True(t, rules.NetworkRule != nil)
-	assert.True(t, rules.NetworkRule.Text() == "||host2^$ctag=pc|printer")
+	assert.NotNil(t, rules.NetworkRule)
+	assert.Equal(t, "||host2^$ctag=pc|printer", rules.NetworkRule.Text())
 
 	// tags don't match
-	rules, ok = dnsEngine.Match("host2", []string{"phone"})
-	assert.True(t, !ok)
+	rules, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host2", SortedClientTags: []string{"phone"}})
+	assert.False(t, ok)
 
 	// tags don't match
-	rules, ok = dnsEngine.Match("host2", []string{})
-	assert.True(t, !ok)
-
-	// tags match (exclusion)
-	rules, ok = dnsEngine.Match("host3", []string{})
-	assert.True(t, ok)
+	rules, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host2", SortedClientTags: []string{}})
+	assert.False(t, ok)
 
 	// 1 tag matches (exclusion)
-	rules, ok = dnsEngine.Match("host3", []string{"phone", "printer"})
+	rules, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host3", SortedClientTags: []string{"phone", "printer"}})
 	assert.True(t, ok)
-	assert.True(t, rules.NetworkRule != nil)
-	assert.True(t, rules.NetworkRule.Text() == "||host3^$ctag=~pc|~router")
+	assert.NotNil(t, rules.NetworkRule)
+	assert.Equal(t, "||host3^$ctag=~pc|~router", rules.NetworkRule.Text())
 
 	// 1 tag matches (exclusion)
-	rules, ok = dnsEngine.Match("host4", []string{"phone", "router"})
+	rules, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host4", SortedClientTags: []string{"phone", "router"}})
 	assert.True(t, ok)
-	assert.True(t, rules.NetworkRule != nil)
-	assert.True(t, rules.NetworkRule.Text() == "||host4^$ctag=~pc|router")
+	assert.NotNil(t, rules.NetworkRule)
+	assert.Equal(t, "||host4^$ctag=~pc|router", rules.NetworkRule.Text())
 
 	// tags don't match (exclusion)
-	rules, ok = dnsEngine.Match("host3", []string{"pc"})
-	assert.True(t, !ok)
+	rules, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host3", SortedClientTags: []string{"pc"}})
+	assert.False(t, ok)
 
 	// tags don't match (exclusion)
-	rules, ok = dnsEngine.Match("host4", []string{"pc", "router"})
-	assert.True(t, !ok)
+	rules, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host4", SortedClientTags: []string{"pc", "router"}})
+	assert.False(t, ok)
 
 	// tags match but it's a $badfilter
-	rules, ok = dnsEngine.Match("host5", []string{"pc"})
-	assert.True(t, !ok)
+	rules, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host5", SortedClientTags: []string{"pc"}})
+	assert.False(t, ok)
 
 	// tags match and $badfilter rule disables global rule
-	rules, ok = dnsEngine.Match("host6", []string{"pc"})
+	rules, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host6", SortedClientTags: []string{"pc"}})
 	assert.True(t, ok)
-	assert.True(t, rules.NetworkRule != nil)
-	assert.True(t, rules.NetworkRule.Text() == "||host6^$ctag=pc|printer")
+	assert.NotNil(t, rules.NetworkRule)
+	assert.Equal(t, "||host6^$ctag=pc|printer", rules.NetworkRule.Text())
 
 	// tags match (exclusion) but it's a $badfilter
-	rules, ok = dnsEngine.Match("host7", []string{"phone"})
-	assert.True(t, !ok)
+	rules, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host7", SortedClientTags: []string{"phone"}})
+	assert.False(t, ok)
+}
+
+func TestClient(t *testing.T) {
+	rulesText := `||host1^$client=127.0.0.1
+||host2^$client=~127.0.0.1
+||host3^$client='Frank\'s laptop'`
+	ruleStorage := newTestRuleStorage(t, 1, rulesText)
+	dnsEngine := NewDNSEngine(ruleStorage)
+	assert.NotNil(t, dnsEngine)
+
+	// match client IP
+	rules, ok := dnsEngine.MatchRequest(DNSRequest{Hostname: "host1", ClientIP: "127.0.0.1"})
+	assert.True(t, ok)
+	assert.NotNil(t, rules.NetworkRule)
+	assert.Equal(t, "||host1^$client=127.0.0.1", rules.NetworkRule.Text())
+
+	// not match client IP
+	rules, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host1", ClientIP: "127.0.0.2"})
+	assert.False(t, ok)
+
+	// restricted client IP
+	rules, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host2", ClientIP: "127.0.0.1"})
+	assert.False(t, ok)
+
+	// non-restricted client IP
+	rules, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host2", ClientIP: "127.0.0.2"})
+	assert.NotNil(t, rules.NetworkRule)
+	assert.Equal(t, "||host2^$client=~127.0.0.1", rules.NetworkRule.Text())
+
+	// match client name
+	rules, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host3", ClientName: "Frank's laptop"})
+	assert.NotNil(t, rules.NetworkRule)
+	assert.Equal(t, "||host3^$client='Frank\\'s laptop'", rules.NetworkRule.Text())
 }
 
 func TestBadfilterRules(t *testing.T) {
@@ -271,7 +300,7 @@ func TestBadfilterRules(t *testing.T) {
 	dnsEngine := NewDNSEngine(ruleStorage)
 	assert.NotNil(t, dnsEngine)
 
-	r, ok := dnsEngine.Match("example.org", nil)
+	r, ok := dnsEngine.Match("example.org")
 	assert.False(t, ok)
 	assert.True(t, r.NetworkRule == nil && r.HostRulesV4 == nil && r.HostRulesV6 == nil)
 }
