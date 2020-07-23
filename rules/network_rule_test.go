@@ -517,6 +517,18 @@ func TestMatchClients(t *testing.T) {
 
 	r.ClientName = "Frank's phone"
 	assert.True(t, f.Match(r))
+
+	f, err = NewNetworkRule("||example.org^$client=name", 0)
+	assert.Nil(t, err)
+	assert.NotNil(t, f)
+
+	r.ClientIP = "127.0.0.1"
+	r.ClientName = "name"
+	assert.True(t, f.Match(r))
+
+	r.ClientIP = "127.0.0.1"
+	r.ClientName = "another-name"
+	assert.False(t, f.Match(r))
 }
 
 func TestNetworkRulePriority(t *testing.T) {
