@@ -209,8 +209,13 @@ func (f *NetworkRule) Match(r *Request) bool {
 		return false
 	}
 
-	if !f.matchClient(r.ClientIP) || !f.matchClient(r.ClientName) {
-		return false
+	if r.ClientIP != "" || r.ClientName != "" {
+		ipMatch := f.matchClient(r.ClientIP)
+		nameMatch := f.matchClient(r.ClientName)
+		if ipMatch < 0 || nameMatch < 0 || // either one is matched by "restricted" rule
+			(ipMatch == 0 && nameMatch == 0) { // none is matched by "permitted" rule
+			return false
+		}
 	}
 
 	return f.matchPattern(r)
@@ -528,27 +533,34 @@ func (f *NetworkRule) matchClientTags(sortedTags []string) bool {
 
 // matchClient returns TRUE if the rule matches with the specified client
 // client can be client name or IP address
-func (f *NetworkRule) matchClient(client string) bool {
+// Return
+//   0: not matched
+//   <0: matched by "restricted" rule
+//   >0: matched by "permitted" rule
+func (f *NetworkRule) matchClient(client string) int {
 	if len(f.restrictedClients) == 0 && len(f.permittedClients) == 0 {
-		return true // the rule doesn't contain $client modifier
+		return 0 // the rule doesn't contain $client modifier
 	}
 	if client == "" {
-		return true // no client specified
+		return 0 // no client specified
 	}
 
 	if findSorted(f.restrictedClients, client) != -1 {
 		// the client is in the list of restricted
-		return false
+		return -1
 	}
 
-	if len(f.permittedClients) != 0 {
-		// If the rule is permitted for specific tags only,
-		// we should check whether our client is among permitted or not
-		// and return the result the result immediately
-		return findSorted(f.permittedClients, client) != -1
+	// If the rule is permitted for specific tags only,
+	// we should check whether our client is among permitted or not
+	// and return the result the result immediately
+	if findSorted(f.permittedClients, client) != -1 {
+		return 1
 	}
 
-	return true
+	if len(f.restrictedClients) != 0 {
+		return 1
+	}
+	return 0
 }
 
 // matchRequestType checks if the specified request type matches the rule properties
