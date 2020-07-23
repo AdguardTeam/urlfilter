@@ -108,6 +108,23 @@ func TestBenchDNSEngine(t *testing.T) {
 	log.Printf("RSS after matching - %d kB (%d kB diff)\n", afterMatch/1024, (afterMatch-afterLoad)/1024)
 }
 
+func TestDNSEnginePriority(t *testing.T) {
+	rulesText := `@@||example.org^
+127.0.0.1  example.org
+`
+
+	ruleStorage := newTestRuleStorage(t, 1, rulesText)
+	dnsEngine := NewDNSEngine(ruleStorage)
+	assert.NotNil(t, dnsEngine)
+
+	r, ok := dnsEngine.Match("example.org")
+	assert.True(t, ok)
+	assert.True(t, r.NetworkRule != nil)
+	assert.True(t, r.NetworkRule.Whitelist)
+	assert.Nil(t, r.HostRulesV4)
+	assert.Nil(t, r.HostRulesV6)
+}
+
 func TestDNSEngineMatchHostname(t *testing.T) {
 	rulesText := `||example.org^
 ||example2.org/*
