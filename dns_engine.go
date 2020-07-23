@@ -90,7 +90,7 @@ func NewDNSEngine(s *filterlist.RuleStorage) *DNSEngine {
 // 192.168.0.1 example.local
 // 2000::1 example.local
 func (d *DNSEngine) Match(hostname string) (DNSResult, bool) {
-	return d.MatchRequest(DNSRequest{Hostname: hostname})
+	return d.MatchRequest(DNSRequest{Hostname: hostname, ClientIP: "0.0.0.0"})
 }
 
 // MatchRequest - matches the specified DNS request

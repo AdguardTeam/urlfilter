@@ -119,7 +119,8 @@ func TestDNSEnginePriority(t *testing.T) {
 
 	r, ok := dnsEngine.Match("example.org")
 	assert.True(t, ok)
-	assert.True(t, r.NetworkRule != nil)
+	assert.NotNil(t, r)
+	assert.NotNil(t, r.NetworkRule)
 	assert.True(t, r.NetworkRule.Whitelist)
 	assert.Nil(t, r.HostRulesV4)
 	assert.Nil(t, r.HostRulesV6)

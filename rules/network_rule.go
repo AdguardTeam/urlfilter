@@ -209,13 +209,8 @@ func (f *NetworkRule) Match(r *Request) bool {
 		return false
 	}
 
-	if r.ClientIP != "" || r.ClientName != "" {
-		ipMatch := f.matchClient(r.ClientIP)
-		nameMatch := f.matchClient(r.ClientName)
-		if ipMatch < 0 || nameMatch < 0 || // either one is matched by "restricted" rule
-			(ipMatch == 0 && nameMatch == 0) { // none is matched by "permitted" rule
-			return false
-		}
+	if !f.matchClient(r.ClientName, r.ClientIP) {
+		return false
 	}
 
 	return f.matchPattern(r)
@@ -532,35 +527,33 @@ func (f *NetworkRule) matchClientTags(sortedTags []string) bool {
 }
 
 // matchClient returns TRUE if the rule matches with the specified client
-// client can be client name or IP address
-// Return
-//   0: not matched
-//   <0: matched by "restricted" rule
-//   >0: matched by "permitted" rule
-func (f *NetworkRule) matchClient(client string) int {
+// name -- client name (if any)
+// ip -- client ip (if any)
+func (f *NetworkRule) matchClient(name string, ip string) bool {
 	if len(f.restrictedClients) == 0 && len(f.permittedClients) == 0 {
-		return 0 // the rule doesn't contain $client modifier
-	}
-	if client == "" {
-		return 0 // no client specified
+		return true // the rule doesn't contain $client modifier
 	}
 
-	if findSorted(f.restrictedClients, client) != -1 {
+	if findSorted(f.restrictedClients, name) != -1 ||
+		findSorted(f.restrictedClients, ip) != -1 {
 		// the client is in the list of restricted
-		return -1
+		return false
 	}
 
-	// If the rule is permitted for specific tags only,
-	// we should check whether our client is among permitted or not
-	// and return the result the result immediately
-	if findSorted(f.permittedClients, client) != -1 {
-		return 1
+	if len(f.permittedClients) != 0 {
+		// If the rule is permitted for specific client only,
+		// we should check whether our client is among permitted or not
+		// and return the result the result immediately
+		if findSorted(f.permittedClients, name) != -1 ||
+			findSorted(f.permittedClients, ip) != -1 {
+			return true
+		}
+
+		return false
 	}
 
-	if len(f.restrictedClients) != 0 {
-		return 1
-	}
-	return 0
+	// If we got here, permitted list is empty and the client is not among restricted
+	return true
 }
 
 // matchRequestType checks if the specified request type matches the rule properties
