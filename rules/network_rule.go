@@ -871,18 +871,6 @@ func findRegexpShortcut(pattern string) string {
 	return strings.ToLower(longest)
 }
 
-// isDomainOrSubdomainOfAny checks if "domain" is domain or subdomain or any of the "domains"
-func isDomainOrSubdomainOfAny(domain string, domains []string) bool {
-	for _, d := range domains {
-		if domain == d ||
-			(strings.HasSuffix(domain, d) &&
-				strings.HasSuffix(domain, "."+d)) {
-			return true
-		}
-	}
-	return false
-}
-
 // parseRuleText splits the rule text in multiple parts:
 // pattern -- a basic rule pattern (which can be easily converted into a regex)
 // options -- a string with all rule options

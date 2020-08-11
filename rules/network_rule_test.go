@@ -384,6 +384,31 @@ func TestDomainRestrictions(t *testing.T) {
 	assert.True(t, f.Match(r))
 }
 
+func TestWildcardTLDRestrictions(t *testing.T) {
+	f, err := NewNetworkRule("||example.org^$domain=example.*", 0)
+	assert.Nil(t, err)
+
+	r := NewRequest("https://example.org/", "", TypeScript)
+	assert.False(t, f.Match(r))
+
+	r = NewRequest("https://example.org/", "https://example.com/", TypeScript)
+	assert.True(t, f.Match(r))
+
+	r = NewRequest("https://example.org/", "https://example.co.uk/", TypeScript)
+	assert.True(t, f.Match(r))
+
+	r = NewRequest("https://example.org/", "https://test.example.co.uk/", TypeScript)
+	assert.True(t, f.Match(r))
+
+	// Not a public suffix
+	r = NewRequest("https://example.org/", "https://example.local/", TypeScript)
+	assert.False(t, f.Match(r))
+
+	// Not a public suffix
+	r = NewRequest("https://example.org/", "https://example.test.test/", TypeScript)
+	assert.False(t, f.Match(r))
+}
+
 func TestInvalidDomainRestrictions(t *testing.T) {
 	_, err := NewNetworkRule("||example.org^$domain=", 0)
 	assert.NotNil(t, err)
