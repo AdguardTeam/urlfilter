@@ -3,6 +3,8 @@ package rules
 import (
 	"sort"
 	"strings"
+
+	"golang.org/x/net/publicsuffix"
 )
 
 // findSorted - finds value in a sorted array
@@ -69,6 +71,35 @@ func stringArraysEquals(l []string, r []string) bool {
 	}
 
 	return true
+}
+
+// isDomainOrSubdomainOfAny checks if "domain" is domain or subdomain or any of the "domains"
+func isDomainOrSubdomainOfAny(domain string, domains []string) bool {
+	for _, d := range domains {
+		if strings.HasSuffix(d, ".*") {
+			// A pattern like "google.*" will match any "google.TLD" domain or subdomain
+			withoutWildcard := d[0 : len(d)-1]
+
+			if strings.HasPrefix(domain, withoutWildcard) ||
+				(strings.Index(domain, withoutWildcard) > 0 &&
+					strings.Index(domain, "."+withoutWildcard) > 0) {
+				tld, icann := publicsuffix.PublicSuffix(domain)
+
+				// Let's check that the domain's TLD is one of the public suffixes
+				if tld != "" && icann &&
+					strings.HasSuffix(domain, withoutWildcard+tld) {
+					return true
+				}
+			}
+		} else {
+			if domain == d ||
+				(strings.HasSuffix(domain, d) &&
+					strings.HasSuffix(domain, "."+d)) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // sort.Interface

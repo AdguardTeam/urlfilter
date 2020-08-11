@@ -101,7 +101,7 @@ func loadDomains(domains string, sep string) (permittedDomains []string, restric
 			d = d[1:]
 		}
 
-		if !govalidator.IsDNSName(d) {
+		if !govalidator.IsDNSName(d) && !strings.HasSuffix(d, ".*") {
 			err = fmt.Errorf("invalid domain specified: %s", domains)
 			return
 		}

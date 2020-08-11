@@ -68,3 +68,15 @@ func TestCosmeticRuleMatch(t *testing.T) {
 	assert.False(t, f.Match("sub.example.org"))
 	assert.False(t, f.Match("sub.sub.example.org"))
 }
+
+func TestCosmeticRuleWildcardTLDMatch(t *testing.T) {
+	f, err := NewCosmeticRule("example.*##banner", 1)
+	assert.Nil(t, err)
+	assert.NotNil(t, f)
+
+	assert.True(t, f.Match("example.org"))
+	assert.True(t, f.Match("test.example.org"))
+	assert.True(t, f.Match("example.co.uk"))
+	assert.False(t, f.Match("example.local"))
+	assert.False(t, f.Match("example.local.test"))
+}
