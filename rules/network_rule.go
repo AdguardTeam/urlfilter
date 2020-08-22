@@ -452,7 +452,10 @@ func (f *NetworkRule) shouldMatchHostname(r *Request) bool {
 	if strings.HasPrefix(f.pattern, MaskStartURL) ||
 		strings.HasPrefix(f.pattern, "http://") ||
 		strings.HasPrefix(f.pattern, "https://") ||
-		strings.HasPrefix(f.pattern, "://") {
+		strings.HasPrefix(f.pattern, "://") ||
+		strings.HasPrefix(f.pattern, "*://") ||
+		strings.HasPrefix(f.pattern, "ALL: ") ||
+		strings.HasPrefix(f.pattern, "0 ") {
 		return false
 	}
 
