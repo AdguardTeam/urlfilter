@@ -41,3 +41,98 @@ func ExtractHostname(url string) string {
 
 	return url[firstIdx:nextIdx]
 }
+
+// IsDomainName - check if input string is a valid domain name
+// Syntax: [label.]... label.label
+//
+// Each label is 1 to 63 characters long, and may contain:
+//   . ASCII letters a-z and A-Z
+//   . digits 0-9
+//   . hyphen ('-')
+// . labels cannot start or end with hyphens (RFC 952)
+// . max length of ascii hostname including dots is 253 characters
+// . TLD is >=2 characters
+// . TLD is [a-zA-Z]+ or "xn--[a-zA-Z0-9]+"
+// . at least 1 level above TLD Source
+// nolint(gocyclo)
+func IsDomainName(name string) bool {
+	if len(name) > 253 {
+		return false
+	}
+
+	st := 0
+	nLabel := 0
+	nLevel := 1
+	var prevChar byte
+	charOnly := true
+	xn := 0
+
+	for _, c := range []byte(name) {
+
+		switch st {
+		case 0:
+			fallthrough
+		case 1:
+			if !((c >= 'a' && c <= 'z') ||
+				(c >= 'A' && c <= 'Z')) {
+				charOnly = false
+				if !(c >= '0' && c <= '9') {
+					return false
+				}
+			} else if c == 'x' || c == 'X' {
+				xn = 1
+			}
+			st = 2
+			nLabel = 1
+
+		case 2:
+			if c == '.' {
+				if prevChar == '-' {
+					return false
+				}
+				nLevel++
+				st = 0
+				charOnly = true
+				xn = 0
+				continue
+			}
+
+			if nLabel == 63 {
+				return false
+			}
+
+			if !((c >= 'a' && c <= 'z') ||
+				(c >= 'A' && c <= 'Z')) {
+				charOnly = false
+				if !((c >= '0' && c <= '9') ||
+					c == '-') {
+					return false
+				}
+			}
+
+			if xn > 0 {
+				if xn < len("xn--") {
+					if c == "xn--"[xn] {
+						xn++
+					} else {
+						xn = 0
+					}
+				} else {
+					xn++
+				}
+			}
+
+			prevChar = c
+			nLabel++
+		}
+	}
+
+	if st != 2 ||
+		nLabel == 1 ||
+		nLevel == 1 ||
+		(!charOnly && xn < len("xn--wwww")) {
+		return false
+	}
+
+	return true
+}

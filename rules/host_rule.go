@@ -4,7 +4,7 @@ import (
 	"net"
 	"strings"
 
-	"github.com/asaskevich/govalidator"
+	"github.com/AdguardTeam/urlfilter/filterutil"
 )
 
 // HostRule is a structure for simple host-level rules (i.e. /etc/hosts syntax).
@@ -15,6 +15,39 @@ type HostRule struct {
 	FilterListID int      // Filter list identifier
 	Hostnames    []string // Hostnames is the list of hostnames that is configured
 	IP           net.IP   // ip address
+}
+
+// Split string by whitespace (' ' or '\t') and return the first element
+func splitNextByWhitespace(ps *string) string {
+	s := *ps
+
+	i := 0
+	// trim space
+	for ; i < len(s); i++ {
+		if !(s[i] == ' ' || s[i] == '\t') {
+			break
+		}
+	}
+
+	begin := i
+	// find space or tab
+	for ; i < len(s); i++ {
+		if s[i] == ' ' || s[i] == '\t' {
+			break
+		}
+	}
+
+	r := s[begin:i]
+
+	// trim space
+	for ; i < len(s); i++ {
+		if !(s[i] == ' ' || s[i] == '\t') {
+			break
+		}
+	}
+	*ps = s[i:]
+
+	return r
 }
 
 // NewHostRule parses the rule and creates a new HostRule instance
@@ -32,31 +65,25 @@ func NewHostRule(ruleText string, filterListID int) (*HostRule, error) {
 		ruleText = ruleText[0 : commentIndex-1]
 	}
 
-	parts := strings.Fields(strings.TrimSpace(ruleText))
-	var ip net.IP
-	var hostnames []string
-
-	if len(parts) >= 2 {
-		for i, part := range parts {
-			if i == 0 {
-				ip = net.ParseIP(parts[0])
-				if ip == nil {
-					return nil, &RuleSyntaxError{msg: "cannot parse IP", ruleText: ruleText}
-				}
-			} else {
-				hostnames = append(hostnames, part)
-			}
+	first := splitNextByWhitespace(&ruleText)
+	if len(ruleText) == 0 {
+		if !filterutil.IsDomainName(first) {
+			return nil, &RuleSyntaxError{msg: "invalid syntax", ruleText: ruleText}
 		}
-	} else if len(parts) == 1 &&
-		isDomainName(parts[0]) {
-		hostnames = append(hostnames, parts[0])
-		ip = net.IPv4(0, 0, 0, 0)
+		h.Hostnames = append(h.Hostnames, first)
+		h.IP = net.IPv4(0, 0, 0, 0)
+
 	} else {
-		return nil, &RuleSyntaxError{msg: "invalid syntax", ruleText: ruleText}
+		h.IP = net.ParseIP(first)
+		if h.IP == nil {
+			return nil, &RuleSyntaxError{msg: "cannot parse IP", ruleText: ruleText}
+		}
+		for len(ruleText) != 0 {
+			host := splitNextByWhitespace(&ruleText)
+			h.Hostnames = append(h.Hostnames, host)
+		}
 	}
 
-	h.Hostnames = hostnames
-	h.IP = ip
 	return &h, nil
 }
 
@@ -89,13 +116,4 @@ func (f *HostRule) Match(hostname string) bool {
 	}
 
 	return false
-}
-
-func isDomainName(line string) bool {
-	if strings.IndexByte(line, '.') == -1 ||
-		line[len(line)-1] == '.' {
-		return false
-	}
-
-	return govalidator.IsDNSName(line)
 }

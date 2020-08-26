@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/asaskevich/govalidator"
+	"github.com/AdguardTeam/urlfilter/filterutil"
 )
 
 // RuleSyntaxError represents an error while parsing a filtering rule
@@ -101,7 +101,7 @@ func loadDomains(domains string, sep string) (permittedDomains []string, restric
 			d = d[1:]
 		}
 
-		if !govalidator.IsDNSName(d) && !strings.HasSuffix(d, ".*") {
+		if !filterutil.IsDomainName(d) && !strings.HasSuffix(d, ".*") {
 			err = fmt.Errorf("invalid domain specified: %s", domains)
 			return
 		}
