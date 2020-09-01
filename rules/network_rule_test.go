@@ -684,6 +684,17 @@ func TestMatchIPAddress(t *testing.T) {
 
 	r = NewRequestForHostname("1.104.154.1")
 	assert.False(t, f.Match(r))
+
+	f, err = NewNetworkRule("/sub.", 0)
+	assert.Nil(t, err)
+	r = NewRequestForHostname("sub.example.org")
+	assert.True(t, f.Match(r))
+	r = NewRequestForHostname("sub.host.org")
+	assert.True(t, f.Match(r))
+	r = NewRequestForHostname("sub2.host.org")
+	assert.False(t, f.Match(r))
+	r = NewRequestForHostname("2sub.host.org")
+	assert.False(t, f.Match(r))
 }
 
 func assertBadfilterNegates(t *testing.T, rule string, badfilter string, expected bool) {

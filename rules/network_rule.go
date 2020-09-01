@@ -456,6 +456,20 @@ func (f *NetworkRule) shouldMatchHostname(r *Request) bool {
 		return false
 	}
 
+	// Check if the pattern "/hostname." contains only allowed characters
+	if len(f.pattern) > 3 && f.pattern[0] == '/' && f.pattern[len(f.pattern)-1] == '.' {
+		for i := 1; i < len(f.pattern)-1; i++ {
+			ch := f.pattern[i]
+			if !((ch >= 'a' && ch <= 'z') ||
+				(ch >= 'A' && ch <= 'Z') ||
+				(ch >= '0' && ch <= '9') ||
+				ch == '.' || ch == '-') {
+				return true
+			}
+		}
+		return false
+	}
+
 	return true
 }
 
