@@ -6,6 +6,7 @@ import (
 	"sort"
 )
 
+// set representation for $client modifiers
 type clients struct {
 	hosts []string
 	nets  ipNets
@@ -91,8 +92,8 @@ func (c *clients) contains(host string, ipStr string) bool {
 
 	ip := net.ParseIP(ipStr)
 	if ip != nil {
-		for _, net := range c.nets {
-			if net.Contains(ip) {
+		for _, subnet := range c.nets {
+			if subnet.Contains(ip) {
 				return true
 			}
 		}
@@ -102,6 +103,7 @@ func (c *clients) contains(host string, ipStr string) bool {
 }
 
 type ipNets []net.IPNet
+var _ ipNets = sort.Interface
 
 func (n ipNets) Len() int {
 	return len(n)
