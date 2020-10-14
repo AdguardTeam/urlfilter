@@ -126,6 +126,8 @@ func (n ipNets) Less(i, j int) bool {
 	jMaskSize, _ := n[j].Mask.Size()
 	if iMaskSize < jMaskSize {
 		return true
+	} else if iMaskSize > jMaskSize {
+		return false
 	}
 
 	// normalized network number byte order
