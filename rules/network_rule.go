@@ -548,7 +548,7 @@ func (f *NetworkRule) matchClient(name string, ip string) bool {
 		return true // the rule doesn't contain $client modifier
 	}
 
-	if f.restrictedClients.isIn(name, ip) {
+	if f.restrictedClients.contains(name, ip) {
 		// the client is in the restricted set
 		return false
 	}
@@ -557,7 +557,7 @@ func (f *NetworkRule) matchClient(name string, ip string) bool {
 		// If the rule is permitted for specific client only,
 		// we should check whether our client is among
 		// permitted or not and return the result immediately
-		return f.permittedClients.isIn(name, ip)
+		return f.permittedClients.contains(name, ip)
 	}
 
 	// If we got here, permitted list is empty and the client is not among restricted

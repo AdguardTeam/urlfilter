@@ -80,7 +80,7 @@ func newClients(clientStrs ...string) *clients {
 	return c
 }
 
-func (c *clients) isIn(host string, ipStr string) bool {
+func (c *clients) contains(host string, ipStr string) bool {
 	if c == nil {
 		return false
 	}
