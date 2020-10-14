@@ -473,38 +473,38 @@ func TestClientTagRules(t *testing.T) {
 func TestLoadClients(t *testing.T) {
 	p, r, err := loadClients("127.0.0.1", '|')
 	assert.Nil(t, err)
-	assert.Equal(t, []string{"127.0.0.1"}, p)
+	assert.Equal(t, *newClients("127.0.0.1"), *p)
 	assert.Nil(t, r)
 
 	p, r, err = loadClients("127.0.0.1|127.0.0.2", '|')
 	assert.Nil(t, err)
-	assert.Equal(t, []string{"127.0.0.1", "127.0.0.2"}, p)
+	assert.Equal(t, *newClients("127.0.0.1", "127.0.0.2"), *p)
 	assert.Nil(t, r)
 
 	p, r, err = loadClients("127.0.0.1|~127.0.0.2", '|')
 	assert.Nil(t, err)
-	assert.Equal(t, []string{"127.0.0.1"}, p)
-	assert.Equal(t, []string{"127.0.0.2"}, r)
+	assert.Equal(t, *newClients("127.0.0.1"), *p)
+	assert.Equal(t, *newClients("127.0.0.2"), *r)
 
 	p, r, err = loadClients("'Frank\\'s laptop'", '|')
 	assert.Nil(t, err)
-	assert.Equal(t, []string{"Frank's laptop"}, p)
+	assert.Equal(t, *newClients("Frank's laptop"), *p)
 	assert.Nil(t, r)
 
 	p, r, err = loadClients("~\"Frank's phone\"", '|')
 	assert.Nil(t, err)
 	assert.Nil(t, p)
-	assert.Equal(t, []string{"Frank's phone"}, r)
+	assert.Equal(t, *newClients("Frank's phone"), *r)
 
 	p, r, err = loadClients("~'Mary\\'s\\, John\\'s\\, and Boris\\'s laptops'", '|')
 	assert.Nil(t, err)
 	assert.Nil(t, p)
-	assert.Equal(t, []string{"Mary's, John's, and Boris's laptops"}, r)
+	assert.Equal(t, *newClients("Mary's, John's, and Boris's laptops"), *r)
 
 	p, r, err = loadClients("~Mom|~Dad|\"Kids\"", '|')
 	assert.Nil(t, err)
-	assert.Equal(t, []string{"Kids"}, p)
-	assert.Equal(t, []string{"Dad", "Mom"}, r)
+	assert.Equal(t, *newClients("Kids"), *p)
+	assert.Equal(t, *newClients("Dad", "Mom"), *r)
 }
 
 func TestLoadInvalidClients(t *testing.T) {
@@ -531,6 +531,36 @@ func TestMatchClients(t *testing.T) {
 	assert.True(t, f.Match(r))
 
 	r.ClientIP = "127.0.0.2"
+	assert.False(t, f.Match(r))
+
+	f, err = NewNetworkRule("||example.org^$client=127.0.0.0/8", 0)
+	assert.Nil(t, err)
+	assert.NotNil(t, f)
+
+	r.ClientIP = "127.1.1.1"
+	assert.True(t, f.Match(r))
+
+	r.ClientIP = "126.0.0.0"
+	assert.False(t, f.Match(r))
+
+	f, err = NewNetworkRule("||example.org^$client=2001::0:00c0:ffee", 0)
+	assert.Nil(t, err)
+	assert.NotNil(t, f)
+
+	r.ClientIP = "2001::c0:ffee"
+	assert.True(t, f.Match(r))
+
+	r.ClientIP = "2001::c0:ffef"
+	assert.False(t, f.Match(r))
+
+	f, err = NewNetworkRule("||example.org^$client=2001::0:00c0:ffee/112", 0)
+	assert.Nil(t, err)
+	assert.NotNil(t, f)
+
+	r.ClientIP = "2001::0:c0:0"
+	assert.True(t, f.Match(r))
+
+	r.ClientIP = "2001::c1:ffee"
 	assert.False(t, f.Match(r))
 
 	f, err = NewNetworkRule("||example.org^$client=~'Frank\\'s laptop'", 0)
@@ -642,6 +672,12 @@ func TestBadfilterRule(t *testing.T) {
 	assertBadfilterNegates(t, "*$ctag=phone|pc", "*$ctag=pc|phone,badfilter", true)
 	assertBadfilterNegates(t, "*$client=127.0.0.1", "*$client=127.0.0.2,badfilter", false)
 	assertBadfilterNegates(t, "*$client=127.0.0.1", "*$client=127.0.0.1,badfilter", true)
+	assertBadfilterNegates(t, "*$client=::|127.0.0.1", "*$client=127.0.0.1|::,badfilter", true)
+	assertBadfilterNegates(t, "*$client=127.0.0.1/8|10.0.0.0/8", "*$client=10.0.0.0/8|127.0.0.1/8,badfilter", true)
+	assertBadfilterNegates(t, "*$client=::", "*$client=0:0000::0,badfilter", true)
+	assertBadfilterNegates(t, "*$client=127.0.0.1/24|127.0.0.1/16", "*$client=127.0.0.1/16|127.0.0.1/24,badfilter", true)
+	assertBadfilterNegates(t, "*$client=fe01::/16|127.0.0.1|1::/16", "*$client=127.0.0.1|1::/16|fe01::/16,badfilter", true)
+	assertBadfilterNegates(t, "*$client=::/64", "*$client=::/63,badfilter", false)
 }
 
 func TestIsHostLevelNetworkRule(t *testing.T) {

@@ -112,8 +112,8 @@ type NetworkRule struct {
 	restrictedClientTags []string // a sorted list of restricted client tags from the $ctag modifier
 
 	// https://github.com/AdguardTeam/AdGuardHome/issues/1761
-	permittedClients  []string // a list of permitted clients from the $client modifier
-	restrictedClients []string // a list of restricted clients from the $client modifier
+	permittedClients  *clients // permitted clients from the $client modifier
+	restrictedClients *clients // restricted clients from the $client modifier
 
 	enabledOptions  NetworkRuleOption // Flag with all enabled rule options
 	disabledOptions NetworkRuleOption // Flag with all disabled rule options
@@ -155,7 +155,7 @@ func NewNetworkRule(ruleText string, filterListID int) (*NetworkRule, error) {
 		pattern == MaskAnyCharacter || pattern == "" ||
 		len(pattern) < 3 {
 		if len(rule.permittedDomains) == 0 &&
-			len(rule.permittedClients) == 0 &&
+			rule.permittedClients.Len() == 0 &&
 			len(rule.permittedClientTags) == 0 {
 			// Rule matches too much and does not have any domain, client or ctag restrictions
 			// We should not allow this kind of rules
@@ -326,7 +326,7 @@ func (f *NetworkRule) IsHigherPriority(r *NetworkRule) bool {
 	if len(f.permittedClientTags) != 0 || len(f.restrictedClientTags) != 0 {
 		count++
 	}
-	if len(f.permittedClients) != 0 || len(f.restrictedClients) != 0 {
+	if f.permittedClients.Len() != 0 || f.restrictedClients.Len() != 0 {
 		count++
 	}
 	rCount := r.enabledOptions.Count() + r.disabledOptions.Count() +
@@ -384,8 +384,8 @@ func (f *NetworkRule) negatesBadfilter(r *NetworkRule) bool {
 		return false
 	}
 
-	if !stringArraysEquals(f.permittedClients, r.permittedClients) ||
-		!stringArraysEquals(f.restrictedClients, r.restrictedClients) {
+	if !f.permittedClients.Equal(r.permittedClients) ||
+		!f.restrictedClients.Equal(r.restrictedClients) {
 		return false
 	}
 
@@ -544,26 +544,20 @@ func (f *NetworkRule) matchClientTags(sortedTags []string) bool {
 // name -- client name (if any)
 // ip -- client ip (if any)
 func (f *NetworkRule) matchClient(name string, ip string) bool {
-	if len(f.restrictedClients) == 0 && len(f.permittedClients) == 0 {
+	if f.restrictedClients.Len() == 0 && f.permittedClients.Len() == 0 {
 		return true // the rule doesn't contain $client modifier
 	}
 
-	if findSorted(f.restrictedClients, name) != -1 ||
-		findSorted(f.restrictedClients, ip) != -1 {
-		// the client is in the list of restricted
+	if f.restrictedClients.isIn(name, ip) {
+		// the client is in the restricted set
 		return false
 	}
 
-	if len(f.permittedClients) != 0 {
+	if f.permittedClients.Len() != 0 {
 		// If the rule is permitted for specific client only,
-		// we should check whether our client is among permitted or not
-		// and return the result the result immediately
-		if findSorted(f.permittedClients, name) != -1 ||
-			findSorted(f.permittedClients, ip) != -1 {
-			return true
-		}
-
-		return false
+		// we should check whether our client is among
+		// permitted or not and return the result immediately
+		return f.permittedClients.isIn(name, ip)
 	}
 
 	// If we got here, permitted list is empty and the client is not among restricted
