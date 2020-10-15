@@ -103,6 +103,7 @@ func (c *clients) contains(host string, ipStr string) bool {
 }
 
 type ipNets []net.IPNet
+
 var _ sort.Interface = (*ipNets)(nil)
 
 func (n ipNets) Len() int {
