@@ -167,7 +167,7 @@ func loadCTags(value string, sep string) (permittedCTags []string, restrictedCTa
 }
 
 // The $client modifier allows specifying clients this rule will be working for.
-// It accepts both client names or IP addresses.
+// It accepts client names, IP addresses, or CIDR address ranges.
 //
 // The syntax is:
 //
@@ -187,13 +187,16 @@ func loadCTags(value string, sep string) (permittedCTags []string, restrictedCTa
 //
 // Examples of the input value:
 // 127.0.0.1
+// 192.168.3.0/24
+// ::
+// fe01::/64
 // 'Frank\'s laptop'
 // "Frank's phone"
 // ~'Mary\'s\, John\'s\, and Boris\'s laptops'
 // ~Mom|~Dad|"Kids"
 //
 // Returns sorted arrays of permitted and restricted clients
-func loadClients(value string, sep byte) (permittedClients []string, restrictedClients []string, err error) {
+func loadClients(value string, sep byte) (permittedClients *clients, restrictedClients *clients, err error) {
 	if value == "" {
 		err = errors.New("value is empty")
 		return
@@ -236,15 +239,20 @@ func loadClients(value string, sep byte) (permittedClients []string, restrictedC
 		}
 
 		if restricted {
-			restrictedClients = append(restrictedClients, client)
+			if restrictedClients == nil {
+				restrictedClients = &clients{}
+			}
+			restrictedClients.add(client)
 		} else {
-			permittedClients = append(permittedClients, client)
+			if permittedClients == nil {
+				permittedClients = &clients{}
+			}
+			permittedClients.add(client)
 		}
 	}
 
-	// Sorting clients so that we could use binary search
-	sort.Strings(permittedClients)
-	sort.Strings(restrictedClients)
+	permittedClients.finalize()
+	restrictedClients.finalize()
 
 	return
 }

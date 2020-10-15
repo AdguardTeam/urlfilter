@@ -3,6 +3,7 @@ package urlfilter
 import (
 	"net"
 	"runtime/debug"
+	"strings"
 	"testing"
 	"time"
 
@@ -279,37 +280,101 @@ func TestClientTags(t *testing.T) {
 	assert.False(t, ok)
 }
 
+func assertMatchRuleText(t *testing.T, rulesText string, rules DNSResult, ok bool) {
+	assert.True(t, ok)
+	if ok {
+		assert.NotNil(t, rules.NetworkRule)
+		assert.Equal(t, rulesText, rules.NetworkRule.Text())
+	}
+}
+
 func TestClient(t *testing.T) {
-	rulesText := `||host1^$client=127.0.0.1
-||host2^$client=~127.0.0.1
-||host3^$client='Frank\'s laptop'`
-	ruleStorage := newTestRuleStorage(t, 1, rulesText)
+	rulesText := []string{
+		"||host0^$client=127.0.0.1",
+		"||host1^$client=~127.0.0.1",
+		"||host2^$client=2001::c0:ffee",
+		"||host3^$client=~2001::c0:ffee",
+		"||host4^$client=127.0.0.1/24",
+		"||host5^$client=~127.0.0.1/24",
+		"||host6^$client=2001::c0:ffee/120",
+		"||host7^$client=~2001::c0:ffee/120",
+		"||host8^$client='Frank\\'s laptop'",
+	}
+	ruleStorage := newTestRuleStorage(t, 1, strings.Join(rulesText, "\n"))
 	dnsEngine := NewDNSEngine(ruleStorage)
 	assert.NotNil(t, dnsEngine)
 
-	// match client IP
-	rules, ok := dnsEngine.MatchRequest(DNSRequest{Hostname: "host1", ClientIP: "127.0.0.1"})
-	assert.True(t, ok)
-	assert.NotNil(t, rules.NetworkRule)
-	assert.Equal(t, "||host1^$client=127.0.0.1", rules.NetworkRule.Text())
+	// match client IPv4
+	rules, ok := dnsEngine.MatchRequest(DNSRequest{Hostname: "host0", ClientIP: "127.0.0.1"})
+	assertMatchRuleText(t, rulesText[0], rules, ok)
 
-	// not match client IP
+	// not match client IPv4
+	rules, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host0", ClientIP: "127.0.0.2"})
+	assert.False(t, ok)
+
+	// restricted client IPv4
+	rules, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host1", ClientIP: "127.0.0.1"})
+	assert.False(t, ok)
+
+	// non-restricted client IPv4
 	rules, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host1", ClientIP: "127.0.0.2"})
+	assertMatchRuleText(t, rulesText[1], rules, ok)
+
+	// match client IPv6
+	rules, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host2", ClientIP: "2001::c0:ffee"})
+	assertMatchRuleText(t, rulesText[2], rules, ok)
+
+	// not match client IPv6
+	rules, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host2", ClientIP: "2001::c0:ffef"})
 	assert.False(t, ok)
 
-	// restricted client IP
-	rules, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host2", ClientIP: "127.0.0.1"})
+	// restricted client IPv6
+	rules, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host3", ClientIP: "2001::c0:ffee"})
 	assert.False(t, ok)
 
-	// non-restricted client IP
-	rules, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host2", ClientIP: "127.0.0.2"})
-	assert.NotNil(t, rules.NetworkRule)
-	assert.Equal(t, "||host2^$client=~127.0.0.1", rules.NetworkRule.Text())
+	// non-restricted client IPv6
+	rules, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host3", ClientIP: "2001::c0:ffef"})
+	assertMatchRuleText(t, rulesText[3], rules, ok)
+
+	// match network IPv4
+	rules, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host4", ClientIP: "127.0.0.254"})
+	assertMatchRuleText(t, rulesText[4], rules, ok)
+
+	// not match network IPv4
+	rules, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host4", ClientIP: "127.0.1.1"})
+	assert.False(t, ok)
+
+	// restricted network IPv4
+	rules, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host5", ClientIP: "127.0.0.254"})
+	assert.False(t, ok)
+
+	// non-restricted network IPv4
+	rules, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host5", ClientIP: "127.0.1.1"})
+	assertMatchRuleText(t, rulesText[5], rules, ok)
+
+	// match network IPv6
+	rules, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host6", ClientIP: "2001::c0:ff07"})
+	assertMatchRuleText(t, rulesText[6], rules, ok)
+
+	// not match network IPv6
+	rules, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host6", ClientIP: "2001::c0:feee"})
+	assert.False(t, ok)
+
+	// restricted network IPv6
+	rules, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host7", ClientIP: "2001::c0:ff07"})
+	assert.False(t, ok)
+
+	// non-restricted network IPv6
+	rules, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host7", ClientIP: "2001::c0:feee"})
+	assertMatchRuleText(t, rulesText[7], rules, ok)
 
 	// match client name
-	rules, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host3", ClientName: "Frank's laptop"})
-	assert.NotNil(t, rules.NetworkRule)
-	assert.Equal(t, "||host3^$client='Frank\\'s laptop'", rules.NetworkRule.Text())
+	rules, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host8", ClientName: "Frank's laptop"})
+	assertMatchRuleText(t, rulesText[8], rules, ok)
+
+	// not match client name
+	rules, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host8", ClientName: "Franks laptop"})
+	assert.False(t, ok)
 }
 
 func TestBadfilterRules(t *testing.T) {
