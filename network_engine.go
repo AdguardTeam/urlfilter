@@ -76,9 +76,7 @@ func (n *NetworkEngine) MatchAll(r *rules.Request) []*rules.NetworkRule {
 	// First check by shortcuts
 	result := n.matchShortcutsLookupTable(r)
 
-	for _, rule := range n.matchDomainsLookupTable(r) {
-		result = append(result, rule)
-	}
+	result = append(result, n.matchDomainsLookupTable(r)...)
 
 	// Now check other rules
 	for i := range n.otherRules {

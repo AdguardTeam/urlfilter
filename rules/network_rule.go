@@ -107,6 +107,13 @@ type NetworkRule struct {
 	permittedDomains  []string // a list of permitted domains from the $domain modifier
 	restrictedDomains []string // a list of restricted domains from the $domain modifier
 
+	// permittedDNSTypes is the list of permitted DNS record type names from
+	// the $dnstype modifier.
+	permittedDNSTypes []uint16
+	// restrictedDNSTypes is the lists of restricted DNS record type names
+	// from the $dnstype modifier.
+	restrictedDNSTypes []uint16
+
 	// https://github.com/AdguardTeam/AdGuardHome/issues/1081#issuecomment-575142737
 	permittedClientTags  []string // a sorted list of permitted client tags from the $ctag modifier
 	restrictedClientTags []string // a sorted list of restricted client tags from the $ctag modifier
@@ -202,6 +209,10 @@ func (f *NetworkRule) Match(r *Request) bool {
 	}
 
 	if !f.matchDomain(r.SourceHostname) {
+		return false
+	}
+
+	if !f.matchDNSType(r.DNSType) {
 		return false
 	}
 
@@ -323,6 +334,9 @@ func (f *NetworkRule) IsHigherPriority(r *NetworkRule) bool {
 	if len(f.permittedDomains) != 0 || len(f.restrictedDomains) != 0 {
 		count++
 	}
+	if len(f.permittedDNSTypes) != 0 || len(f.restrictedDNSTypes) != 0 {
+		count++
+	}
 	if len(f.permittedClientTags) != 0 || len(f.restrictedClientTags) != 0 {
 		count++
 	}
@@ -332,6 +346,9 @@ func (f *NetworkRule) IsHigherPriority(r *NetworkRule) bool {
 	rCount := r.enabledOptions.Count() + r.disabledOptions.Count() +
 		r.permittedRequestTypes.Count() + r.restrictedRequestTypes.Count()
 	if len(r.permittedDomains) != 0 || len(r.restrictedDomains) != 0 {
+		rCount++
+	}
+	if len(r.permittedDNSTypes) != 0 || len(r.restrictedDNSTypes) != 0 {
 		rCount++
 	}
 	if len(r.permittedClientTags) != 0 || len(r.restrictedClientTags) != 0 {
@@ -503,6 +520,32 @@ func (f *NetworkRule) matchDomain(domain string) bool {
 	return true
 }
 
+// matchDNSType checks if the specified filtering rule is allowed for this DNS
+// request record type.
+func (f *NetworkRule) matchDNSType(rtype uint16) (allowed bool) {
+	if len(f.permittedDNSTypes) == 0 && len(f.restrictedDNSTypes) == 0 {
+		return true
+	}
+
+	for _, t := range f.restrictedDNSTypes {
+		if rtype == t {
+			return false
+		}
+	}
+
+	if len(f.permittedDNSTypes) > 0 {
+		for _, t := range f.permittedDNSTypes {
+			if rtype == t {
+				return true
+			}
+		}
+
+		return false
+	}
+
+	return true
+}
+
 // Find an identical entry (case-sensitive) in two sorted arrays
 // Return TRUE if found
 func matchClientTagsSpecific(sortedRuleTags, sortedClientTags []string) bool {
@@ -664,7 +707,13 @@ func (f *NetworkRule) loadOption(name string, value string) error {
 		return f.setOptionEnabled(OptionImportant, true)
 	case "badfilter":
 		return f.setOptionEnabled(OptionBadfilter, true)
+	// $dnstype, the DNS request record type filter.
+	case "dnstype":
+		permitted, restricted, err := loadDNSTypes(value)
+		f.permittedDNSTypes = permitted
+		f.restrictedDNSTypes = restricted
 
+		return err
 	// $domain -- limits the rule for selected domains
 	case "domain":
 		permitted, restricted, err := loadDomains(value, "|")

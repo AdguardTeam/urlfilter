@@ -3,6 +3,7 @@ package rules
 import (
 	"testing"
 
+	"github.com/miekg/dns"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -616,6 +617,7 @@ func TestNetworkRulePriority(t *testing.T) {
 	// more modifiers -> less modifiers
 	compareRulesPriority(t, "||example.org$script,stylesheet", "||example.org$script", true)
 	compareRulesPriority(t, "||example.org$ctag=123,client=123", "||example.org$script", true)
+	compareRulesPriority(t, "||example.org$ctag=123,client=123,dnstype=AAAA", "||example.org$client=123,dnstype=AAAA", true)
 }
 
 func TestMatchSource(t *testing.T) {
@@ -751,4 +753,31 @@ func compareRulesPriority(t *testing.T, left string, right string, expected bool
 	r, err := NewNetworkRule(right, -1)
 	assert.Nil(t, err)
 	assert.Equal(t, expected, l.IsHigherPriority(r))
+}
+
+func TestNetworkRule_Match_dnsType(t *testing.T) {
+	r, err := NewNetworkRule("||example.org^$dnstype=TXT|AAAA", -1)
+	assert.Nil(t, err)
+
+	req := NewRequestForHostname("example.org")
+	req.DNSType = dns.TypeAAAA
+	assert.True(t, r.Match(req))
+
+	r, err = NewNetworkRule("||example.org^$dnstype=~TXT|~AAAA", -1)
+	assert.Nil(t, err)
+	assert.False(t, r.Match(req))
+
+	t.Run("parse_errors", func(t *testing.T) {
+		_, err = NewNetworkRule("||example.org^$dnstype=", -1)
+		assert.NotNil(t, err)
+
+		_, err = NewNetworkRule("||example.org^$dnstype=TXT|", -1)
+		assert.NotNil(t, err)
+
+		_, err = NewNetworkRule("||example.org^$dnstype=NONE", -1)
+		assert.NotNil(t, err)
+
+		_, err = NewNetworkRule("||example.org^$dnstype=INVALIDTYPE", -1)
+		assert.NotNil(t, err)
+	})
 }

@@ -31,6 +31,11 @@ type DNSRequest struct {
 	SortedClientTags []string // Sorted list of client tags ($ctag)
 	ClientIP         string   // Client IP address
 	ClientName       string   // Client name
+
+	// DNSType is the type of the resource record (RR) of a DNS request, for
+	// example "A" or "AAAA".  See package github.com/miekg/dns for all
+	// acceptable constants.
+	DNSType uint16
 }
 
 // NewDNSEngine parses the specified filter lists and returns a DNSEngine built from them.
@@ -109,6 +114,7 @@ func (d *DNSEngine) MatchRequest(dReq DNSRequest) (DNSResult, bool) {
 	r.SortedClientTags = dReq.SortedClientTags
 	r.ClientIP = dReq.ClientIP
 	r.ClientName = dReq.ClientName
+	r.DNSType = dReq.DNSType
 
 	networkRule, ok := d.networkEngine.Match(r)
 	if ok {

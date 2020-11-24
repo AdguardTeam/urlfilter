@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/AdguardTeam/urlfilter/filterutil"
+	"github.com/miekg/dns"
 )
 
 // RuleSyntaxError represents an error while parsing a filtering rule
@@ -114,6 +115,43 @@ func loadDomains(domains string, sep string) (permittedDomains []string, restric
 	}
 
 	return
+}
+
+// loadDNSTypes loads the $dnstype modifier.  types is the list of types.
+func loadDNSTypes(types string) (permittedTypes []uint16, restrictedTypes []uint16, err error) {
+	if types == "" {
+		return nil, nil, errors.New("no dns record types specified")
+	}
+
+	list := strings.Split(types, "|")
+	for i, t := range list {
+		if len(t) == 0 {
+			return nil, nil, fmt.Errorf("dns record type %d is empty", i)
+		}
+
+		restricted := t[0] == '~'
+		if restricted {
+			t = t[1:]
+		}
+
+		// TypeNone and TypeReserved are special cases in package dns.
+		if strings.EqualFold(t, "none") || strings.EqualFold(t, "reserved") {
+			return nil, nil, fmt.Errorf("dns record type %d (%q) is none or reserved", i, t)
+		}
+
+		rtype, ok := dns.StringToType[strings.ToUpper(t)]
+		if !ok {
+			return nil, nil, fmt.Errorf("dns record type %d (%q) is invalid", i, t)
+		}
+
+		if restricted {
+			restrictedTypes = append(restrictedTypes, rtype)
+		} else {
+			permittedTypes = append(permittedTypes, rtype)
+		}
+	}
+
+	return permittedTypes, restrictedTypes, nil
 }
 
 // isValidCTag - returns TRUE if ctag value format is correct: a-z0-9_

@@ -7,11 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/AdguardTeam/urlfilter/filterlist"
-
-	"github.com/AdguardTeam/urlfilter/filterutil"
-
 	"github.com/AdguardTeam/golibs/log"
+	"github.com/AdguardTeam/urlfilter/filterlist"
+	"github.com/AdguardTeam/urlfilter/filterutil"
+	"github.com/miekg/dns"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -386,4 +385,151 @@ func TestBadfilterRules(t *testing.T) {
 	r, ok := dnsEngine.Match("example.org")
 	assert.False(t, ok)
 	assert.True(t, r.NetworkRule == nil && r.HostRulesV4 == nil && r.HostRulesV6 == nil)
+}
+
+func TestDNSEngine_MatchRequest_dnsType(t *testing.T) {
+	const rulesText = `
+||simple^$dnstype=AAAA
+||simple_case^$dnstype=aaaa
+||reverse^$dnstype=~AAAA
+||multiple^$dnstype=A|AAAA
+||multiple_reverse^$dnstype=~A|~AAAA
+||multiple_different^$dnstype=~A|AAAA
+||simple_client^$client=127.0.0.1,dnstype=AAAA
+||priority^$client=127.0.0.1
+||priority^$client=127.0.0.1,dnstype=AAAA
+`
+
+	ruleStorage := newTestRuleStorage(t, 1, rulesText)
+	dnsEngine := NewDNSEngine(ruleStorage)
+	assert.NotNil(t, dnsEngine)
+
+	t.Run("simple", func(t *testing.T) {
+		r := DNSRequest{Hostname: "simple", DNSType: dns.TypeAAAA}
+		_, ok := dnsEngine.MatchRequest(r)
+		assert.True(t, ok)
+
+		r.DNSType = dns.TypeA
+		_, ok = dnsEngine.MatchRequest(r)
+		assert.False(t, ok)
+	})
+
+	t.Run("simple_case", func(t *testing.T) {
+		r := DNSRequest{Hostname: "simple_case", DNSType: dns.TypeAAAA}
+		_, ok := dnsEngine.MatchRequest(r)
+		assert.True(t, ok)
+
+		r.DNSType = dns.TypeA
+		_, ok = dnsEngine.MatchRequest(r)
+		assert.False(t, ok)
+	})
+
+	t.Run("reverse", func(t *testing.T) {
+		r := DNSRequest{Hostname: "reverse", DNSType: dns.TypeAAAA}
+		_, ok := dnsEngine.MatchRequest(r)
+		assert.False(t, ok)
+
+		r.DNSType = dns.TypeA
+		_, ok = dnsEngine.MatchRequest(r)
+		assert.True(t, ok)
+	})
+
+	t.Run("multiple", func(t *testing.T) {
+		r := DNSRequest{Hostname: "multiple", DNSType: dns.TypeAAAA}
+		_, ok := dnsEngine.MatchRequest(r)
+		assert.True(t, ok)
+
+		r.DNSType = dns.TypeA
+		_, ok = dnsEngine.MatchRequest(r)
+		assert.True(t, ok)
+
+		r.DNSType = dns.TypeCNAME
+		_, ok = dnsEngine.MatchRequest(r)
+		assert.False(t, ok)
+	})
+
+	t.Run("multiple_reverse", func(t *testing.T) {
+		r := DNSRequest{
+			Hostname: "multiple_reverse",
+			DNSType:  dns.TypeAAAA,
+		}
+
+		_, ok := dnsEngine.MatchRequest(r)
+		assert.False(t, ok)
+
+		r.DNSType = dns.TypeA
+		_, ok = dnsEngine.MatchRequest(r)
+		assert.False(t, ok)
+
+		r.DNSType = dns.TypeCNAME
+		_, ok = dnsEngine.MatchRequest(r)
+		assert.True(t, ok)
+	})
+
+	t.Run("multiple_different", func(t *testing.T) {
+		// Should be the same as simple.
+		r := DNSRequest{
+			Hostname: "multiple_different",
+			DNSType:  dns.TypeAAAA,
+		}
+
+		_, ok := dnsEngine.MatchRequest(r)
+		assert.True(t, ok)
+
+		r.DNSType = dns.TypeA
+		_, ok = dnsEngine.MatchRequest(r)
+		assert.False(t, ok)
+
+		r.DNSType = dns.TypeCNAME
+		_, ok = dnsEngine.MatchRequest(r)
+		assert.False(t, ok)
+	})
+
+	t.Run("simple_client", func(t *testing.T) {
+		r := DNSRequest{
+			Hostname: "simple_client",
+			DNSType:  dns.TypeAAAA,
+			ClientIP: "127.0.0.1",
+		}
+
+		_, ok := dnsEngine.MatchRequest(r)
+		assert.True(t, ok)
+
+		r = DNSRequest{
+			Hostname: "simple_client",
+			DNSType:  dns.TypeAAAA,
+			ClientIP: "127.0.0.2",
+		}
+		_, ok = dnsEngine.MatchRequest(r)
+		assert.False(t, ok)
+
+		r = DNSRequest{
+			Hostname: "simple_client",
+			DNSType:  dns.TypeA,
+			ClientIP: "127.0.0.1",
+		}
+		_, ok = dnsEngine.MatchRequest(r)
+		assert.False(t, ok)
+	})
+
+	t.Run("priority", func(t *testing.T) {
+		r := DNSRequest{
+			Hostname: "priority",
+			DNSType:  dns.TypeAAAA,
+			ClientIP: "127.0.0.1",
+		}
+
+		rules, ok := dnsEngine.MatchRequest(r)
+		assert.True(t, ok)
+		assert.Contains(t, rules.NetworkRule.Text(), "dnstype=")
+
+		r = DNSRequest{
+			Hostname: "priority",
+			DNSType:  dns.TypeA,
+			ClientIP: "127.0.0.1",
+		}
+		rules, ok = dnsEngine.MatchRequest(r)
+		assert.True(t, ok)
+		assert.NotContains(t, rules.NetworkRule.Text(), "dnstype=")
+	})
 }

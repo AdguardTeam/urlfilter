@@ -69,6 +69,10 @@ type Request struct {
 	Hostname     string // Request hostname
 	Domain       string // Request domain (eTLD+1)
 
+	// DNSType is the type of the resource record (RR) of a DNS request.
+	// See package github.com/miekg/dns for all acceptable constants.
+	DNSType uint16
+
 	SourceURL      string // Source URL
 	SourceHostname string // Source hostname
 	SourceDomain   string // Source domain (eTLD+1)
