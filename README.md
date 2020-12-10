@@ -1,4 +1,3 @@
-[![Build Status](https://travis-ci.com/AdguardTeam/urlfilter.svg?branch=master)](https://travis-ci.com/AdguardTeam/urlfilter)
 [![Code Coverage](https://img.shields.io/codecov/c/github/AdguardTeam/urlfilter/master.svg)](https://codecov.io/github/AdguardTeam/urlfilter?branch=master)
 [![Go Report Card](https://goreportcard.com/badge/github.com/AdguardTeam/urlfilter)](https://goreportcard.com/report/AdguardTeam/urlfilter)
 [![GolangCI](https://golangci.com/badges/github.com/AdguardTeam/urlfilter.svg)](https://golangci.com/r/github.com/AdguardTeam/urlfilter)
