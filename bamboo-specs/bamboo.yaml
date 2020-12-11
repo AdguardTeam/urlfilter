@@ -1,0 +1,77 @@
+---
+version: 2
+plan:
+  project-key: AGH
+  key: URLFLTSPECS
+  name: urlfilter - Build and run tests
+
+stages:
+  - Test:
+      manual: false
+      final: false
+      jobs:
+        - Lint
+        - Test
+
+Lint:
+  docker:
+    image: golangci/golangci-lint
+  key: LINT
+  tasks:
+    - checkout:
+        force-clean-build: 'false'
+    - script:
+        interpreter: SHELL
+        scripts:
+          - |-
+            set -x
+            set -e
+
+            # Print versions
+            golangci-lint --version
+
+            # Run linter
+            golangci-lint run
+
+  requirements:
+    - Docker
+
+
+Test:
+  docker:
+    image: golang:1.14.1
+  key: TEST
+  tasks:
+    - checkout:
+        force-clean-build: 'false'
+    - script:
+        interpreter: SHELL
+        scripts:
+          - |-
+            set -x
+            set -e
+
+            # Print versions
+            go version
+
+            # Run tests
+            go test -race -v -bench="." -coverprofile="coverage.txt" -covermode=atomic ./...
+  requirements:
+    - Docker
+
+branches:
+  create: for-pull-request
+  delete:
+    after-deleted-days: 7
+    after-inactive-days: 30
+  integration:
+    push-on-success: false
+    merge-from: urlfilter - Build and run tests
+  link-to-jira: true
+
+notifications: []
+
+labels: []
+
+other:
+  concurrent-build-plugin: system-default
