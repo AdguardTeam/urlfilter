@@ -72,9 +72,12 @@ type MatchingResult struct {
 // rules - a set of rules matching the request URL
 // sourceRules - a set of rules matching the referrer
 // nolint:gocyclo
-func NewMatchingResult(rules []*NetworkRule, sourceRules []*NetworkRule) MatchingResult {
+func NewMatchingResult(rules, sourceRules []*NetworkRule) MatchingResult {
 	rules = removeBadfilterRules(rules)
+	rules = removeDNSRewriteRules(rules)
+
 	sourceRules = removeBadfilterRules(sourceRules)
+	sourceRules = removeDNSRewriteRules(sourceRules)
 
 	result := MatchingResult{}
 
@@ -213,4 +216,35 @@ func removeBadfilterRules(rules []*NetworkRule) []*NetworkRule {
 	}
 
 	return rules
+}
+
+// removeDNSRewriteRules removes DNS rewrite rules from rules and
+// returns the filtered slice or the original slice if there were none.
+func removeDNSRewriteRules(rules []*NetworkRule) (filtered []*NetworkRule) {
+	// Assume that DNS rewrite rules are rare, and return the
+	// original slice if there are none.
+
+	var i int
+	var found bool
+	for i = range rules {
+		if rules[i].DNSRewrite != nil {
+			found = true
+
+			break
+		}
+	}
+
+	if !found {
+		return rules
+	}
+
+	filtered = rules[:i:i]
+	for ; i < len(rules); i++ {
+		r := rules[i]
+		if r.DNSRewrite == nil {
+			filtered = append(filtered, r)
+		}
+	}
+
+	return filtered
 }

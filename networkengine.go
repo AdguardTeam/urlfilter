@@ -178,7 +178,7 @@ func (n *NetworkEngine) addRuleToShortcutsTable(f *rules.NetworkRule, storageIdx
 
 	// Find the applicable shortcut (the least used)
 	var shortcutHash uint32
-	var minCount = math.MaxInt32
+	minCount := math.MaxInt32
 	for _, shortcutToCheck := range shortcuts {
 		hash := fastHash(shortcutToCheck)
 		count, ok := n.shortcutsHistogram[hash]
@@ -195,7 +195,7 @@ func (n *NetworkEngine) addRuleToShortcutsTable(f *rules.NetworkRule, storageIdx
 	n.shortcutsHistogram[shortcutHash] = minCount + 1
 
 	// Add the rule to the lookup table
-	rulesIndexes, _ := n.shortcutsLookupTable[shortcutHash]
+	rulesIndexes := n.shortcutsLookupTable[shortcutHash]
 	rulesIndexes = append(rulesIndexes, storageIdx)
 	n.shortcutsLookupTable[shortcutHash] = rulesIndexes
 
@@ -247,7 +247,7 @@ func isAnyURLShortcut(f *rules.NetworkRule) bool {
 }
 
 // djb2 hash algorithm
-func fastHashBetween(str string, begin int, end int) uint32 {
+func fastHashBetween(str string, begin, end int) uint32 {
 	hash := uint32(5381)
 	for i := begin; i < end; i++ {
 		hash = (hash * 33) ^ uint32(str[i])
@@ -283,7 +283,7 @@ func containsRule(rules []*rules.NetworkRule, r *rules.NetworkRule) bool {
 func getSubdomains(hostname string) []string {
 	parts := strings.Split(hostname, ".")
 	var subdomains []string
-	var domain = ""
+	domain := ""
 	for i := len(parts) - 1; i >= 0; i-- {
 		if domain == "" {
 			domain = parts[i]

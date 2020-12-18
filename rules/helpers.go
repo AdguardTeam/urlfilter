@@ -18,7 +18,7 @@ func findSorted(sortedArray []string, val string) int {
 }
 
 // splitWithEscapeCharacter splits string by the specified separator if it is not escaped
-func splitWithEscapeCharacter(str string, sep byte, escapeCharacter byte, preserveAllTokens bool) []string {
+func splitWithEscapeCharacter(str string, sep, escapeCharacter byte, preserveAllTokens bool) []string {
 	parts := make([]string, 0)
 
 	if str == "" {
@@ -27,7 +27,7 @@ func splitWithEscapeCharacter(str string, sep byte, escapeCharacter byte, preser
 
 	var sb strings.Builder
 	escaped := false
-	for i := 0; i < len(str); i++ {
+	for i := range str {
 		c := str[i]
 
 		if c == escapeCharacter {
@@ -59,12 +59,12 @@ func splitWithEscapeCharacter(str string, sep byte, escapeCharacter byte, preser
 }
 
 // stringArraysEquals checks if arrays are equal
-func stringArraysEquals(l []string, r []string) bool {
+func stringArraysEquals(l, r []string) bool {
 	if len(l) != len(r) {
 		return false
 	}
 
-	for i := 0; i < len(l); i++ {
+	for i := range l {
 		if l[i] != r[i] {
 			return false
 		}
@@ -108,9 +108,11 @@ type byLength []string
 func (s byLength) Len() int {
 	return len(s)
 }
+
 func (s byLength) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
 }
+
 func (s byLength) Less(i, j int) bool {
 	return len(s[i]) < len(s[j])
 }

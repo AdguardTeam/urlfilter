@@ -87,7 +87,7 @@ type CosmeticResult struct {
 // includeJS defines if we should inject JS into the page (see $jsinject)
 // includeGenericCSS defines if we should inject generic CSS and element hiding rules (see $generichide)
 // TODO: Additionally, we should provide a method that writes result to an io.Writer
-func (e *CosmeticEngine) Match(hostname string, includeCSS bool, includeJS bool, includeGenericCSS bool) CosmeticResult {
+func (e *CosmeticEngine) Match(hostname string, includeCSS, includeJS, includeGenericCSS bool) CosmeticResult {
 	r := CosmeticResult{
 		ElementHiding: StylesResult{},
 		CSS:           StylesResult{},

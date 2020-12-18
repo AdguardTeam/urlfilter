@@ -132,3 +132,37 @@ func testNewNetworkRules(t *testing.T, lines []string, filterListID int) []*Netw
 
 	return rules
 }
+
+func TestRemoveDNSRewriteRules(t *testing.T) {
+	rules := []*NetworkRule{{
+		RuleText:   "host1",
+		DNSRewrite: nil,
+	}, {
+		RuleText:   "host2",
+		DNSRewrite: nil,
+	}, {
+		RuleText:   "host3",
+		DNSRewrite: nil,
+	}}
+
+	got := removeDNSRewriteRules(rules)
+	assert.Equal(t, rules, got)
+
+	rules = []*NetworkRule{{
+		RuleText:   "host1",
+		DNSRewrite: nil,
+	}, {
+		RuleText:   "host2",
+		DNSRewrite: &DNSRewrite{},
+	}, {
+		RuleText:   "host3",
+		DNSRewrite: nil,
+	}}
+
+	got = removeDNSRewriteRules(rules)
+	assert.NotEqual(t, rules, got)
+	if assert.Equal(t, 2, len(got)) {
+		assert.Equal(t, "host1", got[0].RuleText)
+		assert.Equal(t, "host3", got[1].RuleText)
+	}
+}

@@ -21,6 +21,9 @@ type DNSResult struct {
 	NetworkRule *rules.NetworkRule // a network rule or nil
 	HostRulesV4 []*rules.HostRule  // host rules for IPv4 or nil
 	HostRulesV6 []*rules.HostRule  // host rules for IPv6 or nil
+
+	// networkRules are all matched network rules.
+	networkRules []*rules.NetworkRule
 }
 
 // DNSRequest represents a DNS query with associated metadata.
@@ -35,7 +38,7 @@ type DNSRequest struct {
 	// DNSType is the type of the resource record (RR) of a DNS request, for
 	// example "A" or "AAAA".  See package github.com/miekg/dns for all
 	// acceptable constants.
-	DNSType uint16
+	DNSType rules.RRType
 }
 
 // NewDNSEngine parses the specified filter lists and returns a DNSEngine built from them.
@@ -63,9 +66,9 @@ func NewDNSEngine(s *filterlist.RuleStorage) *DNSEngine {
 
 	networkEngine := &NetworkEngine{
 		ruleStorage:          s,
-		domainsLookupTable:   make(map[uint32][]int64, 0),
+		domainsLookupTable:   make(map[uint32][]int64),
 		shortcutsLookupTable: make(map[uint32][]int64, networkRulesCount),
-		shortcutsHistogram:   make(map[uint32]int, 0),
+		shortcutsHistogram:   make(map[uint32]int),
 	}
 
 	// Go through all rules in the storage and add them to the lookup tables
@@ -98,16 +101,17 @@ func (d *DNSEngine) Match(hostname string) (DNSResult, bool) {
 	return d.MatchRequest(DNSRequest{Hostname: hostname, ClientIP: "0.0.0.0"})
 }
 
-// MatchRequest - matches the specified DNS request
+// MatchRequest matches the specified DNS request.  The return parameter
+// matched is true if the result has a basic network rule or some host
+// rules.
 //
-// It returns true and the list of rules found or false and nil.
-// The list of rules can be found when there're multiple host rules matching the same domain.
-// For instance:
-// 192.168.0.1 example.local
-// 2000::1 example.local
-func (d *DNSEngine) MatchRequest(dReq DNSRequest) (DNSResult, bool) {
+// For compatibility reasons, it is also false when there are DNS
+// rewrite and other kinds of special network rules, so users who need
+// those will need to ignore the matched return parameter and instead
+// inspect the results of the corresponding DNSResult getters.
+func (d *DNSEngine) MatchRequest(dReq DNSRequest) (res DNSResult, matched bool) {
 	if dReq.Hostname == "" {
-		return DNSResult{}, false
+		return res, false
 	}
 
 	r := rules.NewRequestForHostname(dReq.Hostname)
@@ -116,28 +120,34 @@ func (d *DNSEngine) MatchRequest(dReq DNSRequest) (DNSResult, bool) {
 	r.ClientName = dReq.ClientName
 	r.DNSType = dReq.DNSType
 
-	networkRule, ok := d.networkEngine.Match(r)
-	if ok {
-		// Network rules always have higher priority
-		return DNSResult{NetworkRule: networkRule}, true
+	res.networkRules = d.networkEngine.MatchAll(r)
+
+	result := rules.NewMatchingResult(res.networkRules, nil)
+	resultRule := result.GetBasicResult()
+	if resultRule != nil {
+		// Network rules always have higher priority.
+		res.NetworkRule = resultRule
+		return res, true
 	}
 
 	rr, ok := d.matchLookupTable(dReq.Hostname)
 	if !ok {
-		return DNSResult{}, false
+		return res, false
 	}
-	res := DNSResult{}
+
 	for _, rule := range rr {
 		hostRule, ok := rule.(*rules.HostRule)
 		if !ok {
 			continue
 		}
+
 		if hostRule.IP.To4() != nil {
 			res.HostRulesV4 = append(res.HostRulesV4, hostRule)
 		} else {
 			res.HostRulesV6 = append(res.HostRulesV6, hostRule)
 		}
 	}
+
 	return res, true
 }
 
@@ -164,7 +174,7 @@ func (d *DNSEngine) matchLookupTable(hostname string) ([]rules.Rule, bool) {
 func (d *DNSEngine) addRule(hostRule *rules.HostRule, storageIdx int64) {
 	for _, hostname := range hostRule.Hostnames {
 		hash := fastHash(hostname)
-		rulesIndexes, _ := d.lookupTable[hash]
+		rulesIndexes := d.lookupTable[hash]
 		d.lookupTable[hash] = append(rulesIndexes, storageIdx)
 	}
 

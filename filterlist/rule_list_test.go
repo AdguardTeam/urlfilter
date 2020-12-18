@@ -48,6 +48,7 @@ func TestStringRuleListScanner(t *testing.T) {
 	assert.Equal(t, 1, f.GetFilterListID())
 
 	f, err = ruleList.RetrieveRule(21)
+	assert.Nil(t, err)
 	assert.NotNil(t, f)
 	assert.Equal(t, "##banner", f.Text())
 	assert.Equal(t, 1, f.GetFilterListID())
@@ -89,6 +90,7 @@ func TestFileRuleListScanner(t *testing.T) {
 	assert.Equal(t, 1, f.GetFilterListID())
 
 	f, err = ruleList.RetrieveRule(21)
+	assert.Nil(t, err)
 	assert.NotNil(t, f)
 	assert.Equal(t, "##banner", f.Text())
 	assert.Equal(t, 1, f.GetFilterListID())

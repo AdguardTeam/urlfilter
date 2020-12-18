@@ -735,7 +735,7 @@ func TestMatchIPAddress(t *testing.T) {
 	assert.False(t, f.Match(r))
 }
 
-func assertBadfilterNegates(t *testing.T, rule string, badfilter string, expected bool) {
+func assertBadfilterNegates(t *testing.T, rule, badfilter string, expected bool) {
 	r, err := NewNetworkRule(rule, -1)
 	assert.Nil(t, err)
 	assert.NotNil(t, r)
@@ -747,7 +747,7 @@ func assertBadfilterNegates(t *testing.T, rule string, badfilter string, expecte
 	assert.Equal(t, expected, b.negatesBadfilter(r), "")
 }
 
-func compareRulesPriority(t *testing.T, left string, right string, expected bool) {
+func compareRulesPriority(t *testing.T, left, right string, expected bool) {
 	l, err := NewNetworkRule(left, -1)
 	assert.Nil(t, err)
 	r, err := NewNetworkRule(right, -1)

@@ -81,8 +81,9 @@ func newClients(clientStrs ...string) *clients {
 	return c
 }
 
-// containsAny - checks if "clients" contains host or ipStr
-func (c *clients) containsAny(host string, ipStr string) bool {
+// containsAny returns true if clients contain either host or the IP
+// address ipStr is within one of the clients' subnets.
+func (c *clients) containsAny(host, ipStr string) bool {
 	if c == nil {
 		return false
 	}

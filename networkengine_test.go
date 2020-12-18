@@ -13,11 +13,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/AdguardTeam/urlfilter/filterlist"
-
-	"github.com/AdguardTeam/urlfilter/rules"
-
 	"github.com/AdguardTeam/golibs/log"
+	"github.com/AdguardTeam/urlfilter/filterlist"
+	"github.com/AdguardTeam/urlfilter/rules"
 	"github.com/shirou/gopsutil/process"
 	"github.com/stretchr/testify/assert"
 )
@@ -32,7 +30,7 @@ type testRequest struct {
 	LineNumber  int
 	Line        string
 	URL         string `json:"url"`
-	FrameUrl    string `json:"frameUrl"`
+	FrameURL    string `json:"frameUrl"`
 	RequestType string `json:"cpt"`
 }
 
@@ -122,7 +120,7 @@ func TestBenchNetworkEngine(t *testing.T) {
 	assert.True(t, len(testRequests) > 0)
 	var requests []*rules.Request
 	for _, req := range testRequests {
-		r := rules.NewRequest(req.URL, req.FrameUrl, testGetRequestType(req.RequestType))
+		r := rules.NewRequest(req.URL, req.FrameURL, testGetRequestType(req.RequestType))
 		requests = append(requests, r)
 	}
 
@@ -267,7 +265,7 @@ func loadRequests(t *testing.T) []testRequest {
 		if line != "" {
 			var req testRequest
 			err := json.Unmarshal([]byte(line), &req)
-			if err == nil && isSupportedURL(req.URL) && isSupportedURL(req.FrameUrl) {
+			if err == nil && isSupportedURL(req.URL) && isSupportedURL(req.FrameURL) {
 				req.Line = line
 				req.LineNumber = lineNumber
 				requests = append(requests, req)
@@ -294,7 +292,7 @@ func unzip(src, dest string) error {
 		}
 	}()
 
-	_ = os.MkdirAll(dest, 0755)
+	_ = os.MkdirAll(dest, 0o755)
 
 	// Closure to address file descriptors issue with all the deferred .Close() methods
 	extractAndWriteFile := func(f *zip.File) error {

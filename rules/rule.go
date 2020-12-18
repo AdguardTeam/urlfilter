@@ -20,11 +20,9 @@ func (e *RuleSyntaxError) Error() string {
 	return fmt.Sprintf("syntax error: %s, rule: %s", e.msg, e.ruleText)
 }
 
-var (
-	// ErrUnsupportedRule signals that this might be a valid rule type,
-	// but it is not yet supported by this library
-	ErrUnsupportedRule = errors.New("this type of rules is unsupported")
-)
+// ErrUnsupportedRule signals that this might be a valid rule type,
+// but it is not yet supported by this library
+var ErrUnsupportedRule = errors.New("this type of rules is unsupported")
 
 // Rule is a base interface for all filtering rules
 type Rule interface {
@@ -87,7 +85,7 @@ func isComment(line string) bool {
 // loadDomains loads $domain modifier or cosmetic rules domains
 // domains is the list of domains
 // sep is the separator character. for network rules it is '|', for cosmetic it is ','.
-func loadDomains(domains string, sep string) (permittedDomains []string, restrictedDomains []string, err error) {
+func loadDomains(domains, sep string) (permittedDomains, restrictedDomains []string, err error) {
 	if domains == "" {
 		err = errors.New("no domains specified")
 		return
@@ -117,37 +115,48 @@ func loadDomains(domains string, sep string) (permittedDomains []string, restric
 	return
 }
 
+// strToRR converts s to a DNS resource record (RR) type.  s may be in any
+// letter case.
+func strToRR(s string) (rr RRType, err error) {
+	// TypeNone and TypeReserved are special cases in package dns.
+	if strings.EqualFold(s, "none") || strings.EqualFold(s, "reserved") {
+		return 0, errors.New("dns rr type is none or reserved")
+	}
+
+	rr, ok := dns.StringToType[strings.ToUpper(s)]
+	if !ok {
+		return 0, fmt.Errorf("dns rr type %q is invalid", s)
+	}
+
+	return rr, nil
+}
+
 // loadDNSTypes loads the $dnstype modifier.  types is the list of types.
-func loadDNSTypes(types string) (permittedTypes []uint16, restrictedTypes []uint16, err error) {
+func loadDNSTypes(types string) (permittedTypes, restrictedTypes []RRType, err error) {
 	if types == "" {
 		return nil, nil, errors.New("no dns record types specified")
 	}
 
 	list := strings.Split(types, "|")
-	for i, t := range list {
-		if len(t) == 0 {
+	for i, rrStr := range list {
+		if len(rrStr) == 0 {
 			return nil, nil, fmt.Errorf("dns record type %d is empty", i)
 		}
 
-		restricted := t[0] == '~'
+		restricted := rrStr[0] == '~'
 		if restricted {
-			t = t[1:]
+			rrStr = rrStr[1:]
 		}
 
-		// TypeNone and TypeReserved are special cases in package dns.
-		if strings.EqualFold(t, "none") || strings.EqualFold(t, "reserved") {
-			return nil, nil, fmt.Errorf("dns record type %d (%q) is none or reserved", i, t)
-		}
-
-		rtype, ok := dns.StringToType[strings.ToUpper(t)]
-		if !ok {
-			return nil, nil, fmt.Errorf("dns record type %d (%q) is invalid", i, t)
+		rr, err := strToRR(rrStr)
+		if err != nil {
+			return nil, nil, fmt.Errorf("type %d (%q): %w", i, rrStr, err)
 		}
 
 		if restricted {
-			restrictedTypes = append(restrictedTypes, rtype)
+			restrictedTypes = append(restrictedTypes, rr)
 		} else {
-			permittedTypes = append(permittedTypes, rtype)
+			permittedTypes = append(permittedTypes, rr)
 		}
 	}
 
@@ -170,7 +179,7 @@ func isValidCTag(s string) bool {
 // value: string value of the $ctag modifier
 // sep: separator character; for network rules it is '|'
 // returns sorted arrays with permitted and restricted $ctag
-func loadCTags(value string, sep string) (permittedCTags []string, restrictedCTags []string, err error) {
+func loadCTags(value, sep string) (permittedCTags, restrictedCTags []string, err error) {
 	if value == "" {
 		err = errors.New("value is empty")
 		return
@@ -234,7 +243,7 @@ func loadCTags(value string, sep string) (permittedCTags []string, restrictedCTa
 // ~Mom|~Dad|"Kids"
 //
 // Returns sorted arrays of permitted and restricted clients
-func loadClients(value string, sep byte) (permittedClients *clients, restrictedClients *clients, err error) {
+func loadClients(value string, sep byte) (permittedClients, restrictedClients *clients, err error) {
 	if value == "" {
 		err = errors.New("value is empty")
 		return

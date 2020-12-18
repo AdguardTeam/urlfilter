@@ -83,7 +83,7 @@ type Request struct {
 }
 
 // NewRequest creates a new instance of "Request" and populates it's fields
-func NewRequest(url string, sourceURL string, requestType RequestType) *Request {
+func NewRequest(url, sourceURL string, requestType RequestType) *Request {
 	r := Request{
 		RequestType: requestType,
 
