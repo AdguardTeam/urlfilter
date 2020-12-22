@@ -140,7 +140,12 @@ func TestDNSEngine_MatchRequest_dnsRewrite(t *testing.T) {
 
 |refused_host^$dnsrewrite=REFUSED
 |new_cname^$dnsrewrite=othercname
+|new_mx^$dnsrewrite=NOERROR;MX;32 new_mx_host
 |new_txt^$dnsrewrite=NOERROR;TXT;new_txtcontent
+|1.2.3.4.in-addr.arpa^$dnsrewrite=NOERROR;PTR;new_ptr
+
+|https_record^$dnsrewrite=NOERROR;HTTPS;32 https_record_host alpn=h3
+|svcb_record^$dnsrewrite=NOERROR;SVCB;32 svcb_record_host alpn=h3
 
 |https_type^$dnstype=HTTPS,dnsrewrite=REFUSED
 
@@ -318,6 +323,24 @@ func TestDNSEngine_MatchRequest_dnsRewrite(t *testing.T) {
 		}
 	})
 
+	t.Run("new_mx", func(t *testing.T) {
+		res, ok := dnsEngine.Match(path.Base(t.Name()))
+		assert.False(t, ok)
+
+		dnsr := res.DNSRewritesAll()
+		if assert.Len(t, dnsr, 1) {
+			nr := dnsr[0]
+			assert.Equal(t, dns.RcodeSuccess, nr.DNSRewrite.RCode)
+			assert.Equal(t, dns.TypeMX, nr.DNSRewrite.RRType)
+
+			mx := &rules.DNSMX{
+				Exchange:   "new_mx_host",
+				Preference: 32,
+			}
+			assert.Equal(t, mx, nr.DNSRewrite.Value)
+		}
+	})
+
 	t.Run("new_txt", func(t *testing.T) {
 		res, ok := dnsEngine.Match(path.Base(t.Name()))
 		assert.False(t, ok)
@@ -328,6 +351,63 @@ func TestDNSEngine_MatchRequest_dnsRewrite(t *testing.T) {
 			assert.Equal(t, dns.RcodeSuccess, nr.DNSRewrite.RCode)
 			assert.Equal(t, dns.TypeTXT, nr.DNSRewrite.RRType)
 			assert.Equal(t, "new_txtcontent", nr.DNSRewrite.Value)
+		}
+	})
+
+	t.Run("1.2.3.4.in-addr.arpa", func(t *testing.T) {
+		res, ok := dnsEngine.Match(path.Base(t.Name()))
+		assert.False(t, ok)
+
+		dnsr := res.DNSRewritesAll()
+		if assert.Len(t, dnsr, 1) {
+			nr := dnsr[0]
+			assert.Equal(t, dns.RcodeSuccess, nr.DNSRewrite.RCode)
+			assert.Equal(t, dns.TypePTR, nr.DNSRewrite.RRType)
+			assert.Equal(t, "new_ptr", nr.DNSRewrite.Value)
+		}
+	})
+
+	t.Run("https_record", func(t *testing.T) {
+		res, ok := dnsEngine.Match(path.Base(t.Name()))
+		assert.False(t, ok)
+
+		dnsr := res.DNSRewritesAll()
+		if assert.Len(t, dnsr, 1) {
+			nr := dnsr[0]
+			assert.Equal(t, dns.RcodeSuccess, nr.DNSRewrite.RCode)
+			assert.Equal(t, dns.TypeHTTPS, nr.DNSRewrite.RRType)
+
+			p := map[string]string{
+				"alpn": "h3",
+			}
+			svcb := &rules.DNSSVCB{
+				Params:   p,
+				Target:   "https_record_host",
+				Priority: 32,
+			}
+			assert.Equal(t, svcb, nr.DNSRewrite.Value)
+		}
+	})
+
+	t.Run("svcb_record", func(t *testing.T) {
+		res, ok := dnsEngine.Match(path.Base(t.Name()))
+		assert.False(t, ok)
+
+		dnsr := res.DNSRewritesAll()
+		if assert.Len(t, dnsr, 1) {
+			nr := dnsr[0]
+			assert.Equal(t, dns.RcodeSuccess, nr.DNSRewrite.RCode)
+			assert.Equal(t, dns.TypeSVCB, nr.DNSRewrite.RRType)
+
+			p := map[string]string{
+				"alpn": "h3",
+			}
+			svcb := &rules.DNSSVCB{
+				Params:   p,
+				Target:   "svcb_record_host",
+				Priority: 32,
+			}
+			assert.Equal(t, svcb, nr.DNSRewrite.Value)
 		}
 	})
 

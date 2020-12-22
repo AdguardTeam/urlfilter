@@ -115,9 +115,9 @@ func loadDomains(domains, sep string) (permittedDomains, restrictedDomains []str
 	return
 }
 
-// strToRR converts s to a DNS resource record (RR) type.  s may be in any
-// letter case.
-func strToRR(s string) (rr RRType, err error) {
+// strToRRType converts s to a DNS resource record (RR) type.  s may be
+// in any letter case.
+func strToRRType(s string) (rr RRType, err error) {
 	// TypeNone and TypeReserved are special cases in package dns.
 	if strings.EqualFold(s, "none") || strings.EqualFold(s, "reserved") {
 		return 0, errors.New("dns rr type is none or reserved")
@@ -148,7 +148,7 @@ func loadDNSTypes(types string) (permittedTypes, restrictedTypes []RRType, err e
 			rrStr = rrStr[1:]
 		}
 
-		rr, err := strToRR(rrStr)
+		rr, err := strToRRType(rrStr)
 		if err != nil {
 			return nil, nil, fmt.Errorf("type %d (%q): %w", i, rrStr, err)
 		}
