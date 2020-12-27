@@ -80,9 +80,7 @@ func isDomainOrSubdomainOfAny(domain string, domains []string) bool {
 			// A pattern like "google.*" will match any "google.TLD" domain or subdomain
 			withoutWildcard := d[0 : len(d)-1]
 
-			if strings.HasPrefix(domain, withoutWildcard) ||
-				(strings.Index(domain, withoutWildcard) > 0 &&
-					strings.Index(domain, "."+withoutWildcard) > 0) {
+			if strings.HasPrefix(domain, withoutWildcard) || strings.Index(domain, "."+withoutWildcard) > 0 {
 				tld, icann := publicsuffix.PublicSuffix(domain)
 
 				// Let's check that the domain's TLD is one of the public suffixes
@@ -92,9 +90,7 @@ func isDomainOrSubdomainOfAny(domain string, domains []string) bool {
 				}
 			}
 		} else {
-			if domain == d ||
-				(strings.HasSuffix(domain, d) &&
-					strings.HasSuffix(domain, "."+d)) {
+			if domain == d || strings.HasSuffix(domain, "."+d) {
 				return true
 			}
 		}
