@@ -80,6 +80,50 @@ func allUppercaseASCII(s string) (ok bool) {
 	return true
 }
 
+// isValidHostRune returns true if r is a valid rune for a hostname part.
+func isValidHostRune(r rune) (ok bool) {
+	return r == '-' || isValidHostFirstRune(r)
+}
+
+// isValidHostFirstRune returns true if r is a valid first rune for a hostname
+// part.
+func isValidHostFirstRune(r rune) (ok bool) {
+	return (r >= 'a' && r <= 'z') ||
+		(r >= 'A' && r <= 'Z') ||
+		(r >= '0' && r <= '9')
+}
+
+// validateHost validates the host in accordance to RFC-952 with RFC-1123's
+// inclusion of digits at the start of the host.  It also doesn't validate
+// against two or more hyphens to allow punycode and internationalized domains.
+//
+// TODO(a.garipov):  !!  a test suite.
+func validateHost(host string) (err error) {
+	l := len(host)
+	if l == 0 || l > 63 {
+		return fmt.Errorf("invalid hostname length: %d", l)
+	}
+
+	parts := strings.Split(host, ".")
+	for i, p := range parts {
+		if len(p) == 0 {
+			return fmt.Errorf("empty hostname part at index %d", i)
+		}
+
+		if r := p[0]; !isValidHostFirstRune(rune(r)) {
+			return fmt.Errorf("invalid hostname part at index %d: invalid char %q at index %d", i, r, 0)
+		}
+
+		for j, r := range p[1:] {
+			if !isValidHostRune(r) {
+				return fmt.Errorf("invalid hostname part at index %d: invalid char %q at index %d", i, r, j+1)
+			}
+		}
+	}
+
+	return nil
+}
+
 // loadDNSRewritesShort loads the shorthand version of the $dnsrewrite modifier.
 func loadDNSRewriteShort(s string) (rewrite *DNSRewrite, err error) {
 	if s == "" {
@@ -111,6 +155,11 @@ func loadDNSRewriteShort(s string) (rewrite *DNSRewrite, err error) {
 			RRType: dns.TypeAAAA,
 			Value:  ip,
 		}, nil
+	}
+
+	err = validateHost(s)
+	if err != nil {
+		return nil, fmt.Errorf("invalid shorthand hostname %q: %w", s, err)
 	}
 
 	return &DNSRewrite{

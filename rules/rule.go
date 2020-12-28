@@ -148,7 +148,8 @@ func loadDNSTypes(types string) (permittedTypes, restrictedTypes []RRType, err e
 			rrStr = rrStr[1:]
 		}
 
-		rr, err := strToRRType(rrStr)
+		var rr RRType
+		rr, err = strToRRType(rrStr)
 		if err != nil {
 			return nil, nil, fmt.Errorf("type %d (%q): %w", i, rrStr, err)
 		}

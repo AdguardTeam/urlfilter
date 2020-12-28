@@ -12,29 +12,29 @@ import (
 
 func TestDNSResult_DNSRewrites(t *testing.T) {
 	const rulesText = `
-|disable_one^$dnsrewrite=127.0.0.1
-|disable_one^$dnsrewrite=127.0.0.2
-@@||disable_one^$dnsrewrite=127.0.0.1
+|disable-one^$dnsrewrite=127.0.0.1
+|disable-one^$dnsrewrite=127.0.0.2
+@@||disable-one^$dnsrewrite=127.0.0.1
 
-|simple_exc^$dnsrewrite=127.0.0.1
-@@||simple_exc^
+|simple-exc^$dnsrewrite=127.0.0.1
+@@||simple-exc^
 
-|disable_cname^$dnsrewrite=127.0.0.1
-|disable_cname^$dnsrewrite=new_cname
-@@||disable_cname^$dnsrewrite=new_cname
+|disable-cname^$dnsrewrite=127.0.0.1
+|disable-cname^$dnsrewrite=new-cname
+@@||disable-cname^$dnsrewrite=new-cname
 
-|disable_cname_many^$dnsrewrite=127.0.0.1
-|disable_cname_many^$dnsrewrite=new_cname_1
-|disable_cname_many^$dnsrewrite=new_cname_2
-@@||disable_cname_many^$dnsrewrite=new_cname_1
+|disable-cname-many^$dnsrewrite=127.0.0.1
+|disable-cname-many^$dnsrewrite=new-cname-1
+|disable-cname-many^$dnsrewrite=new-cname-2
+@@||disable-cname-many^$dnsrewrite=new-cname-1
 
-|disable_all^$dnsrewrite=127.0.0.1
-|disable_all^$dnsrewrite=127.0.0.2
-@@||disable_all^$dnsrewrite
+|disable-all^$dnsrewrite=127.0.0.1
+|disable-all^$dnsrewrite=127.0.0.2
+@@||disable-all^$dnsrewrite
 
-|disable_all_order^$dnsrewrite=127.0.0.1
-@@||disable_all_order^$dnsrewrite=
-|disable_all_order^$dnsrewrite=127.0.0.2
+|disable-all-order^$dnsrewrite=127.0.0.1
+@@||disable-all-order^$dnsrewrite=
+|disable-all-order^$dnsrewrite=127.0.0.2
 `
 
 	ruleStorage := newTestRuleStorage(t, 1, rulesText)
@@ -44,7 +44,7 @@ func TestDNSResult_DNSRewrites(t *testing.T) {
 	ipv4p1 := net.IPv4(127, 0, 0, 1)
 	ipv4p2 := net.IPv4(127, 0, 0, 2)
 
-	t.Run("disable_one", func(t *testing.T) {
+	t.Run("disable-one", func(t *testing.T) {
 		res, ok := dnsEngine.Match(path.Base(t.Name()))
 		assert.False(t, ok)
 
@@ -57,7 +57,7 @@ func TestDNSResult_DNSRewrites(t *testing.T) {
 		}
 	})
 
-	t.Run("simple_exc", func(t *testing.T) {
+	t.Run("simple-exc", func(t *testing.T) {
 		res, ok := dnsEngine.Match(path.Base(t.Name()))
 
 		// Simple matching.
@@ -74,7 +74,7 @@ func TestDNSResult_DNSRewrites(t *testing.T) {
 		}
 	})
 
-	t.Run("disable_cname", func(t *testing.T) {
+	t.Run("disable-cname", func(t *testing.T) {
 		res, ok := dnsEngine.Match(path.Base(t.Name()))
 		assert.False(t, ok)
 
@@ -88,7 +88,7 @@ func TestDNSResult_DNSRewrites(t *testing.T) {
 		}
 	})
 
-	t.Run("disable_cname_many", func(t *testing.T) {
+	t.Run("disable-cname-many", func(t *testing.T) {
 		res, ok := dnsEngine.Match(path.Base(t.Name()))
 		assert.False(t, ok)
 
@@ -101,11 +101,11 @@ func TestDNSResult_DNSRewrites(t *testing.T) {
 			assert.Equal(t, ipv4p1, dr.Value)
 
 			dr = dnsr[1].DNSRewrite
-			assert.Equal(t, "new_cname_2", dr.NewCNAME)
+			assert.Equal(t, "new-cname-2", dr.NewCNAME)
 		}
 	})
 
-	t.Run("disable_all", func(t *testing.T) {
+	t.Run("disable-all", func(t *testing.T) {
 		res, ok := dnsEngine.Match(path.Base(t.Name()))
 		assert.False(t, ok)
 
@@ -113,7 +113,7 @@ func TestDNSResult_DNSRewrites(t *testing.T) {
 		assert.Len(t, dnsr, 0)
 	})
 
-	t.Run("disable_all_order", func(t *testing.T) {
+	t.Run("disable-all-order", func(t *testing.T) {
 		res, ok := dnsEngine.Match(path.Base(t.Name()))
 		assert.False(t, ok)
 
@@ -124,48 +124,50 @@ func TestDNSResult_DNSRewrites(t *testing.T) {
 
 func TestDNSEngine_MatchRequest_dnsRewrite(t *testing.T) {
 	const rulesText = `
-|short_v4^$dnsrewrite=127.0.0.1
-|short_v4_multiple^$dnsrewrite=127.0.0.1
-|short_v4_multiple^$dnsrewrite=127.0.0.2
-|normal_v4^$dnsrewrite=NOERROR;A;127.0.0.1
-|normal_v4_multiple^$dnsrewrite=NOERROR;A;127.0.0.1
-|normal_v4_multiple^$dnsrewrite=NOERROR;A;127.0.0.2
+|short-v4^$dnsrewrite=127.0.0.1
+|short-v4-multiple^$dnsrewrite=127.0.0.1
+|short-v4-multiple^$dnsrewrite=127.0.0.2
+|normal-v4^$dnsrewrite=NOERROR;A;127.0.0.1
+|normal-v4-multiple^$dnsrewrite=NOERROR;A;127.0.0.1
+|normal-v4-multiple^$dnsrewrite=NOERROR;A;127.0.0.2
 
-|short_v6^$dnsrewrite=::1
-|short_v6_multiple^$dnsrewrite=::1
-|short_v6_multiple^$dnsrewrite=::2
-|normal_v6^$dnsrewrite=NOERROR;AAAA;::1
-|normal_v6_multiple^$dnsrewrite=NOERROR;AAAA;::1
-|normal_v6_multiple^$dnsrewrite=NOERROR;AAAA;::2
+|short-v6^$dnsrewrite=::1
+|short-v6-multiple^$dnsrewrite=::1
+|short-v6-multiple^$dnsrewrite=::2
+|normal-v6^$dnsrewrite=NOERROR;AAAA;::1
+|normal-v6-multiple^$dnsrewrite=NOERROR;AAAA;::1
+|normal-v6-multiple^$dnsrewrite=NOERROR;AAAA;::2
 
-|refused_host^$dnsrewrite=REFUSED
-|new_cname^$dnsrewrite=othercname
-|new_mx^$dnsrewrite=NOERROR;MX;32 new_mx_host
-|new_txt^$dnsrewrite=NOERROR;TXT;new_txtcontent
-|1.2.3.4.in-addr.arpa^$dnsrewrite=NOERROR;PTR;new_ptr
+|refused-host^$dnsrewrite=REFUSED
+|new-cname^$dnsrewrite=othercname
+|new-mx^$dnsrewrite=NOERROR;MX;32 new-mx-host
+|new-txt^$dnsrewrite=NOERROR;TXT;new-txtcontent
+|1.2.3.4.in-addr.arpa^$dnsrewrite=NOERROR;PTR;new-ptr
 
-|https_record^$dnsrewrite=NOERROR;HTTPS;32 https_record_host alpn=h3
-|svcb_record^$dnsrewrite=NOERROR;SVCB;32 svcb_record_host alpn=h3
+|https-record^$dnsrewrite=NOERROR;HTTPS;32 https-record-host alpn=h3
+|svcb-record^$dnsrewrite=NOERROR;SVCB;32 svcb-record-host alpn=h3
 
-|https_type^$dnstype=HTTPS,dnsrewrite=REFUSED
+|https-type^$dnstype=HTTPS,dnsrewrite=REFUSED
 
-|disable_one^$dnsrewrite=127.0.0.1
-|disable_one^$dnsrewrite=127.0.0.2
-@@||disable_one^$dnsrewrite=127.0.0.1
+|disable-one^$dnsrewrite=127.0.0.1
+|disable-one^$dnsrewrite=127.0.0.2
+@@||disable-one^$dnsrewrite=127.0.0.1
 
-|disable_all^$dnsrewrite=127.0.0.1
-|disable_all^$dnsrewrite=127.0.0.2
-@@||disable_all^$dnsrewrite
+|disable-all^$dnsrewrite=127.0.0.1
+|disable-all^$dnsrewrite=127.0.0.2
+@@||disable-all^$dnsrewrite
 
-|disable_all_alt_syntax^$dnsrewrite=127.0.0.1
-|disable_all_alt_syntax^$dnsrewrite=127.0.0.2
-@@||disable_all_alt_syntax^$dnsrewrite=
+|disable-all-alt-syntax^$dnsrewrite=127.0.0.1
+|disable-all-alt-syntax^$dnsrewrite=127.0.0.2
+@@||disable-all-alt-syntax^$dnsrewrite=
 
-@@||blocked_later^$dnsrewrite
-||blocked_later^
+@@||blocked-later^$dnsrewrite
+||blocked-later^
 
-@@||etc_hosts_rule^$dnsrewrite
-127.0.0.1 etc_hosts_rule
+@@||etc-hosts-rule^$dnsrewrite
+127.0.0.1 etc-hosts-rule
+
+||bad-shorthand^$dnsrewrite=A:NOERROR:127.0.0.1
 `
 
 	ruleStorage := newTestRuleStorage(t, 1, rulesText)
@@ -177,7 +179,7 @@ func TestDNSEngine_MatchRequest_dnsRewrite(t *testing.T) {
 	ipv6p1 := net.IP{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}
 	ipv6p2 := net.IP{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2}
 
-	t.Run("short_v4", func(t *testing.T) {
+	t.Run("short-v4", func(t *testing.T) {
 		res, ok := dnsEngine.Match(path.Base(t.Name()))
 		assert.False(t, ok)
 
@@ -190,7 +192,7 @@ func TestDNSEngine_MatchRequest_dnsRewrite(t *testing.T) {
 		}
 	})
 
-	t.Run("short_v4_multiple", func(t *testing.T) {
+	t.Run("short-v4-multiple", func(t *testing.T) {
 		res, ok := dnsEngine.Match(path.Base(t.Name()))
 		assert.False(t, ok)
 
@@ -208,7 +210,7 @@ func TestDNSEngine_MatchRequest_dnsRewrite(t *testing.T) {
 		}
 	})
 
-	t.Run("normal_v4", func(t *testing.T) {
+	t.Run("normal-v4", func(t *testing.T) {
 		res, ok := dnsEngine.Match(path.Base(t.Name()))
 		assert.False(t, ok)
 
@@ -221,7 +223,7 @@ func TestDNSEngine_MatchRequest_dnsRewrite(t *testing.T) {
 		}
 	})
 
-	t.Run("normal_v4_multiple", func(t *testing.T) {
+	t.Run("normal-v4-multiple", func(t *testing.T) {
 		res, ok := dnsEngine.Match(path.Base(t.Name()))
 		assert.False(t, ok)
 
@@ -239,7 +241,7 @@ func TestDNSEngine_MatchRequest_dnsRewrite(t *testing.T) {
 		}
 	})
 
-	t.Run("short_v6", func(t *testing.T) {
+	t.Run("short-v6", func(t *testing.T) {
 		res, ok := dnsEngine.Match(path.Base(t.Name()))
 		assert.False(t, ok)
 
@@ -252,7 +254,7 @@ func TestDNSEngine_MatchRequest_dnsRewrite(t *testing.T) {
 		}
 	})
 
-	t.Run("short_v6_multiple", func(t *testing.T) {
+	t.Run("short-v6-multiple", func(t *testing.T) {
 		res, ok := dnsEngine.Match(path.Base(t.Name()))
 		assert.False(t, ok)
 
@@ -270,7 +272,7 @@ func TestDNSEngine_MatchRequest_dnsRewrite(t *testing.T) {
 		}
 	})
 
-	t.Run("normal_v6", func(t *testing.T) {
+	t.Run("normal-v6", func(t *testing.T) {
 		res, ok := dnsEngine.Match(path.Base(t.Name()))
 		assert.False(t, ok)
 
@@ -283,7 +285,7 @@ func TestDNSEngine_MatchRequest_dnsRewrite(t *testing.T) {
 		}
 	})
 
-	t.Run("normal_v6_multiple", func(t *testing.T) {
+	t.Run("normal-v6-multiple", func(t *testing.T) {
 		res, ok := dnsEngine.Match(path.Base(t.Name()))
 		assert.False(t, ok)
 
@@ -301,7 +303,7 @@ func TestDNSEngine_MatchRequest_dnsRewrite(t *testing.T) {
 		}
 	})
 
-	t.Run("refused_host", func(t *testing.T) {
+	t.Run("refused-host", func(t *testing.T) {
 		res, ok := dnsEngine.Match(path.Base(t.Name()))
 		assert.False(t, ok)
 
@@ -312,7 +314,7 @@ func TestDNSEngine_MatchRequest_dnsRewrite(t *testing.T) {
 		}
 	})
 
-	t.Run("new_cname", func(t *testing.T) {
+	t.Run("new-cname", func(t *testing.T) {
 		res, ok := dnsEngine.Match(path.Base(t.Name()))
 		assert.False(t, ok)
 
@@ -323,7 +325,7 @@ func TestDNSEngine_MatchRequest_dnsRewrite(t *testing.T) {
 		}
 	})
 
-	t.Run("new_mx", func(t *testing.T) {
+	t.Run("new-mx", func(t *testing.T) {
 		res, ok := dnsEngine.Match(path.Base(t.Name()))
 		assert.False(t, ok)
 
@@ -334,14 +336,14 @@ func TestDNSEngine_MatchRequest_dnsRewrite(t *testing.T) {
 			assert.Equal(t, dns.TypeMX, nr.DNSRewrite.RRType)
 
 			mx := &rules.DNSMX{
-				Exchange:   "new_mx_host",
+				Exchange:   "new-mx-host",
 				Preference: 32,
 			}
 			assert.Equal(t, mx, nr.DNSRewrite.Value)
 		}
 	})
 
-	t.Run("new_txt", func(t *testing.T) {
+	t.Run("new-txt", func(t *testing.T) {
 		res, ok := dnsEngine.Match(path.Base(t.Name()))
 		assert.False(t, ok)
 
@@ -350,7 +352,7 @@ func TestDNSEngine_MatchRequest_dnsRewrite(t *testing.T) {
 			nr := dnsr[0]
 			assert.Equal(t, dns.RcodeSuccess, nr.DNSRewrite.RCode)
 			assert.Equal(t, dns.TypeTXT, nr.DNSRewrite.RRType)
-			assert.Equal(t, "new_txtcontent", nr.DNSRewrite.Value)
+			assert.Equal(t, "new-txtcontent", nr.DNSRewrite.Value)
 		}
 	})
 
@@ -363,11 +365,11 @@ func TestDNSEngine_MatchRequest_dnsRewrite(t *testing.T) {
 			nr := dnsr[0]
 			assert.Equal(t, dns.RcodeSuccess, nr.DNSRewrite.RCode)
 			assert.Equal(t, dns.TypePTR, nr.DNSRewrite.RRType)
-			assert.Equal(t, "new_ptr", nr.DNSRewrite.Value)
+			assert.Equal(t, "new-ptr", nr.DNSRewrite.Value)
 		}
 	})
 
-	t.Run("https_record", func(t *testing.T) {
+	t.Run("https-record", func(t *testing.T) {
 		res, ok := dnsEngine.Match(path.Base(t.Name()))
 		assert.False(t, ok)
 
@@ -382,14 +384,14 @@ func TestDNSEngine_MatchRequest_dnsRewrite(t *testing.T) {
 			}
 			svcb := &rules.DNSSVCB{
 				Params:   p,
-				Target:   "https_record_host",
+				Target:   "https-record-host",
 				Priority: 32,
 			}
 			assert.Equal(t, svcb, nr.DNSRewrite.Value)
 		}
 	})
 
-	t.Run("svcb_record", func(t *testing.T) {
+	t.Run("svcb-record", func(t *testing.T) {
 		res, ok := dnsEngine.Match(path.Base(t.Name()))
 		assert.False(t, ok)
 
@@ -404,14 +406,14 @@ func TestDNSEngine_MatchRequest_dnsRewrite(t *testing.T) {
 			}
 			svcb := &rules.DNSSVCB{
 				Params:   p,
-				Target:   "svcb_record_host",
+				Target:   "svcb-record-host",
 				Priority: 32,
 			}
 			assert.Equal(t, svcb, nr.DNSRewrite.Value)
 		}
 	})
 
-	t.Run("https_type", func(t *testing.T) {
+	t.Run("https-type", func(t *testing.T) {
 		r := DNSRequest{
 			Hostname: path.Base(t.Name()),
 			DNSType:  dns.TypeHTTPS,
@@ -427,7 +429,7 @@ func TestDNSEngine_MatchRequest_dnsRewrite(t *testing.T) {
 		}
 
 		r = DNSRequest{
-			Hostname: "https_type",
+			Hostname: "https-type",
 			DNSType:  dns.TypeA,
 		}
 
@@ -435,7 +437,7 @@ func TestDNSEngine_MatchRequest_dnsRewrite(t *testing.T) {
 		assert.False(t, ok)
 	})
 
-	t.Run("disable_one", func(t *testing.T) {
+	t.Run("disable-one", func(t *testing.T) {
 		res, ok := dnsEngine.Match(path.Base(t.Name()))
 		assert.False(t, ok)
 
@@ -457,7 +459,7 @@ func TestDNSEngine_MatchRequest_dnsRewrite(t *testing.T) {
 		}
 	})
 
-	t.Run("disable_all", func(t *testing.T) {
+	t.Run("disable-all", func(t *testing.T) {
 		res, ok := dnsEngine.Match(path.Base(t.Name()))
 		assert.False(t, ok)
 
@@ -476,7 +478,7 @@ func TestDNSEngine_MatchRequest_dnsRewrite(t *testing.T) {
 		}
 	})
 
-	t.Run("disable_all_alt_syntax", func(t *testing.T) {
+	t.Run("disable-all-alt-syntax", func(t *testing.T) {
 		res, ok := dnsEngine.Match(path.Base(t.Name()))
 		assert.False(t, ok)
 
@@ -495,11 +497,11 @@ func TestDNSEngine_MatchRequest_dnsRewrite(t *testing.T) {
 		}
 	})
 
-	t.Run("blocked_later", func(t *testing.T) {
+	t.Run("blocked-later", func(t *testing.T) {
 		res, ok := dnsEngine.Match(path.Base(t.Name()))
 		assert.True(t, ok)
 		if assert.NotNil(t, res.NetworkRule) {
-			assert.Equal(t, "||blocked_later^", res.NetworkRule.RuleText)
+			assert.Equal(t, "||blocked-later^", res.NetworkRule.RuleText)
 		}
 
 		dnsr := res.DNSRewritesAll()
@@ -508,16 +510,25 @@ func TestDNSEngine_MatchRequest_dnsRewrite(t *testing.T) {
 		}
 	})
 
-	t.Run("etc_hosts_rule", func(t *testing.T) {
+	t.Run("etc-hosts-rule", func(t *testing.T) {
 		res, ok := dnsEngine.Match(path.Base(t.Name()))
 		assert.True(t, ok)
 		if assert.Len(t, res.HostRulesV4, 1) {
-			assert.Equal(t, "127.0.0.1 etc_hosts_rule", res.HostRulesV4[0].RuleText)
+			assert.Equal(t, "127.0.0.1 etc-hosts-rule", res.HostRulesV4[0].RuleText)
 		}
 
 		dnsr := res.DNSRewritesAll()
 		if assert.Len(t, dnsr, 1) {
 			assert.True(t, dnsr[0].Whitelist)
 		}
+	})
+
+	// See https://github.com/AdguardTeam/AdGuardHome/issues/2492.
+	t.Run("bad-shorthand", func(t *testing.T) {
+		res, ok := dnsEngine.Match(path.Base(t.Name()))
+		assert.False(t, ok)
+
+		dnsr := res.DNSRewritesAll()
+		assert.Nil(t, dnsr)
 	})
 }

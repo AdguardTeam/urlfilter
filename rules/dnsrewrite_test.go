@@ -6,6 +6,58 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestValidateHost(t *testing.T) {
+	testCases := []struct {
+		name string
+		in   string
+		want string
+	}{{
+		name: "success",
+		in:   "example.com",
+		want: "",
+	}, {
+		name: "success_punycode",
+		// Aka "имена.бг".
+		in:   "xn--80ajiqg.xn--90ae",
+		want: "",
+	}, {
+		name: "empty",
+		in:   "",
+		want: "invalid hostname length: 0",
+	}, {
+		name: "too_long",
+		in:   "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+		want: "invalid hostname length: 64",
+	}, {
+		name: "empty_part",
+		in:   "example..com",
+		want: "empty hostname part at index 1",
+	}, {
+		name: "bad_part_first",
+		in:   "www.-example.com",
+		want: "invalid hostname part at index 1: invalid char '-' at index 0",
+	}, {
+		name: "bad_part_inner",
+		in:   "www:example.com",
+		want: "invalid hostname part at index 0: invalid char ':' at index 3",
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateHost(tc.in)
+			if err != nil {
+				assert.Equal(t, tc.want, err.Error())
+
+				return
+			}
+
+			if tc.want != "" {
+				t.Errorf("want error %q, got nil", tc.want)
+			}
+		})
+	}
+}
+
 func TestNetworkRule_Match_dnsRewrite(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		req := NewRequestForHostname("example.org")
@@ -110,6 +162,10 @@ func TestNetworkRule_Match_dnsRewrite(t *testing.T) {
 		assert.NotNil(t, err)
 
 		_, err = NewNetworkRule("||example.org^$dnsrewrite=noerror;svcb;42 bad stuffs", -1)
+		assert.NotNil(t, err)
+
+		// See https://github.com/AdguardTeam/AdGuardHome/issues/2492.
+		_, err = NewNetworkRule("||example.org^$dnsrewrite=A:NOERROR:127.0.0.1", -1)
 		assert.NotNil(t, err)
 	})
 }
