@@ -7,8 +7,8 @@ plan:
 
 stages:
   - Test:
-      manual: false
-      final: false
+      manual: 'false'
+      final: 'false'
       jobs:
         - Lint
         - Test
@@ -34,7 +34,7 @@ Lint:
             golangci-lint run
 
   requirements:
-    - Docker
+    - adg-docker: 'true'
 
 
 Test:
@@ -57,17 +57,17 @@ Test:
             # Run tests
             go test -race -v -bench="." -coverprofile="coverage.txt" -covermode=atomic ./...
   requirements:
-    - Docker
+    - adg-docker: 'true'
 
 branches:
   create: for-pull-request
   delete:
-    after-deleted-days: 7
-    after-inactive-days: 30
+    after-deleted-days: '7'
+    after-inactive-days: '30'
   integration:
-    push-on-success: false
+    push-on-success: 'false'
     merge-from: urlfilter - Build and run tests
-  link-to-jira: true
+  link-to-jira: 'true'
 
 notifications: []
 
