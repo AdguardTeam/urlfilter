@@ -165,7 +165,9 @@ func NewNetworkRule(ruleText string, filterListID int) (*NetworkRule, error) {
 		len(pattern) < 3 {
 		if len(rule.permittedDomains) == 0 &&
 			rule.permittedClients.Len() == 0 &&
-			len(rule.permittedClientTags) == 0 {
+			len(rule.permittedClientTags) == 0 &&
+			len(rule.permittedDNSTypes) == 0 &&
+			len(rule.restrictedDNSTypes) == 0 {
 			// Rule matches too much and does not have any domain, client or ctag restrictions
 			// We should not allow this kind of rules
 			return nil, ErrTooWideRule
