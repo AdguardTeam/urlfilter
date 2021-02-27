@@ -4,6 +4,7 @@ plan:
   project-key: AGH
   key: URLFLTSPECS
   name: urlfilter - Build and run tests
+  dockerGo: golang:1.16
 
 stages:
   - Test:
@@ -39,7 +40,10 @@ Lint:
 
 Test:
   docker:
-    image: golang:1.14.1
+    image: ${bamboo.dockerGo}
+    volumes:
+      ${system.GO_CACHE_DIR}: "${bamboo.cacheGo}"
+      ${system.GO_PKG_CACHE_DIR}: "${bamboo.cacheGoPkg}"
   key: TEST
   tasks:
     - checkout:
