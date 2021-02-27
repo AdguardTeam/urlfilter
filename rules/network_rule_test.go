@@ -756,16 +756,20 @@ func compareRulesPriority(t *testing.T, left, right string, expected bool) {
 }
 
 func TestNetworkRule_Match_dnsType(t *testing.T) {
-	r, err := NewNetworkRule("||example.org^$dnstype=TXT|AAAA", -1)
-	assert.Nil(t, err)
-
 	req := NewRequestForHostname("example.org")
 	req.DNSType = dns.TypeAAAA
+
+	r, err := NewNetworkRule("||example.org^$dnstype=TXT|AAAA", -1)
+	assert.Nil(t, err)
 	assert.True(t, r.Match(req))
 
 	r, err = NewNetworkRule("||example.org^$dnstype=~TXT|~AAAA", -1)
 	assert.Nil(t, err)
 	assert.False(t, r.Match(req))
+
+	r, err = NewNetworkRule("$dnstype=AAAA", -1)
+	assert.Nil(t, err)
+	assert.True(t, r.Match(req))
 
 	t.Run("parse_errors", func(t *testing.T) {
 		_, err = NewNetworkRule("||example.org^$dnstype=", -1)
