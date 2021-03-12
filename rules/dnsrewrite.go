@@ -30,6 +30,8 @@ type RRType = uint16
 // If the RRType is either dns.TypeHTTPS or dns.TypeSVCB, the underlying value
 // is a non-nil *DNSSVCB.
 //
+// If the RRType is dns.TypeSRV, the underlying value is a non-nil *DNSSRV.
+//
 // Otherwise, currently, it is nil.  New types may be added in the future.
 type RRValue = interface{}
 
@@ -93,11 +95,11 @@ func isValidHostFirstRune(r rune) (ok bool) {
 		(r >= '0' && r <= '9')
 }
 
+const invalidCharMsg = "invalid hostname part at index %d: invalid char %q at index %d"
+
 // validateHost validates the host in accordance to RFC-952 with RFC-1123's
 // inclusion of digits at the start of the host.  It also doesn't validate
 // against two or more hyphens to allow punycode and internationalized domains.
-//
-// TODO(a.garipov):  !!  a test suite.
 func validateHost(host string) (err error) {
 	l := len(host)
 	if l == 0 || l > 63 {
@@ -111,12 +113,12 @@ func validateHost(host string) (err error) {
 		}
 
 		if r := p[0]; !isValidHostFirstRune(rune(r)) {
-			return fmt.Errorf("invalid hostname part at index %d: invalid char %q at index %d", i, r, 0)
+			return fmt.Errorf(invalidCharMsg, i, r, 0)
 		}
 
 		for j, r := range p[1:] {
 			if !isValidHostRune(r) {
-				return fmt.Errorf("invalid hostname part at index %d: invalid char %q at index %d", i, r, j+1)
+				return fmt.Errorf(invalidCharMsg, i, r, j+1)
 			}
 		}
 	}
@@ -173,10 +175,18 @@ type DNSMX struct {
 	Preference uint16
 }
 
+// DNSSRV is the type of RRValue values returned for SRV records in DNS rewrites.
+type DNSSRV struct {
+	Target   string
+	Priority uint16
+	Weight   uint16
+	Port     uint16
+}
+
 // DNSSVCB is the type of RRValue values returned for HTTPS and SVCB records in
 // dns rewrites.
 //
-// See https://tools.ietf.org/html/draft-ietf-dnsop-svcb-https-01.
+// See https://tools.ietf.org/html/draft-ietf-dnsop-svcb-https-02.
 type DNSSVCB struct {
 	Params   map[string]string
 	Target   string
@@ -186,6 +196,33 @@ type DNSSVCB struct {
 // dnsRewriteRRHandler is a function that parses values for specific resource
 // record types.
 type dnsRewriteRRHandler func(rcode RCode, rr RRType, valStr string) (dnsr *DNSRewrite, err error)
+
+// cnameDNSRewriteRRHandler is a DNS rewrite handler that parses full-form CNAME
+// rewrites.
+func cnameDNSRewriteRRHandler(_ RCode, _ RRType, valStr string) (dnsr *DNSRewrite, err error) {
+	err = validateHost(valStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid cname host: %w", err)
+	}
+
+	return &DNSRewrite{
+		NewCNAME: valStr,
+	}, nil
+}
+
+// ptrDNSRewriteRRHandler is a DNS rewrite handler that parses PTR rewrites.
+func ptrDNSRewriteRRHandler(rcode RCode, rr RRType, valStr string) (dnsr *DNSRewrite, err error) {
+	err = validateHost(valStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid ptr host: %w", err)
+	}
+
+	return &DNSRewrite{
+		RCode:  rcode,
+		RRType: rr,
+		Value:  valStr,
+	}, nil
+}
 
 // strDNSRewriteRRHandler is a simple DNS rewrite handler that returns
 // a *DNSRewrite with Value st to valStr.
@@ -197,10 +234,65 @@ func strDNSRewriteRRHandler(rcode RCode, rr RRType, valStr string) (dnsr *DNSRew
 	}, nil
 }
 
+// srvDNSRewriteRRHandler is a DNS rewrite handler that parses SRV rewrites.
+func srvDNSRewriteRRHandler(rcode RCode, rr RRType, valStr string) (dnsr *DNSRewrite, err error) {
+	fields := strings.Split(valStr, " ")
+	if len(fields) < 4 {
+		return nil, fmt.Errorf("invalid srv %q: need four fields", valStr)
+	}
+
+	var prio64 uint64
+	prio64, err = strconv.ParseUint(fields[0], 10, 16)
+	if err != nil {
+		return nil, fmt.Errorf("invalid srv priority: %w", err)
+	}
+
+	var weight64 uint64
+	weight64, err = strconv.ParseUint(fields[1], 10, 16)
+	if err != nil {
+		return nil, fmt.Errorf("invalid srv weight: %w", err)
+	}
+
+	var port64 uint64
+	port64, err = strconv.ParseUint(fields[2], 10, 16)
+	if err != nil {
+		return nil, fmt.Errorf("invalid srv port: %w", err)
+	}
+
+	target := fields[3]
+
+	// From RFC 2782:
+	//
+	//   A Target of "." means that the service is decidedly not available
+	//   at this domain.
+	//
+	if target != "." {
+		err = validateHost(target)
+		if err != nil {
+			return nil, fmt.Errorf("invalid srv target: %w", err)
+		}
+	}
+
+	v := &DNSSRV{
+		Target:   target,
+		Priority: uint16(prio64),
+		Weight:   uint16(weight64),
+		Port:     uint16(port64),
+	}
+
+	dnsr = &DNSRewrite{
+		RCode:  rcode,
+		RRType: rr,
+		Value:  v,
+	}
+
+	return dnsr, nil
+}
+
 // svcbDNSRewriteRRHandler is a DNS rewrite handler that parses SVCB and HTTPS
 // rewrites.
 //
-// See https://tools.ietf.org/html/draft-ietf-dnsop-svcb-https-01.
+// See https://tools.ietf.org/html/draft-ietf-dnsop-svcb-https-02.
 //
 // TODO(a.garipov): Currently, we only support the contiguous type of
 // char-string values from the RFC.
@@ -226,10 +318,24 @@ func svcbDNSRewriteRRHandler(rcode RCode, rr RRType, valStr string) (dnsr *DNSRe
 		return nil, fmt.Errorf("invalid %s priority: %w", name, err)
 	}
 
+	target := fields[1]
+
+	// From the IETF draft:
+	//
+	//   If TargetName has the value "." (represented in the wire format as
+	//   a zero-length label), special rules apply.
+	//
+	if target != "." {
+		err = validateHost(target)
+		if err != nil {
+			return nil, fmt.Errorf("invalid %s target: %w", name, err)
+		}
+	}
+
 	if len(fields) == 2 {
 		v := &DNSSVCB{
 			Priority: uint16(prio64),
-			Target:   fields[1],
+			Target:   target,
 		}
 
 		return &DNSRewrite{
@@ -243,7 +349,9 @@ func svcbDNSRewriteRRHandler(rcode RCode, rr RRType, valStr string) (dnsr *DNSRe
 	for i, pair := range fields[2:] {
 		kv := strings.Split(pair, "=")
 		if l := len(kv); l != 2 {
-			return nil, fmt.Errorf("invalid %s param at index %d: got %d fields", name, i, l)
+			err = fmt.Errorf("invalid %s param at index %d: got %d fields", name, i, l)
+
+			return nil, err
 		}
 
 		// TODO(a.garipov): Validate for uniqueness?  Validate against
@@ -253,7 +361,7 @@ func svcbDNSRewriteRRHandler(rcode RCode, rr RRType, valStr string) (dnsr *DNSRe
 
 	v := &DNSSVCB{
 		Priority: uint16(prio64),
-		Target:   fields[1],
+		Target:   target,
 		Params:   params,
 	}
 
@@ -295,11 +403,7 @@ var dnsRewriteRRHandlers = map[RRType]dnsRewriteRRHandler{
 		}, nil
 	},
 
-	dns.TypeCNAME: func(rcode RCode, rr RRType, valStr string) (dnsr *DNSRewrite, err error) {
-		return &DNSRewrite{
-			NewCNAME: valStr,
-		}, nil
-	},
+	dns.TypeCNAME: cnameDNSRewriteRRHandler,
 
 	dns.TypeMX: func(rcode RCode, rr RRType, valStr string) (dnsr *DNSRewrite, err error) {
 		parts := strings.SplitN(valStr, " ", 2)
@@ -313,8 +417,14 @@ var dnsRewriteRRHandlers = map[RRType]dnsRewriteRRHandler{
 			return nil, fmt.Errorf("invalid mx preference: %w", err)
 		}
 
+		exch := parts[1]
+		err = validateHost(exch)
+		if err != nil {
+			return nil, fmt.Errorf("invalid mx exchange: %w", err)
+		}
+
 		v := &DNSMX{
-			Exchange:   parts[1],
+			Exchange:   exch,
 			Preference: uint16(pref64),
 		}
 
@@ -325,11 +435,14 @@ var dnsRewriteRRHandlers = map[RRType]dnsRewriteRRHandler{
 		}, nil
 	},
 
-	dns.TypePTR: strDNSRewriteRRHandler,
+	dns.TypePTR: ptrDNSRewriteRRHandler,
+
 	dns.TypeTXT: strDNSRewriteRRHandler,
 
 	dns.TypeHTTPS: svcbDNSRewriteRRHandler,
 	dns.TypeSVCB:  svcbDNSRewriteRRHandler,
+
+	dns.TypeSRV: srvDNSRewriteRRHandler,
 }
 
 // loadDNSRewritesNormal loads the normal version for of the $dnsrewrite
