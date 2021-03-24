@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bufio"
 	"encoding/json"
+	"errors"
 	"io"
 	"io/ioutil"
 	"os"
@@ -242,7 +243,7 @@ func newTestRuleStorage(t *testing.T, listID int, rulesText string) *filterlist.
 }
 
 func loadRequests(t *testing.T) []testRequest {
-	if _, err := os.Stat(requestsPath); os.IsNotExist(err) {
+	if _, err := os.Stat(requestsPath); errors.Is(err, os.ErrNotExist) {
 		err = unzip(requestsPath+".zip", testResourcesDir)
 		if err != nil {
 			t.Fatalf("cannot unzip %s.zip", requestsPath)

@@ -1,7 +1,6 @@
 package rules
 
 import (
-	"regexp"
 	"strings"
 )
 
@@ -44,12 +43,27 @@ const (
 	RegexStartString = "^"
 )
 
-// https://developer.mozilla.org/en/JavaScript/Reference/Global_Objects/regexp
-// should be escaped . * + ? ^ $ { } ( ) | [ ] / \
-// except of * | ^
-var (
-	specialCharacters      = []string{".", "+", "?", "$", "{", "}", "(", ")", "[", "]", "/", "\\"}
-	reSpecialCharacters, _ = regexp.Compile("[" + strings.Join(specialCharacters, "\\") + "]")
+// According to [MDN], the special characters are:
+//
+//   . * + ? ^ $ { } ( ) | [ ] / \
+//
+// Make an excepttion for our own special characters of "*", "|", and "^" which
+// require additional processing.
+//
+// [MDN]: https://developer.mozilla.org/en/JavaScript/Reference/Global_Objects/regexp
+var specialCharReplacer = strings.NewReplacer(
+	`.`, `\.`,
+	`+`, `\+`,
+	`?`, `\?`,
+	`$`, `\$`,
+	`{`, `\{`,
+	`}`, `\}`,
+	`(`, `\(`,
+	`)`, `\)`,
+	`[`, `\[`,
+	`]`, `\]`,
+	`/`, `\/`,
+	`\`, `\\`,
 )
 
 // patternToRegexp is a helper method for creating regular expressions from the simple
@@ -70,8 +84,8 @@ func patternToRegexp(pattern string) string {
 		pattern = pattern[:len(pattern)-len("/*")] + "^"
 	}
 
-	// Escape special characters except of * | ^
-	regex := reSpecialCharacters.ReplaceAllString(pattern, "\\$0")
+	// Escape special characters.
+	regex := specialCharReplacer.Replace(pattern)
 
 	// Now escape "|" characters but avoid escaping them in the special places
 	if strings.HasPrefix(regex, MaskStartURL) {
