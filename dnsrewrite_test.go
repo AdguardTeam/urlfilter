@@ -17,8 +17,20 @@ func TestDNSResult_DNSRewrites(t *testing.T) {
 |disable-one^$dnsrewrite=127.0.0.2
 @@||disable-one^$dnsrewrite=127.0.0.1
 
+|priority^$dnsrewrite=127.0.0.1
+||priority^
+
+|priority-important^$dnsrewrite=127.0.0.1
+||priority-important^$important
+
 |simple-exc^$dnsrewrite=127.0.0.1
 @@||simple-exc^
+
+@@|exc-exc^$dnsrewrite=127.0.0.1
+@@||exc-exc^
+
+@@||exc-exc-order^
+@@|exc-exc-order^$dnsrewrite=127.0.0.1
 
 |disable-cname^$dnsrewrite=127.0.0.1
 |disable-cname^$dnsrewrite=new-cname
@@ -58,6 +70,42 @@ func TestDNSResult_DNSRewrites(t *testing.T) {
 		assert.Equal(t, ipv4p2, dr.Value)
 	})
 
+	t.Run("priority", func(t *testing.T) {
+		res, ok := dnsEngine.Match(path.Base(t.Name()))
+
+		// Simple matching.
+		assert.True(t, ok)
+		assert.Len(t, res.HostRulesV4, 0)
+
+		// DNS rewrite matching.
+		dnsr := res.DNSRewrites()
+		require.Len(t, dnsr, 1)
+
+		dr := dnsr[0].DNSRewrite
+		assert.Equal(t, dns.RcodeSuccess, dr.RCode)
+		assert.Equal(t, dns.TypeA, dr.RRType)
+		assert.Equal(t, ipv4p1, dr.Value)
+	})
+
+	t.Run("priority-important", func(t *testing.T) {
+		res, ok := dnsEngine.Match(path.Base(t.Name()))
+
+		// Simple matching.
+		assert.True(t, ok)
+		require.NotNil(t, res.NetworkRule)
+
+		assert.Contains(t, res.NetworkRule.RuleText, "$important")
+
+		// DNS rewrite matching.
+		dnsr := res.DNSRewrites()
+		require.Len(t, dnsr, 1)
+
+		dr := dnsr[0].DNSRewrite
+		assert.Equal(t, dns.RcodeSuccess, dr.RCode)
+		assert.Equal(t, dns.TypeA, dr.RRType)
+		assert.Equal(t, ipv4p1, dr.Value)
+	})
+
 	t.Run("simple-exc", func(t *testing.T) {
 		res, ok := dnsEngine.Match(path.Base(t.Name()))
 
@@ -73,6 +121,26 @@ func TestDNSResult_DNSRewrites(t *testing.T) {
 		assert.Equal(t, dns.RcodeSuccess, dr.RCode)
 		assert.Equal(t, dns.TypeA, dr.RRType)
 		assert.Equal(t, ipv4p1, dr.Value)
+	})
+
+	t.Run("exc-exc", func(t *testing.T) {
+		res, ok := dnsEngine.Match(path.Base(t.Name()))
+		assert.True(t, ok)
+		assert.True(t, res.NetworkRule.Whitelist)
+
+		// DNS rewrite matching.
+		dnsr := res.DNSRewrites()
+		require.Len(t, dnsr, 0)
+	})
+
+	t.Run("exc-exc-order", func(t *testing.T) {
+		res, ok := dnsEngine.Match(path.Base(t.Name()))
+		assert.True(t, ok)
+		assert.True(t, res.NetworkRule.Whitelist)
+
+		// DNS rewrite matching.
+		dnsr := res.DNSRewrites()
+		require.Len(t, dnsr, 0)
 	})
 
 	t.Run("disable-cname", func(t *testing.T) {
