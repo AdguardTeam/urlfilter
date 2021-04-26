@@ -53,7 +53,6 @@ func ExtractHostname(url string) string {
 // . max length of ascii hostname including dots is 253 characters
 // . TLD is >=2 characters
 // . TLD is [a-zA-Z]+ or "xn--[a-zA-Z0-9]+"
-// . at least 1 level above TLD Source
 // nolint(gocyclo)
 func IsDomainName(name string) bool {
 	if len(name) > 253 {
@@ -129,7 +128,6 @@ func IsDomainName(name string) bool {
 
 	if st != 2 ||
 		nLabel == 1 ||
-		nLevel == 1 ||
 		(!charOnly && xn < len("xn--wwww")) {
 		return false
 	}

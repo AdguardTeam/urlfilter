@@ -15,8 +15,8 @@ func TestIsDomainName(t *testing.T) {
 	assert.True(t, IsDomainName("abc.xn--p1ai"))
 	assert.True(t, IsDomainName("xn--p1ai.xn--p1ai"))
 	assert.True(t, IsDomainName("123456789012345678901234567890123456789012345678901234567890123.cc"))
-
-	assert.False(t, IsDomainName("cc"))
+	assert.True(t, IsDomainName("cc"))
+	assert.True(t, IsDomainName("xn--p1ai"))
 
 	assert.False(t, IsDomainName("#cc"))
 	assert.False(t, IsDomainName("a.cc#"))

@@ -16,8 +16,8 @@ const (
 	escapeCharacter  = '\\'
 )
 
-// ErrTooWideRule - returned if the rule matches all urls but has no domain, client or ctag restrictions
-var ErrTooWideRule = errors.New("the rule is too wide, add domain, client or ctag restrictions or make it more specific")
+// ErrTooWideRule - returned if the rule matches all urls but has no domain, denyallow, client or ctag restrictions
+var ErrTooWideRule = errors.New("the rule is too wide, add domain, denyallow, client or ctag restrictions or make it more specific")
 
 var (
 	reEscapedOptionsDelimiter = regexp.MustCompile(regexp.QuoteMeta("\\$"))
@@ -109,6 +109,7 @@ type NetworkRule struct {
 
 	permittedDomains  []string // a list of permitted domains from the $domain modifier
 	restrictedDomains []string // a list of restricted domains from the $domain modifier
+	denyAllowDomains  []string // a list of excluded domains from the $denyallow modifier
 
 	// permittedDNSTypes is the list of permitted DNS record type names from
 	// the $dnstype modifier.
@@ -167,7 +168,8 @@ func NewNetworkRule(ruleText string, filterListID int) (*NetworkRule, error) {
 			rule.permittedClients.Len() == 0 &&
 			len(rule.permittedClientTags) == 0 &&
 			len(rule.permittedDNSTypes) == 0 &&
-			len(rule.restrictedDNSTypes) == 0 {
+			len(rule.restrictedDNSTypes) == 0 &&
+			len(rule.denyAllowDomains) == 0 {
 			// Rule matches too much and does not have any domain, client or ctag restrictions
 			// We should not allow this kind of rules
 			return nil, ErrTooWideRule
@@ -212,7 +214,11 @@ func (f *NetworkRule) Match(r *Request) bool {
 		return false
 	}
 
-	if !f.matchDomain(r.SourceHostname) {
+	if !f.matchRequestDomain(r.Hostname) {
+		return false
+	}
+
+	if !f.matchSourceDomain(r.SourceHostname) {
 		return false
 	}
 
@@ -342,6 +348,9 @@ func (f *NetworkRule) IsHigherPriority(r *NetworkRule) bool {
 		count++
 	}
 	if f.permittedClients.Len() != 0 || f.restrictedClients.Len() != 0 {
+		count++
+	}
+	if len(f.denyAllowDomains) != 0 {
 		count++
 	}
 	rCount := r.enabledOptions.Count() + r.disabledOptions.Count() +
@@ -496,8 +505,27 @@ func (f *NetworkRule) matchShortcut(r *Request) bool {
 	return strings.Contains(r.URLLowerCase, f.Shortcut)
 }
 
-// matchDomain checks if the specified filtering rule is allowed on this domain
-func (f *NetworkRule) matchDomain(domain string) bool {
+// matchRequestDomain checks if the filtering rule is allowed to match this
+// request domain, e.g. it checks it against the $denyallow modifier
+//
+// Please pay attention at how $denyallow works:  the rule will work if the
+// request hostname **does not** belong to $denyallow domains.
+// The idea is to allow rules that block anything EXCEPT FOR some domains.
+// For instance, if we have a website that we know to load a lot of
+// third-party crap, but some of the domains are crucial for this website,
+// we may want to add something like this:
+// `*$script,domain=example.org,denyallow=essentialdomain1.com|essentialdomain2.com`
+func (f *NetworkRule) matchRequestDomain(domain string) bool {
+	if len(f.denyAllowDomains) == 0 {
+		return true
+	}
+
+	return !isDomainOrSubdomainOfAny(domain, f.denyAllowDomains)
+}
+
+// matchSourceDomain checks if the specified filtering rule is allowed on this domain
+// e.g. it checks the domain against what's specified in the $domain modifier
+func (f *NetworkRule) matchSourceDomain(domain string) bool {
 	if len(f.permittedDomains) == 0 && len(f.restrictedDomains) == 0 {
 		return true
 	}
@@ -721,12 +749,24 @@ func (f *NetworkRule) loadOption(name, value string) error {
 		f.DNSRewrite = rewrite
 
 		return err
-	// $domain -- limits the rule for selected domains
+	// $domain -- limits the rule for selected source domains
 	case "domain":
 		permitted, restricted, err := loadDomains(value, "|")
 		f.permittedDomains = permitted
 		f.restrictedDomains = restricted
 		return err
+
+	// $denyallow -- disables the rule for the selected request domains
+	case "denyallow":
+		permitted, restricted, err := loadDomains(value, "|")
+		if err != nil {
+			return err
+		}
+		if len(restricted) > 0 || len(permitted) == 0 {
+			return fmt.Errorf("invalid $denyallow value: %s", value)
+		}
+		f.denyAllowDomains = permitted
+		return nil
 
 	// $ctag - limits the rule for selected "Client tags"
 	case "ctag":
