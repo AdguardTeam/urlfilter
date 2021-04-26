@@ -89,24 +89,50 @@ func (n *NetworkEngine) MatchAll(r *rules.Request) []*rules.NetworkRule {
 	return result
 }
 
-// matchShortcutsLookupTable finds all matching rules from the shortcuts lookup table
-func (n *NetworkEngine) matchShortcutsLookupTable(r *rules.Request) []*rules.NetworkRule {
-	var result []*rules.NetworkRule
+// ruleIn checks if the particular rule instance is contained by the slice of
+// pointers.
+func ruleIn(rule *rules.NetworkRule, rs []*rules.NetworkRule) (ok bool) {
+	for _, r := range rs {
+		if r == rule {
+			return true
+		}
+	}
+
+	return false
+}
+
+// matchShortcutsLookupTable finds all matching rules from the shortcuts lookup
+// table.
+func (n *NetworkEngine) matchShortcutsLookupTable(r *rules.Request) (result []*rules.NetworkRule) {
 	urlLen := len(r.URLLowerCase)
 	if urlLen > maxURLLength {
 		urlLen = maxURLLength
 	}
 
 	for i := 0; i <= urlLen-shortcutLength; i++ {
+		// The shortcutsLookupTable contains the shortcuts of rules of
+		// fixed length and rules itself.  Go through all the substrings
+		// of passed URL having such length to find matching rules.
 		hash := fastHashBetween(r.URLLowerCase, i, i+shortcutLength)
-		if matchingRules, ok := n.shortcutsLookupTable[hash]; ok {
-			for i := range matchingRules {
-				ruleIdx := matchingRules[i]
-				rule := n.ruleStorage.RetrieveNetworkRule(ruleIdx)
-				if rule != nil && rule.Match(r) {
-					result = append(result, rule)
-				}
+		matchingRules, ok := n.shortcutsLookupTable[hash]
+		if !ok {
+			continue
+		}
+
+		for i := range matchingRules {
+			ruleIdx := matchingRules[i]
+			rule := n.ruleStorage.RetrieveNetworkRule(ruleIdx)
+
+			// Make sure that the same rule isn't returned twice.
+			// This happens when the URL has a repeating pattern.
+			// The check is performed rarely and on rather short
+			// slices so it shouldn't cause any performance issues.
+			if rule == nil || ruleIn(rule, result) || !rule.Match(r) {
+				continue
 			}
+
+			result = append(result, rule)
+
 		}
 	}
 
@@ -256,6 +282,8 @@ func fastHashBetween(str string, begin, end int) uint32 {
 }
 
 // djb2 hash algorithm
+//
+// TODO(e.burkov): Inspect all uses.  Perhaps use maphash.
 func fastHash(str string) uint32 {
 	if str == "" {
 		return 0
