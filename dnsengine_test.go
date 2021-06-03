@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/AdguardTeam/golibs/log"
 	"github.com/AdguardTeam/urlfilter/filterlist"
 	"github.com/AdguardTeam/urlfilter/filterutil"
@@ -200,6 +202,17 @@ func TestRegexp(t *testing.T) {
 	assert.True(t, ok && res.NetworkRule.Text() == text && res.NetworkRule.Whitelist)
 }
 
+func TestMultipleIPPerHost(t *testing.T) {
+	text := `1.1.1.1 example.org
+2.2.2.2 example.org`
+	ruleStorage := newTestRuleStorage(t, 1, text)
+	dnsEngine := NewDNSEngine(ruleStorage)
+
+	res, ok := dnsEngine.Match("example.org")
+	require.True(t, ok)
+	require.Equal(t, 2, len(res.HostRulesV4))
+}
+
 func TestClientTags(t *testing.T) {
 	rulesText := `||host1^$ctag=pc|printer
 ||host1^
@@ -277,14 +290,6 @@ func TestClientTags(t *testing.T) {
 	// tags match (exclusion) but it's a $badfilter
 	res, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host7", SortedClientTags: []string{"phone"}})
 	assert.False(t, ok)
-}
-
-func assertMatchRuleText(t *testing.T, rulesText string, rules DNSResult, ok bool) {
-	assert.True(t, ok)
-	if ok {
-		assert.NotNil(t, rules.NetworkRule)
-		assert.Equal(t, rulesText, rules.NetworkRule.Text())
-	}
 }
 
 func TestClient(t *testing.T) {
@@ -532,4 +537,12 @@ func TestDNSEngine_MatchRequest_dnsType(t *testing.T) {
 		assert.True(t, ok)
 		assert.NotContains(t, res.NetworkRule.Text(), "dnstype=")
 	})
+}
+
+func assertMatchRuleText(t *testing.T, rulesText string, rules DNSResult, ok bool) {
+	assert.True(t, ok)
+	if ok {
+		assert.NotNil(t, rules.NetworkRule)
+		assert.Equal(t, rulesText, rules.NetworkRule.Text())
+	}
 }
