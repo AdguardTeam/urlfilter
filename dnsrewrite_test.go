@@ -212,6 +212,7 @@ func TestDNSEngine_MatchRequest_dnsRewrite(t *testing.T) {
 |new-mx^$dnsrewrite=NOERROR;MX;32 new-mx-host
 |new-txt^$dnsrewrite=NOERROR;TXT;new-txtcontent
 |1.2.3.4.in-addr.arpa^$dnsrewrite=NOERROR;PTR;new-ptr
+|1.2.3.5.in-addr.arpa^$dnsrewrite=NOERROR;PTR;new-ptr-with-dot.
 
 |https-record^$dnsrewrite=NOERROR;HTTPS;32 https-record-host alpn=h3
 |svcb-record^$dnsrewrite=NOERROR;SVCB;32 svcb-record-host alpn=h3
@@ -437,7 +438,20 @@ func TestDNSEngine_MatchRequest_dnsRewrite(t *testing.T) {
 		nr := dnsr[0]
 		assert.Equal(t, dns.RcodeSuccess, nr.DNSRewrite.RCode)
 		assert.Equal(t, dns.TypePTR, nr.DNSRewrite.RRType)
-		assert.Equal(t, "new-ptr", nr.DNSRewrite.Value)
+		assert.Equal(t, "new-ptr.", nr.DNSRewrite.Value)
+	})
+
+	t.Run("1.2.3.5.in-addr.arpa", func(t *testing.T) {
+		res, ok := dnsEngine.Match(path.Base(t.Name()))
+		assert.False(t, ok)
+
+		dnsr := res.DNSRewritesAll()
+		require.Len(t, dnsr, 1)
+
+		nr := dnsr[0]
+		assert.Equal(t, dns.RcodeSuccess, nr.DNSRewrite.RCode)
+		assert.Equal(t, dns.TypePTR, nr.DNSRewrite.RRType)
+		assert.Equal(t, "new-ptr-with-dot.", nr.DNSRewrite.Value)
 	})
 
 	t.Run("https-record", func(t *testing.T) {

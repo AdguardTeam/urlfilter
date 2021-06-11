@@ -313,11 +313,11 @@ func TestClient(t *testing.T) {
 	assertMatchRuleText(t, rulesText[0], res, ok)
 
 	// not match client IPv4
-	res, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host0", ClientIP: "127.0.0.2"})
+	_, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host0", ClientIP: "127.0.0.2"})
 	assert.False(t, ok)
 
 	// restricted client IPv4
-	res, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host1", ClientIP: "127.0.0.1"})
+	_, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host1", ClientIP: "127.0.0.1"})
 	assert.False(t, ok)
 
 	// non-restricted client IPv4
@@ -329,11 +329,11 @@ func TestClient(t *testing.T) {
 	assertMatchRuleText(t, rulesText[2], res, ok)
 
 	// not match client IPv6
-	res, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host2", ClientIP: "2001::c0:ffef"})
+	_, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host2", ClientIP: "2001::c0:ffef"})
 	assert.False(t, ok)
 
 	// restricted client IPv6
-	res, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host3", ClientIP: "2001::c0:ffee"})
+	_, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host3", ClientIP: "2001::c0:ffee"})
 	assert.False(t, ok)
 
 	// non-restricted client IPv6
@@ -345,11 +345,11 @@ func TestClient(t *testing.T) {
 	assertMatchRuleText(t, rulesText[4], res, ok)
 
 	// not match network IPv4
-	res, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host4", ClientIP: "127.0.1.1"})
+	_, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host4", ClientIP: "127.0.1.1"})
 	assert.False(t, ok)
 
 	// restricted network IPv4
-	res, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host5", ClientIP: "127.0.0.254"})
+	_, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host5", ClientIP: "127.0.0.254"})
 	assert.False(t, ok)
 
 	// non-restricted network IPv4
@@ -361,11 +361,11 @@ func TestClient(t *testing.T) {
 	assertMatchRuleText(t, rulesText[6], res, ok)
 
 	// not match network IPv6
-	res, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host6", ClientIP: "2001::c0:feee"})
+	_, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host6", ClientIP: "2001::c0:feee"})
 	assert.False(t, ok)
 
 	// restricted network IPv6
-	res, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host7", ClientIP: "2001::c0:ff07"})
+	_, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host7", ClientIP: "2001::c0:ff07"})
 	assert.False(t, ok)
 
 	// non-restricted network IPv6
@@ -377,7 +377,7 @@ func TestClient(t *testing.T) {
 	assertMatchRuleText(t, rulesText[8], res, ok)
 
 	// not match client name
-	res, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host8", ClientName: "Franks laptop"})
+	_, ok = dnsEngine.MatchRequest(DNSRequest{Hostname: "host8", ClientName: "Franks laptop"})
 	assert.False(t, ok)
 }
 

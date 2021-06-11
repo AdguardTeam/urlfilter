@@ -24,8 +24,10 @@ type RRType = uint16
 //
 // If the RRType is dns.TypeMX, the underlying value is a non-nil *DNSMX.
 //
-// If the RRType is either dns.TypePTR or dns.TypeTXT, the underlying type of
-// Value is string.
+// If the RRType is either dns.TypePTR the underlying type of Value is string,
+// and it is a valid FQDN.
+//
+// If the RRType is either dns.TypeTXT, the underlying type of Value is string.
 //
 // If the RRType is either dns.TypeHTTPS or dns.TypeSVCB, the underlying value
 // is a non-nil *DNSSVCB.
@@ -212,6 +214,15 @@ func cnameDNSRewriteRRHandler(_ RCode, _ RRType, valStr string) (dnsr *DNSRewrit
 
 // ptrDNSRewriteRRHandler is a DNS rewrite handler that parses PTR rewrites.
 func ptrDNSRewriteRRHandler(rcode RCode, rr RRType, valStr string) (dnsr *DNSRewrite, err error) {
+	// Accept both vanilla domain names and FQDNs.
+	var fqdn string
+	if l := len(valStr); l > 0 && valStr[l-1] == '.' {
+		fqdn = valStr
+		valStr = valStr[:l-1]
+	} else {
+		fqdn = dns.Fqdn(valStr)
+	}
+
 	err = validateHost(valStr)
 	if err != nil {
 		return nil, fmt.Errorf("invalid ptr host: %w", err)
@@ -220,7 +231,7 @@ func ptrDNSRewriteRRHandler(rcode RCode, rr RRType, valStr string) (dnsr *DNSRew
 	return &DNSRewrite{
 		RCode:  rcode,
 		RRType: rr,
-		Value:  valStr,
+		Value:  fqdn,
 	}, nil
 }
 
