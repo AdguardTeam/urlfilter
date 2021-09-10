@@ -1,8 +1,8 @@
 .DS_Store
 .vscode
 .idea
-test/requests.json
-test/requests2.json
-test/*.pprof
-test/*.db
+testdata/requests.json
+testdata/requests2.json
+testdata/*.pprof
+testdata/*.db
 *~

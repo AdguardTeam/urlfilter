@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	testResourcesDir = "../test"
+	testResourcesDir = "../testdata"
 )
 
 func TestStringRuleListScanner(t *testing.T) {

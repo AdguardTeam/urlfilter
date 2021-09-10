@@ -54,7 +54,7 @@ func TestBenchDNSEngine(t *testing.T) {
 		}
 	}
 
-	start := getRSS()
+	start := alloc()
 	log.Printf("RSS before loading rules - %d kB", start/1024)
 
 	startParse := time.Now()
@@ -64,7 +64,7 @@ func TestBenchDNSEngine(t *testing.T) {
 	log.Printf("Elapsed on parsing rules: %v", time.Since(startParse))
 	log.Printf("Rules count - %v", dnsEngine.RulesCount)
 
-	afterLoad := getRSS()
+	afterLoad := alloc()
 	log.Printf("RSS after loading rules - %d kB (%d kB diff)", afterLoad/1024, (afterLoad-start)/1024)
 
 	totalMatches := 0
@@ -106,7 +106,7 @@ func TestBenchDNSEngine(t *testing.T) {
 	log.Printf("Min per request: %v", minElapsedMatch)
 	log.Printf("Storage cache length: %d", ruleStorage.GetCacheSize())
 
-	afterMatch := getRSS()
+	afterMatch := alloc()
 	log.Printf("RSS after matching - %d kB (%d kB diff)\n", afterMatch/1024, (afterMatch-afterLoad)/1024)
 }
 

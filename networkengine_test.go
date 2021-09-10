@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
 	"runtime/debug"
 	"strings"
 	"testing"
@@ -17,22 +18,21 @@ import (
 	"github.com/AdguardTeam/golibs/log"
 	"github.com/AdguardTeam/urlfilter/filterlist"
 	"github.com/AdguardTeam/urlfilter/rules"
-	"github.com/shirou/gopsutil/process"
 	"github.com/stretchr/testify/assert"
 )
 
 const (
-	testResourcesDir = "test"
+	testResourcesDir = "testdata"
 	filterPath       = testResourcesDir + "/easylist.txt"
 	requestsPath     = testResourcesDir + "/requests.json"
 )
 
 type testRequest struct {
-	LineNumber  int
 	Line        string
 	URL         string `json:"url"`
 	FrameURL    string `json:"frameUrl"`
 	RequestType string `json:"cpt"`
+	LineNumber  int
 }
 
 func TestEmptyNetworkEngine(t *testing.T) {
@@ -125,8 +125,8 @@ func TestBenchNetworkEngine(t *testing.T) {
 		requests = append(requests, r)
 	}
 
-	start := getRSS()
-	log.Printf("RSS before loading rules - %d kB\n", start/1024)
+	start := alloc()
+	log.Printf("Allocated before loading rules - %d kB\n", start/1024)
 
 	startParse := time.Now()
 	engine := buildNetworkEngine(t)
@@ -134,8 +134,12 @@ func TestBenchNetworkEngine(t *testing.T) {
 	defer engine.ruleStorage.Close()
 	log.Printf("Elapsed on parsing rules: %v", time.Since(startParse))
 
-	afterLoad := getRSS()
-	log.Printf("RSS after loading rules - %d kB (%d kB diff)\n", afterLoad/1024, (afterLoad-start)/1024)
+	afterLoad := alloc()
+	log.Printf(
+		"Allocated after loading rules - %d kB (%d kB diff)\n",
+		afterLoad/1024,
+		(afterLoad-start)/1024,
+	)
 
 	totalMatches := 0
 	totalElapsed := time.Duration(0)
@@ -170,8 +174,12 @@ func TestBenchNetworkEngine(t *testing.T) {
 	log.Printf("Min per request: %v", minElapsedMatch)
 	log.Printf("Storage cache length: %d", engine.ruleStorage.GetCacheSize())
 
-	afterMatch := getRSS()
-	log.Printf("RSS after matching - %d kB (%d kB diff)\n", afterMatch/1024, (afterMatch-afterLoad)/1024)
+	afterMatch := alloc()
+	log.Printf(
+		"Allocated after matching - %d kB (%d kB diff)\n",
+		afterMatch/1024,
+		(afterMatch-afterLoad)/1024,
+	)
 }
 
 // assumeRequestType converts string value from requests.json to RequestType
@@ -318,8 +326,8 @@ func unzip(src, dest string) error {
 				return err
 			}
 			defer func() {
-				if err := f.Close(); err != nil {
-					panic(err)
+				if cerr := f.Close(); cerr != nil {
+					panic(cerr)
 				}
 			}()
 
@@ -341,14 +349,9 @@ func unzip(src, dest string) error {
 	return nil
 }
 
-func getRSS() uint64 {
-	proc, err := process.NewProcess(int32(os.Getpid()))
-	if err != nil {
-		panic(err)
-	}
-	minfo, err := proc.MemoryInfo()
-	if err != nil {
-		panic(err)
-	}
-	return minfo.RSS
+func alloc() uint64 {
+	m := &runtime.MemStats{}
+	runtime.ReadMemStats(m)
+
+	return m.Alloc
 }
