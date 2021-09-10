@@ -1,12 +1,12 @@
 package rules
 
 import (
-	"errors"
 	"fmt"
 	"net"
 	"strconv"
 	"strings"
 
+	"github.com/AdguardTeam/golibs/errors"
 	"github.com/miekg/dns"
 )
 
@@ -19,7 +19,7 @@ type RRType = uint16
 
 // RRValue is the value of a resource record.
 //
-// If the coresponding RRType is either dns.TypeA or dns.TypeAAAA, the
+// If the corresponding RRType is either dns.TypeA or dns.TypeAAAA, the
 // underlying type of RRValue is net.IP.
 //
 // If the RRType is dns.TypeMX, the underlying value is a non-nil *DNSMX.
@@ -59,7 +59,7 @@ func loadDNSRewrite(s string) (rewrite *DNSRewrite, err error) {
 	case 1:
 		return loadDNSRewriteShort(s)
 	case 2:
-		return nil, errors.New("invalid dnsrewrite: expected zero or two delimiters")
+		return nil, errors.Error("invalid dnsrewrite: expected zero or two delimiters")
 	case 3:
 		return loadDNSRewriteNormal(parts[0], parts[1], parts[2])
 	default:
@@ -132,7 +132,7 @@ func validateHost(host string) (err error) {
 func loadDNSRewriteShort(s string) (rewrite *DNSRewrite, err error) {
 	if s == "" {
 		// Return an empty DNSRewrite, because an empty string most
-		// probalby means that this is a disabling allowlist case.
+		// probably means that this is a disabling allowlist case.
 		return &DNSRewrite{}, nil
 	} else if allUppercaseASCII(s) {
 		if s == "REFUSED" {

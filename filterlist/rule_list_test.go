@@ -7,9 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-const (
-	testResourcesDir = "../testdata"
-)
+const testResourcesDir = "../testdata"
 
 func TestStringRuleListScanner(t *testing.T) {
 	ruleList := &StringRuleList{

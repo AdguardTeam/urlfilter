@@ -4,9 +4,7 @@ import (
 	"archive/zip"
 	"bufio"
 	"encoding/json"
-	"errors"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -15,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/AdguardTeam/golibs/errors"
 	"github.com/AdguardTeam/golibs/log"
 	"github.com/AdguardTeam/urlfilter/filterlist"
 	"github.com/AdguardTeam/urlfilter/rules"
@@ -215,7 +214,7 @@ func isSupportedURL(url string) bool {
 }
 
 func buildNetworkEngine(t *testing.T) *NetworkEngine {
-	filterBytes, err := ioutil.ReadFile(filterPath)
+	filterBytes, err := os.ReadFile(filterPath)
 	if err != nil {
 		t.Fatalf("cannot read %s", filterPath)
 	}

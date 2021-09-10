@@ -25,7 +25,7 @@ ENV = env\
 # Keep the line above blank.
 
 # Keep this target first, so that a naked make invocation triggers
-# a full build.
+# a full check.
 check: lint test
 
 lint:

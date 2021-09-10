@@ -2,7 +2,7 @@ package proxy
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"math"
 	"strings"
 
@@ -51,7 +51,7 @@ func (s *Server) filterHTML(session *Session) error {
 		return err
 	}
 
-	res.Body = ioutil.NopCloser(bytes.NewReader(b))
+	res.Body = io.NopCloser(bytes.NewReader(b))
 	res.Header.Del("Content-Encoding")
 	res.ContentLength = int64(len(b))
 	return nil

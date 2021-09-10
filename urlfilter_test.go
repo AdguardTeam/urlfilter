@@ -1,7 +1,7 @@
 package urlfilter
 
 import (
-	"io/ioutil"
+	"io"
 	"os"
 	"testing"
 
@@ -11,7 +11,7 @@ import (
 func TestMain(m *testing.M) {
 	// TODO(a.garipov): Refactor code and tests to not use the global
 	// mutable logger.
-	log.SetOutput(ioutil.Discard)
+	log.SetOutput(io.Discard)
 
 	os.Exit(m.Run())
 }
