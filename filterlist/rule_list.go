@@ -2,13 +2,13 @@ package filterlist
 
 import (
 	"bytes"
-	"errors"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 
+	"github.com/AdguardTeam/golibs/errors"
 	"github.com/AdguardTeam/urlfilter/rules"
 )
 
@@ -16,11 +16,9 @@ import (
 // So it makes sense to use 4KB.
 const readerBufferSize = 4 * 1024
 
-var (
-	// ErrRuleRetrieval signals that the rule cannot be retrieved by RuleList
-	// by the the specified index
-	ErrRuleRetrieval = errors.New("cannot retrieve the rule")
-)
+// ErrRuleRetrieval signals that the rule cannot be retrieved by RuleList
+// by the the specified index
+var ErrRuleRetrieval errors.Error = "cannot retrieve the rule"
 
 // RuleList represents a set of filtering rules
 type RuleList interface {

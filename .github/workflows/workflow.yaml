@@ -7,18 +7,16 @@ jobs:
   tests:
     runs-on:
       - ubuntu-latest
-    env:
-      GO111MODULE: "on"
 
     steps:
       - uses: actions/checkout@master
 
       - uses: actions/setup-go@v1
         with:
-          go-version: 1.14.x
+          go-version: 1.16.x
 
       - name: tests
-        run: go test -race -v -bench="." -coverprofile="coverage.txt" -covermode=atomic ./...
+        run: go test --bench='.' --coverprofile='./coverage.txt' --race -v ./...
 
       - name: Upload coverage
         uses: codecov/codecov-action@v1

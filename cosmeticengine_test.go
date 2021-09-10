@@ -2,11 +2,9 @@ package urlfilter
 
 import (
 	"encoding/json"
-	"log"
 	"testing"
 
 	"github.com/AdguardTeam/urlfilter/filterlist"
-
 	"github.com/stretchr/testify/assert"
 )
 
@@ -29,7 +27,8 @@ func TestElementHidingSimple(t *testing.T) {
 	if err != nil {
 		t.Fatalf("cannot marshal: %s", err)
 	}
-	log.Print(string(jsonString))
+
+	t.Logf("%s", jsonString)
 }
 
 func TestElementHidingNoDisabled(t *testing.T) {
@@ -50,7 +49,8 @@ func TestElementHidingNoDisabled(t *testing.T) {
 	if err != nil {
 		t.Fatalf("cannot marshal: %s", err)
 	}
-	log.Print(string(jsonString))
+
+	t.Logf("%s", jsonString)
 }
 
 func TestElementHidingNoGeneric(t *testing.T) {
@@ -70,7 +70,8 @@ func TestElementHidingNoGeneric(t *testing.T) {
 	if err != nil {
 		t.Fatalf("cannot marshal: %s", err)
 	}
-	log.Print(string(jsonString))
+
+	t.Logf("%s", jsonString)
 }
 
 func TestElementHidingNoCSS(t *testing.T) {
@@ -89,7 +90,8 @@ func TestElementHidingNoCSS(t *testing.T) {
 	if err != nil {
 		t.Fatalf("cannot marshal: %s", err)
 	}
-	log.Print(string(jsonString))
+
+	t.Logf("%s", jsonString)
 }
 
 func buildCosmeticEngine(t *testing.T) *CosmeticEngine {

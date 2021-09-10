@@ -4,35 +4,36 @@ import (
 	"archive/zip"
 	"bufio"
 	"encoding/json"
-	"errors"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
 	"runtime/debug"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/AdguardTeam/golibs/errors"
 	"github.com/AdguardTeam/golibs/log"
 	"github.com/AdguardTeam/urlfilter/filterlist"
 	"github.com/AdguardTeam/urlfilter/rules"
-	"github.com/shirou/gopsutil/process"
+	"github.com/shirou/gopsutil/v3/process"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const (
-	testResourcesDir = "test"
+	testResourcesDir = "testdata"
 	filterPath       = testResourcesDir + "/easylist.txt"
 	requestsPath     = testResourcesDir + "/requests.json"
 )
 
 type testRequest struct {
-	LineNumber  int
 	Line        string
 	URL         string `json:"url"`
 	FrameURL    string `json:"frameUrl"`
 	RequestType string `json:"cpt"`
+	LineNumber  int
 }
 
 func TestEmptyNetworkEngine(t *testing.T) {
@@ -125,8 +126,12 @@ func TestBenchNetworkEngine(t *testing.T) {
 		requests = append(requests, r)
 	}
 
-	start := getRSS()
-	log.Printf("RSS before loading rules - %d kB\n", start/1024)
+	startHeap, startRSS := alloc(t)
+	t.Logf(
+		"Allocated before loading rules (heap/RSS, kiB): %d/%d",
+		startHeap,
+		startRSS,
+	)
 
 	startParse := time.Now()
 	engine := buildNetworkEngine(t)
@@ -134,8 +139,14 @@ func TestBenchNetworkEngine(t *testing.T) {
 	defer engine.ruleStorage.Close()
 	log.Printf("Elapsed on parsing rules: %v", time.Since(startParse))
 
-	afterLoad := getRSS()
-	log.Printf("RSS after loading rules - %d kB (%d kB diff)\n", afterLoad/1024, (afterLoad-start)/1024)
+	loadHeap, loadRSS := alloc(t)
+	log.Printf(
+		"Allocated after loading rules (heap/RSS, kiB): %d/%d (%d/%d diff)",
+		loadHeap,
+		loadRSS,
+		loadHeap-startHeap,
+		loadRSS-startRSS,
+	)
 
 	totalMatches := 0
 	totalElapsed := time.Duration(0)
@@ -170,8 +181,14 @@ func TestBenchNetworkEngine(t *testing.T) {
 	log.Printf("Min per request: %v", minElapsedMatch)
 	log.Printf("Storage cache length: %d", engine.ruleStorage.GetCacheSize())
 
-	afterMatch := getRSS()
-	log.Printf("RSS after matching - %d kB (%d kB diff)\n", afterMatch/1024, (afterMatch-afterLoad)/1024)
+	matchHeap, matchRSS := alloc(t)
+	log.Printf(
+		"Allocated after matching (heap/RSS, kiB): %d/%d (%d/%d diff)",
+		matchHeap,
+		matchRSS,
+		matchHeap-loadHeap,
+		matchRSS-loadRSS,
+	)
 }
 
 // assumeRequestType converts string value from requests.json to RequestType
@@ -207,7 +224,7 @@ func isSupportedURL(url string) bool {
 }
 
 func buildNetworkEngine(t *testing.T) *NetworkEngine {
-	filterBytes, err := ioutil.ReadFile(filterPath)
+	filterBytes, err := os.ReadFile(filterPath)
 	if err != nil {
 		t.Fatalf("cannot read %s", filterPath)
 	}
@@ -318,8 +335,8 @@ func unzip(src, dest string) error {
 				return err
 			}
 			defer func() {
-				if err := f.Close(); err != nil {
-					panic(err)
+				if cerr := f.Close(); cerr != nil {
+					panic(cerr)
 				}
 			}()
 
@@ -341,14 +358,16 @@ func unzip(src, dest string) error {
 	return nil
 }
 
-func getRSS() uint64 {
-	proc, err := process.NewProcess(int32(os.Getpid()))
-	if err != nil {
-		panic(err)
-	}
-	minfo, err := proc.MemoryInfo()
-	if err != nil {
-		panic(err)
-	}
-	return minfo.RSS
+// alloc returns the heap and RSS memory sizes, in kibibytes.
+func alloc(t *testing.T) (heap, rss uint64) {
+	p, err := process.NewProcess(int32(os.Getpid()))
+	require.NoError(t, err)
+
+	mi, err := p.MemoryInfo()
+	require.NoError(t, err)
+
+	ms := &runtime.MemStats{}
+	runtime.ReadMemStats(ms)
+
+	return ms.Alloc / 1024, mi.RSS / 1024
 }

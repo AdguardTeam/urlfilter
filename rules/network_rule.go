@@ -1,11 +1,12 @@
 package rules
 
 import (
-	"errors"
 	"fmt"
 	"regexp"
 	"strings"
 	"sync"
+
+	"github.com/AdguardTeam/golibs/errors"
 )
 
 const (
@@ -16,8 +17,10 @@ const (
 	escapeCharacter  = '\\'
 )
 
-// ErrTooWideRule - returned if the rule matches all urls but has no domain, denyallow, client or ctag restrictions
-var ErrTooWideRule = errors.New("the rule is too wide, add domain, denyallow, client or ctag restrictions or make it more specific")
+// ErrTooWideRule is returned if the rule matches all urls but has no domain,
+// denyallow, client or ctag restrictions.
+var ErrTooWideRule errors.Error = "the rule is too wide, add domain, denyallow, client, " +
+	"or ctag restrictions or make it more specific"
 
 var (
 	reEscapedOptionsDelimiter = regexp.MustCompile(regexp.QuoteMeta("\\$"))

@@ -1,17 +1,15 @@
 module github.com/AdguardTeam/urlfilter
 
-go 1.14
+go 1.16
 
 require (
-	github.com/AdguardTeam/golibs v0.4.0
+	github.com/AdguardTeam/golibs v0.9.2
 	github.com/AdguardTeam/gomitmproxy v0.2.0
-	github.com/StackExchange/wmi v0.0.0-20190523213315-cbe66965904d // indirect
-	github.com/go-ole/go-ole v1.2.4 // indirect
 	github.com/jessevdk/go-flags v1.4.0
-	github.com/joomcode/errorx v1.0.1
-	github.com/miekg/dns v1.1.35
-	github.com/shirou/gopsutil v2.20.3+incompatible
-	github.com/stretchr/testify v1.5.1
-	golang.org/x/net v0.0.0-20200324143707-d3edc9973b7e
-	golang.org/x/sys v0.0.0-20200331124033-c3d80250170d // indirect
+	github.com/miekg/dns v1.1.43
+	github.com/shirou/gopsutil/v3 v3.21.8
+	github.com/stretchr/testify v1.7.0
+	golang.org/x/net v0.0.0-20210908191846-a5e095526f91
 )
+
+require golang.org/x/sys v0.0.0-20210909193231-528a39cd75f3 // indirect

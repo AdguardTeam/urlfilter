@@ -3,7 +3,6 @@ package proxy
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"text/template"
 
@@ -104,7 +103,7 @@ func (s *Server) buildContentScript(session *Session) *http.Response {
 			return proxyutil.NewErrorResponse(r, err)
 		}
 		contentLen = b.Len()
-		bodyReader = ioutil.NopCloser(b)
+		bodyReader = io.NopCloser(b)
 	} else {
 		bodyReader = bytes.NewReader(bodyBytes)
 	}

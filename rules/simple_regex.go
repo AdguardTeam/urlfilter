@@ -47,7 +47,7 @@ const (
 //
 //   . * + ? ^ $ { } ( ) | [ ] / \
 //
-// Make an excepttion for our own special characters of "*", "|", and "^" which
+// Make an exception for our own special characters of "*", "|", and "^" which
 // require additional processing.
 //
 // [MDN]: https://developer.mozilla.org/en/JavaScript/Reference/Global_Objects/regexp

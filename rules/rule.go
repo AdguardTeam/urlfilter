@@ -1,11 +1,11 @@
 package rules
 
 import (
-	"errors"
 	"fmt"
 	"sort"
 	"strings"
 
+	"github.com/AdguardTeam/golibs/errors"
 	"github.com/AdguardTeam/urlfilter/filterutil"
 	"github.com/miekg/dns"
 )
@@ -20,9 +20,9 @@ func (e *RuleSyntaxError) Error() string {
 	return fmt.Sprintf("syntax error: %s, rule: %s", e.msg, e.ruleText)
 }
 
-// ErrUnsupportedRule signals that this might be a valid rule type,
-// but it is not yet supported by this library
-var ErrUnsupportedRule = errors.New("this type of rules is unsupported")
+// ErrUnsupportedRule signals that this might be a valid rule type, but it is
+// not yet supported by this library
+var ErrUnsupportedRule errors.Error = "this type of rules is unsupported"
 
 // Rule is a base interface for all filtering rules
 type Rule interface {
@@ -87,7 +87,7 @@ func isComment(line string) bool {
 // sep is the separator character. for network rules it is '|', for cosmetic it is ','.
 func loadDomains(domains, sep string) (permittedDomains, restrictedDomains []string, err error) {
 	if domains == "" {
-		err = errors.New("no domains specified")
+		err = errors.Error("no domains specified")
 		return
 	}
 
@@ -120,7 +120,7 @@ func loadDomains(domains, sep string) (permittedDomains, restrictedDomains []str
 func strToRRType(s string) (rr RRType, err error) {
 	// TypeNone and TypeReserved are special cases in package dns.
 	if strings.EqualFold(s, "none") || strings.EqualFold(s, "reserved") {
-		return 0, errors.New("dns rr type is none or reserved")
+		return 0, errors.Error("dns rr type is none or reserved")
 	}
 
 	rr, ok := dns.StringToType[strings.ToUpper(s)]
@@ -134,7 +134,7 @@ func strToRRType(s string) (rr RRType, err error) {
 // loadDNSTypes loads the $dnstype modifier.  types is the list of types.
 func loadDNSTypes(types string) (permittedTypes, restrictedTypes []RRType, err error) {
 	if types == "" {
-		return nil, nil, errors.New("no dns record types specified")
+		return nil, nil, errors.Error("no dns record types specified")
 	}
 
 	list := strings.Split(types, "|")
@@ -182,7 +182,7 @@ func isValidCTag(s string) bool {
 // returns sorted arrays with permitted and restricted $ctag
 func loadCTags(value, sep string) (permittedCTags, restrictedCTags []string, err error) {
 	if value == "" {
-		err = errors.New("value is empty")
+		err = errors.Error("value is empty")
 		return
 	}
 
@@ -246,7 +246,7 @@ func loadCTags(value, sep string) (permittedCTags, restrictedCTags []string, err
 // Returns sorted arrays of permitted and restricted clients
 func loadClients(value string, sep byte) (permittedClients, restrictedClients *clients, err error) {
 	if value == "" {
-		err = errors.New("value is empty")
+		err = errors.Error("value is empty")
 		return
 	}
 

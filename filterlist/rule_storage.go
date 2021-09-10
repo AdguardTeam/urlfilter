@@ -4,10 +4,9 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/AdguardTeam/urlfilter/rules"
-
+	"github.com/AdguardTeam/golibs/errors"
 	"github.com/AdguardTeam/golibs/log"
-	"github.com/joomcode/errorx"
+	"github.com/AdguardTeam/urlfilter/rules"
 )
 
 // RuleStorage is an abstraction that combines several rule lists
@@ -147,7 +146,7 @@ func (s *RuleStorage) Close() error {
 	}
 
 	if len(errs) > 0 {
-		return errorx.DecorateMany("couldn't close all rule lists", errs...)
+		return errors.List("closing rule lists", errs...)
 	}
 
 	return nil
