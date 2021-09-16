@@ -39,7 +39,7 @@ type Session struct {
 	MediaType string // Mime media type
 	Charset   string // Response charset (if it's possible to parse it from content-type)
 
-	Result rules.MatchingResult // Filtering engine result
+	Result *rules.MatchingResult // Filtering engine result
 }
 
 // NewSession creates a new instance of the Session struct and initializes it.

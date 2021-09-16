@@ -2,6 +2,7 @@ package urlfilter
 
 import (
 	"github.com/AdguardTeam/urlfilter/filterlist"
+	"github.com/AdguardTeam/urlfilter/filterutil"
 	"github.com/AdguardTeam/urlfilter/rules"
 )
 
@@ -64,12 +65,7 @@ func NewDNSEngine(s *filterlist.RuleStorage) *DNSEngine {
 		RulesCount:   0,
 	}
 
-	networkEngine := &NetworkEngine{
-		ruleStorage:          s,
-		domainsLookupTable:   make(map[uint32][]int64),
-		shortcutsLookupTable: make(map[uint32][]int64, networkRulesCount),
-		shortcutsHistogram:   make(map[uint32]int),
-	}
+	networkEngine := NewNetworkEngineSkipStorageScan(s)
 
 	// Go through all rules in the storage and add them to the lookup tables
 	scanner := s.NewRuleStorageScanner()
@@ -80,7 +76,7 @@ func NewDNSEngine(s *filterlist.RuleStorage) *DNSEngine {
 			d.addRule(hostRule, idx)
 		} else if networkRule, ok := f.(*rules.NetworkRule); ok {
 			if networkRule.IsHostLevelNetworkRule() {
-				networkEngine.addRule(networkRule, idx)
+				networkEngine.AddRule(networkRule, idx)
 			}
 		}
 	}
@@ -97,7 +93,7 @@ func NewDNSEngine(s *filterlist.RuleStorage) *DNSEngine {
 // For instance:
 // 192.168.0.1 example.local
 // 2000::1 example.local
-func (d *DNSEngine) Match(hostname string) (DNSResult, bool) {
+func (d *DNSEngine) Match(hostname string) (*DNSResult, bool) {
 	return d.MatchRequest(DNSRequest{Hostname: hostname, ClientIP: "0.0.0.0"})
 }
 
@@ -109,7 +105,13 @@ func (d *DNSEngine) Match(hostname string) (DNSResult, bool) {
 // rewrite and other kinds of special network rules, so users who need
 // those will need to ignore the matched return parameter and instead
 // inspect the results of the corresponding DNSResult getters.
-func (d *DNSEngine) MatchRequest(dReq DNSRequest) (res DNSResult, matched bool) {
+//
+// TODO(ameshkov): return nil when there's no match. Currently, the logic is
+// flawed because it analyzes the DNSResult even when matched is false and
+// looks for $dnsrewrite rules.
+func (d *DNSEngine) MatchRequest(dReq DNSRequest) (res *DNSResult, matched bool) {
+	res = &DNSResult{}
+
 	if dReq.Hostname == "" {
 		return res, false
 	}
@@ -153,7 +155,7 @@ func (d *DNSEngine) MatchRequest(dReq DNSRequest) (res DNSResult, matched bool) 
 
 // matchLookupTable looks for matching rules in the d.lookupTable
 func (d *DNSEngine) matchLookupTable(hostname string) ([]rules.Rule, bool) {
-	hash := fastHash(hostname)
+	hash := filterutil.FastHash(hostname)
 	rulesIndexes, ok := d.lookupTable[hash]
 	if !ok {
 		return nil, false
@@ -173,7 +175,7 @@ func (d *DNSEngine) matchLookupTable(hostname string) ([]rules.Rule, bool) {
 // addRule adds rule to the index
 func (d *DNSEngine) addRule(hostRule *rules.HostRule, storageIdx int64) {
 	for _, hostname := range hostRule.Hostnames {
-		hash := fastHash(hostname)
+		hash := filterutil.FastHash(hostname)
 		rulesIndexes := d.lookupTable[hash]
 		d.lookupTable[hash] = append(rulesIndexes, storageIdx)
 	}

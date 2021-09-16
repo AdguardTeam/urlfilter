@@ -63,7 +63,7 @@ type MatchingResult struct {
 	ReplaceRules []*NetworkRule
 
 	// StealthRule - this is a whitelist rule that negates stealth mode features
-	// Note that the stealth rule can be be received from both rules and sourceRules
+	// Note that the stealth rule can be received from both rules and sourceRules
 	// https://kb.adguard.com/en/general/how-to-create-your-own-ad-filters#stealth-modifier
 	StealthRule *NetworkRule
 }
@@ -72,16 +72,16 @@ type MatchingResult struct {
 // rules - a set of rules matching the request URL
 // sourceRules - a set of rules matching the referrer
 // nolint:gocyclo
-func NewMatchingResult(rules, sourceRules []*NetworkRule) MatchingResult {
+func NewMatchingResult(rules, sourceRules []*NetworkRule) (result *MatchingResult) {
 	rules = removeBadfilterRules(rules)
 	rules = removeDNSRewriteRules(rules)
 
 	sourceRules = removeBadfilterRules(sourceRules)
 	sourceRules = removeDNSRewriteRules(sourceRules)
 
-	result := MatchingResult{}
+	result = &MatchingResult{}
 
-	// First of all, find document-level whitelist rules
+	// First, find document-level whitelist rules.
 	for _, rule := range sourceRules {
 		if rule.isDocumentWhitelistRule() {
 			if result.DocumentRule == nil || rule.IsHigherPriority(result.DocumentRule) {

@@ -4,9 +4,13 @@ import (
 	"strings"
 
 	"github.com/AdguardTeam/urlfilter/filterutil"
-
 	"golang.org/x/net/publicsuffix"
 )
+
+// maxURLLength limits the URL length by 4 KiB. It appears that there
+// can be URLs longer than a megabyte, and it makes no sense to go
+// through the whole URL.
+const maxURLLength = 4 * 1024
 
 // RequestType is the request types enumeration
 type RequestType uint32
@@ -84,6 +88,13 @@ type Request struct {
 
 // NewRequest creates a new instance of "Request" and populates it's fields
 func NewRequest(url, sourceURL string, requestType RequestType) *Request {
+	if len(url) > maxURLLength {
+		url = url[:maxURLLength]
+	}
+	if len(sourceURL) > maxURLLength {
+		sourceURL = sourceURL[:maxURLLength]
+	}
+
 	r := Request{
 		RequestType: requestType,
 

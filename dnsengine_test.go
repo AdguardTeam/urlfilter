@@ -7,13 +7,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
-
-	"github.com/AdguardTeam/golibs/log"
 	"github.com/AdguardTeam/urlfilter/filterlist"
 	"github.com/AdguardTeam/urlfilter/filterutil"
 	"github.com/miekg/dns"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -65,11 +63,11 @@ func TestBenchDNSEngine(t *testing.T) {
 	dnsEngine := NewDNSEngine(ruleStorage)
 	assert.NotNil(t, dnsEngine)
 
-	log.Printf("Elapsed on parsing rules: %v", time.Since(startParse))
-	log.Printf("Rules count - %v", dnsEngine.RulesCount)
+	t.Logf("Elapsed on parsing rules: %v", time.Since(startParse))
+	t.Logf("Rules count - %v", dnsEngine.RulesCount)
 
 	loadHeap, loadRSS := alloc(t)
-	log.Printf(
+	t.Logf(
 		"Allocated after loading rules (heap/RSS, kiB): %d/%d (%d/%d diff)",
 		loadHeap,
 		loadRSS,
@@ -84,7 +82,7 @@ func TestBenchDNSEngine(t *testing.T) {
 
 	for i, reqHostname := range testHostnames {
 		if i != 0 && i%10000 == 0 {
-			log.Printf("Processed %d requests", i)
+			t.Logf("Processed %d requests", i)
 		}
 
 		startMatch := time.Now()
@@ -109,15 +107,15 @@ func TestBenchDNSEngine(t *testing.T) {
 		}
 	}
 
-	log.Printf("Total matches: %d", totalMatches)
-	log.Printf("Total elapsed: %v", totalElapsed)
-	log.Printf("Average per request: %v", time.Duration(int64(totalElapsed)/int64(len(testHostnames))))
-	log.Printf("Max per request: %v", maxElapsedMatch)
-	log.Printf("Min per request: %v", minElapsedMatch)
-	log.Printf("Storage cache length: %d", ruleStorage.GetCacheSize())
+	t.Logf("Total matches: %d", totalMatches)
+	t.Logf("Total elapsed: %v", totalElapsed)
+	t.Logf("Average per request: %v", time.Duration(int64(totalElapsed)/int64(len(testHostnames))))
+	t.Logf("Max per request: %v", maxElapsedMatch)
+	t.Logf("Min per request: %v", minElapsedMatch)
+	t.Logf("Storage cache length: %d", ruleStorage.GetCacheSize())
 
 	matchHeap, matchRSS := alloc(t)
-	log.Printf(
+	t.Logf(
 		"Allocated after matching (heap/RSS, kiB): %d/%d (%d/%d diff)",
 		matchHeap,
 		matchRSS,
@@ -555,7 +553,7 @@ func TestDNSEngine_MatchRequest_dnsType(t *testing.T) {
 	})
 }
 
-func assertMatchRuleText(t *testing.T, rulesText string, rules DNSResult, ok bool) {
+func assertMatchRuleText(t *testing.T, rulesText string, rules *DNSResult, ok bool) {
 	assert.True(t, ok)
 	if ok {
 		assert.NotNil(t, rules.NetworkRule)

@@ -137,10 +137,10 @@ func TestBenchNetworkEngine(t *testing.T) {
 	engine := buildNetworkEngine(t)
 	assert.NotNil(t, engine)
 	defer engine.ruleStorage.Close()
-	log.Printf("Elapsed on parsing rules: %v", time.Since(startParse))
+	t.Logf("Elapsed on parsing rules: %v", time.Since(startParse))
 
 	loadHeap, loadRSS := alloc(t)
-	log.Printf(
+	t.Logf(
 		"Allocated after loading rules (heap/RSS, kiB): %d/%d (%d/%d diff)",
 		loadHeap,
 		loadRSS,
@@ -155,7 +155,7 @@ func TestBenchNetworkEngine(t *testing.T) {
 
 	for i, req := range requests {
 		if i != 0 && i%10000 == 0 {
-			log.Printf("Processed %d requests", i)
+			t.Logf("Processed %d requests", i)
 		}
 
 		startMatch := time.Now()
@@ -174,15 +174,15 @@ func TestBenchNetworkEngine(t *testing.T) {
 		}
 	}
 
-	log.Printf("Total matches: %d", totalMatches)
-	log.Printf("Total elapsed: %v", totalElapsed)
-	log.Printf("Average per request: %v", time.Duration(int64(totalElapsed)/int64(len(requests))))
-	log.Printf("Max per request: %v", maxElapsedMatch)
-	log.Printf("Min per request: %v", minElapsedMatch)
-	log.Printf("Storage cache length: %d", engine.ruleStorage.GetCacheSize())
+	t.Logf("Total matches: %d", totalMatches)
+	t.Logf("Total elapsed: %v", totalElapsed)
+	t.Logf("Average per request: %v", time.Duration(int64(totalElapsed)/int64(len(requests))))
+	t.Logf("Max per request: %v", maxElapsedMatch)
+	t.Logf("Min per request: %v", minElapsedMatch)
+	t.Logf("Storage cache length: %d", engine.ruleStorage.GetCacheSize())
 
 	matchHeap, matchRSS := alloc(t)
-	log.Printf(
+	t.Logf(
 		"Allocated after matching (heap/RSS, kiB): %d/%d (%d/%d diff)",
 		matchHeap,
 		matchRSS,

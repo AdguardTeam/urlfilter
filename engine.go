@@ -21,7 +21,7 @@ func NewEngine(s *filterlist.RuleStorage) *Engine {
 
 // MatchRequest - matches the specified request against the filtering engine
 // and returns the matching result.
-func (e *Engine) MatchRequest(r *rules.Request) rules.MatchingResult {
+func (e *Engine) MatchRequest(r *rules.Request) (res *rules.MatchingResult) {
 	var networkRules []*rules.NetworkRule
 	var sourceRules []*rules.NetworkRule
 

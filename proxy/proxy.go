@@ -1,3 +1,5 @@
+// Package proxy implements a MITM proxy that uses urlfilter to filter content.
+// TODO(ameshkov): extract to a submodule
 package proxy
 
 import (
