@@ -145,6 +145,7 @@ func TestDNSEnginePriority(t *testing.T) {
 func TestDNSEngineMatchHostname(t *testing.T) {
 	rulesText := `||example.org^
 ||example2.org/*
+||example3.org|
 0.0.0.0 v4.com
 127.0.0.1 v4.com
 :: v6.com
@@ -155,35 +156,45 @@ func TestDNSEngineMatchHostname(t *testing.T) {
 `
 	ruleStorage := newTestRuleStorage(t, 1, rulesText)
 	dnsEngine := NewDNSEngine(ruleStorage)
-	assert.NotNil(t, dnsEngine)
+	require.NotNil(t, dnsEngine)
 
 	r, ok := dnsEngine.Match("example.org")
-	assert.True(t, ok)
-	assert.True(t, r.NetworkRule != nil)
+	require.True(t, ok)
+
+	assert.NotNil(t, r.NetworkRule)
 
 	r, ok = dnsEngine.Match("example2.org")
-	assert.True(t, ok)
-	assert.True(t, r.NetworkRule != nil)
+	require.True(t, ok)
+
+	assert.NotNil(t, r.NetworkRule)
+
+	r, ok = dnsEngine.Match("example3.org")
+	require.True(t, ok)
+
+	assert.NotNil(t, r.NetworkRule)
 
 	r, ok = dnsEngine.Match("v4.com")
-	assert.True(t, ok)
-	assert.True(t, len(r.HostRulesV4) == 2)
-	assert.True(t, r.HostRulesV4[0].IP.Equal(net.ParseIP("0.0.0.0")))
-	assert.True(t, r.HostRulesV4[1].IP.Equal(net.ParseIP("127.0.0.1")))
+	require.True(t, ok)
+	require.Len(t, r.HostRulesV4, 2)
+
+	assert.Equal(t, r.HostRulesV4[0].IP, net.ParseIP("0.0.0.0"))
+	assert.Equal(t, r.HostRulesV4[1].IP, net.ParseIP("127.0.0.1"))
 
 	r, ok = dnsEngine.Match("v6.com")
-	assert.True(t, ok)
-	assert.True(t, len(r.HostRulesV6) == 1)
-	assert.True(t, r.HostRulesV6[0].IP.Equal(net.ParseIP("::")))
+	require.True(t, ok)
+	require.Len(t, r.HostRulesV6, 1)
+
+	assert.Equal(t, r.HostRulesV6[0].IP, net.ParseIP("::"))
 
 	r, ok = dnsEngine.Match("v4and6.com")
-	assert.True(t, ok)
-	assert.True(t, len(r.HostRulesV4) == 2)
-	assert.True(t, len(r.HostRulesV6) == 2)
-	assert.True(t, r.HostRulesV4[0].IP.Equal(net.ParseIP("127.0.0.1")))
-	assert.True(t, r.HostRulesV4[1].IP.Equal(net.ParseIP("127.0.0.2")))
-	assert.True(t, r.HostRulesV6[0].IP.Equal(net.ParseIP("::1")))
-	assert.True(t, r.HostRulesV6[1].IP.Equal(net.ParseIP("::2")))
+	require.True(t, ok)
+	require.Len(t, r.HostRulesV4, 2)
+	require.Len(t, r.HostRulesV6, 2)
+
+	assert.Equal(t, r.HostRulesV4[0].IP, net.ParseIP("127.0.0.1"))
+	assert.Equal(t, r.HostRulesV4[1].IP, net.ParseIP("127.0.0.2"))
+	assert.Equal(t, r.HostRulesV6[0].IP, net.ParseIP("::1"))
+	assert.Equal(t, r.HostRulesV6[1].IP, net.ParseIP("::2"))
 
 	_, ok = dnsEngine.Match("example.net")
 	assert.False(t, ok)

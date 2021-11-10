@@ -79,28 +79,23 @@ func patternToRegexp(pattern string) string {
 		return pattern[1 : len(pattern)-1]
 	}
 
-	// example.org/* -> example.org^
-	if strings.HasSuffix(pattern, "/*") {
-		pattern = pattern[:len(pattern)-len("/*")] + "^"
-	}
-
 	// Escape special characters.
 	regex := specialCharReplacer.Replace(pattern)
 
 	// Now escape "|" characters but avoid escaping them in the special places
 	if strings.HasPrefix(regex, MaskStartURL) {
 		regex = regex[:len(MaskStartURL)] +
-			strings.Replace(regex[len(MaskStartURL):len(regex)-1], MaskPipe, "\\"+MaskPipe, -1) +
+			strings.ReplaceAll(regex[len(MaskStartURL):len(regex)-1], MaskPipe, "\\"+MaskPipe) +
 			regex[len(regex)-1:]
 	} else {
 		regex = regex[:len(MaskPipe)] +
-			strings.Replace(regex[len(MaskPipe):len(regex)-1], MaskPipe, "\\"+MaskPipe, -1) +
+			strings.ReplaceAll(regex[len(MaskPipe):len(regex)-1], MaskPipe, "\\"+MaskPipe) +
 			regex[len(regex)-1:]
 	}
 
 	// Replace special URL masks
-	regex = strings.Replace(regex, MaskAnyCharacter, RegexAnyCharacter, -1)
-	regex = strings.Replace(regex, MaskSeparator, RegexSeparator, -1)
+	regex = strings.ReplaceAll(regex, MaskAnyCharacter, RegexAnyCharacter)
+	regex = strings.ReplaceAll(regex, MaskSeparator, RegexSeparator)
 
 	// Replace start URL and pipes
 	if strings.HasPrefix(regex, MaskStartURL) {

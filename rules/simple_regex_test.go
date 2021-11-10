@@ -7,15 +7,28 @@ import (
 )
 
 func TestPatternToRegex(t *testing.T) {
-	regex := patternToRegexp("||example.org^")
-	expected := RegexStartURL + "example\\.org" + RegexSeparator
-	assert.Equal(t, expected, regex)
+	testCases := []struct {
+		name    string
+		pattern string
+		want    string
+	}{{
+		name:    "plain_url",
+		pattern: "||example.org^",
+		want:    RegexStartURL + "example\\.org" + RegexSeparator,
+	}, {
+		name:    "url_with_path",
+		pattern: "|https://example.org/[*]^",
+		want: RegexStartString + "https:\\/\\/example\\.org\\/\\[" + RegexAnyCharacter + "\\]" +
+			RegexSeparator,
+	}, {
+		name:    "url_without_path",
+		pattern: "|https://example.org|",
+		want:    RegexStartString + "https:\\/\\/example\\.org" + RegexEndString,
+	}}
 
-	regex = patternToRegexp("|https://example.org|")
-	expected = RegexStartString + "https:\\/\\/example\\.org" + RegexEndString
-	assert.Equal(t, expected, regex)
-
-	regex = patternToRegexp("|https://example.org/[*]^")
-	expected = RegexStartString + "https:\\/\\/example\\.org\\/\\[" + RegexAnyCharacter + "\\]" + RegexSeparator
-	assert.Equal(t, expected, regex)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, patternToRegexp(tc.pattern))
+		})
+	}
 }

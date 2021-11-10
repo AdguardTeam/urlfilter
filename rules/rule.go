@@ -33,12 +33,10 @@ type Rule interface {
 	GetFilterListID() int
 }
 
-// NewRule creates a new filtering rule from the specified line
-// It returns nil if the line is empty or if it is a comment
-func NewRule(line string, filterListID int) (Rule, error) {
-	line = strings.TrimSpace(line)
-
-	if line == "" || isComment(line) {
+// NewRule creates a new filtering rule from the specified line.  It returns nil
+// if the line is empty or if it is a comment.
+func NewRule(line string, filterListID int) (r Rule, err error) {
+	if line = strings.TrimSpace(line); line == "" || isComment(line) {
 		return nil, nil
 	}
 
@@ -46,8 +44,8 @@ func NewRule(line string, filterListID int) (Rule, error) {
 		return NewCosmeticRule(line, filterListID)
 	}
 
-	f, err := NewHostRule(line, filterListID)
-	if err == nil {
+	var f *HostRule
+	if f, err = NewHostRule(line, filterListID); err == nil {
 		return f, nil
 	}
 

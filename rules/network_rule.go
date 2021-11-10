@@ -143,14 +143,17 @@ type NetworkRule struct {
 }
 
 // NewNetworkRule parses the rule text and returns a filter rule
-func NewNetworkRule(ruleText string, filterListID int) (*NetworkRule, error) {
+func NewNetworkRule(ruleText string, filterListID int) (r *NetworkRule, err error) {
 	// split rule into pattern and options
-	pattern, options, whitelist, err := parseRuleText(ruleText)
+
+	var pattern, options string
+	var whitelist bool
+	pattern, options, whitelist, err = parseRuleText(ruleText)
 	if err != nil {
 		return nil, err
 	}
 
-	rule := NetworkRule{
+	r = &NetworkRule{
 		RuleText:     ruleText,
 		Whitelist:    whitelist,
 		FilterListID: filterListID,
@@ -158,29 +161,34 @@ func NewNetworkRule(ruleText string, filterListID int) (*NetworkRule, error) {
 	}
 
 	// parse options
-	err = rule.loadOptions(options)
+	err = r.loadOptions(options)
 	if err != nil {
 		return nil, err
+	}
+
+	// example.org/* -> example.org^
+	if strings.HasSuffix(r.pattern, "/*") {
+		r.pattern = r.pattern[:len(r.pattern)-len("/*")] + "^"
 	}
 
 	// validate rule
 	if pattern == MaskStartURL || pattern == MaskPipe ||
 		pattern == MaskAnyCharacter || pattern == "" ||
 		len(pattern) < 3 {
-		if len(rule.permittedDomains) == 0 &&
-			rule.permittedClients.Len() == 0 &&
-			len(rule.permittedClientTags) == 0 &&
-			len(rule.permittedDNSTypes) == 0 &&
-			len(rule.restrictedDNSTypes) == 0 &&
-			len(rule.denyAllowDomains) == 0 {
+		if len(r.permittedDomains) == 0 &&
+			r.permittedClients.Len() == 0 &&
+			len(r.permittedClientTags) == 0 &&
+			len(r.permittedDNSTypes) == 0 &&
+			len(r.restrictedDNSTypes) == 0 &&
+			len(r.denyAllowDomains) == 0 {
 			// Rule matches too much and does not have any domain, client or ctag restrictions
 			// We should not allow this kind of rules
 			return nil, ErrTooWideRule
 		}
 	}
 
-	rule.loadShortcut()
-	return &rule, nil
+	r.loadShortcut()
+	return r, nil
 }
 
 // Text returns the original rule text
@@ -199,45 +207,24 @@ func (f *NetworkRule) String() string {
 	return f.RuleText
 }
 
-// Match checks if this filtering rule matches the specified request
-func (f *NetworkRule) Match(r *Request) bool {
-	if !f.matchShortcut(r) {
+// Match checks if this filtering rule matches the specified request.
+func (f *NetworkRule) Match(r *Request) (ok bool) {
+	switch {
+	case
+		!f.matchShortcut(r),
+		f.IsOptionEnabled(OptionThirdParty) && !r.ThirdParty,
+		f.IsOptionDisabled(OptionThirdParty) && r.ThirdParty,
+		!f.matchRequestType(r.RequestType),
+		!f.matchRequestDomain(r.Hostname),
+		!f.matchSourceDomain(r.SourceHostname),
+		!f.matchDNSType(r.DNSType),
+		!f.matchClientTags(r.SortedClientTags),
+		!f.matchClient(r.ClientName, r.ClientIP),
+		!f.matchPattern(r):
 		return false
 	}
 
-	if f.IsOptionEnabled(OptionThirdParty) && !r.ThirdParty {
-		return false
-	}
-
-	if f.IsOptionDisabled(OptionThirdParty) && r.ThirdParty {
-		return false
-	}
-
-	if !f.matchRequestType(r.RequestType) {
-		return false
-	}
-
-	if !f.matchRequestDomain(r.Hostname) {
-		return false
-	}
-
-	if !f.matchSourceDomain(r.SourceHostname) {
-		return false
-	}
-
-	if !f.matchDNSType(r.DNSType) {
-		return false
-	}
-
-	if !f.matchClientTags(r.SortedClientTags) {
-		return false
-	}
-
-	if !f.matchClient(r.ClientName, r.ClientIP) {
-		return false
-	}
-
-	return f.matchPattern(r)
+	return true
 }
 
 // IsOptionEnabled returns true if the specified option is enabled
@@ -279,11 +266,8 @@ func (f *NetworkRule) IsHostLevelNetworkRule() bool {
 
 // IsRegexRule returns true if rule's pattern is a regular expression
 func (f *NetworkRule) IsRegexRule() bool {
-	if strings.HasPrefix(f.pattern, maskRegexRule) &&
-		strings.HasSuffix(f.pattern, maskRegexRule) {
-		return true
-	}
-	return false
+	return strings.HasPrefix(f.pattern, maskRegexRule) &&
+		strings.HasSuffix(f.pattern, maskRegexRule)
 }
 
 // IsGeneric returns true if the rule is considered "generic"
@@ -373,49 +357,21 @@ func (f *NetworkRule) IsHigherPriority(r *NetworkRule) bool {
 // negatesBadfilter only makes sense when the "f" rule has a `badfilter` modifier
 // it returns true if the "f" rule negates the specified "r" rule
 func (f *NetworkRule) negatesBadfilter(r *NetworkRule) bool {
-	if !f.IsOptionEnabled(OptionBadfilter) {
-		return false
-	}
-
-	if f.Whitelist != r.Whitelist {
-		return false
-	}
-
-	if f.pattern != r.pattern {
-		return false
-	}
-
-	if f.permittedRequestTypes != r.permittedRequestTypes {
-		return false
-	}
-
-	if f.restrictedRequestTypes != r.restrictedRequestTypes {
-		return false
-	}
-
-	if (f.enabledOptions ^ OptionBadfilter) != r.enabledOptions {
-		return false
-	}
-
-	if f.disabledOptions != r.disabledOptions {
-		return false
-	}
-
-	if !stringArraysEquals(f.permittedDomains, r.permittedDomains) {
-		return false
-	}
-
-	if !stringArraysEquals(f.restrictedDomains, r.restrictedDomains) {
-		return false
-	}
-
-	if !stringArraysEquals(f.permittedClientTags, r.permittedClientTags) ||
-		!stringArraysEquals(f.restrictedClientTags, r.restrictedClientTags) {
-		return false
-	}
-
-	if !f.permittedClients.Equal(r.permittedClients) ||
-		!f.restrictedClients.Equal(r.restrictedClients) {
+	switch {
+	case
+		!f.IsOptionEnabled(OptionBadfilter),
+		f.Whitelist != r.Whitelist,
+		f.pattern != r.pattern,
+		f.permittedRequestTypes != r.permittedRequestTypes,
+		f.restrictedRequestTypes != r.restrictedRequestTypes,
+		(f.enabledOptions ^ OptionBadfilter) != r.enabledOptions,
+		f.disabledOptions != r.disabledOptions,
+		!stringArraysEquals(f.permittedDomains, r.permittedDomains),
+		!stringArraysEquals(f.restrictedDomains, r.restrictedDomains),
+		!stringArraysEquals(f.permittedClientTags, r.permittedClientTags),
+		!stringArraysEquals(f.restrictedClientTags, r.restrictedClientTags),
+		!f.permittedClients.Equal(r.permittedClients),
+		!f.restrictedClients.Equal(r.restrictedClients):
 		return false
 	}
 
@@ -427,45 +383,54 @@ func (f *NetworkRule) negatesBadfilter(r *NetworkRule) bool {
 // of the page subrequests.
 // For instance, `@@||example.org^$urlblock` unblocks all sub-requests.
 func (f *NetworkRule) isDocumentWhitelistRule() bool {
-	if !f.Whitelist {
-		return false
+	return f.Whitelist && (f.IsOptionEnabled(OptionUrlblock) ||
+		f.IsOptionEnabled(OptionGenericblock))
+}
+
+func (f *NetworkRule) preparePattern() (res int) {
+	f.Lock()
+	defer f.Unlock()
+
+	switch {
+	case f.regex != nil:
+		return 1
+	case f.invalid:
+		return -1
+	default:
+		// Go on.
 	}
 
-	return f.IsOptionEnabled(OptionUrlblock) || f.IsOptionEnabled(OptionGenericblock)
+	pattern := patternToRegexp(f.pattern)
+	if pattern == RegexAnyCharacter {
+		return 0
+	}
+
+	if !f.IsOptionEnabled(OptionMatchCase) {
+		pattern = "(?i)" + pattern
+	}
+
+	var err error
+	if f.regex, err = regexp.Compile(pattern); err != nil {
+		f.invalid = true
+
+		return -1
+	}
+
+	return 1
 }
 
 // matchPattern uses the regex pattern to match the request URL
 func (f *NetworkRule) matchPattern(r *Request) bool {
-	f.Lock()
-	if f.regex == nil {
-		if f.invalid {
-			f.Unlock()
-			return false
-		}
-
-		pattern := patternToRegexp(f.pattern)
-		if pattern == RegexAnyCharacter {
-			f.Unlock()
-			return true
-		}
-
-		if !f.IsOptionEnabled(OptionMatchCase) {
-			pattern = "(?i)" + pattern
-		}
-
-		re, err := regexp.Compile(pattern)
-		if err != nil {
-			f.invalid = true
-			f.Unlock()
-			return false
-		}
-		f.regex = re
+	if res := f.preparePattern(); res == -1 {
+		return false
+	} else if res == 0 {
+		return true
 	}
-	f.Unlock()
 
 	if f.shouldMatchHostname(r) {
 		return f.regex.MatchString(r.Hostname)
 	}
+
 	return f.regex.MatchString(r.URL)
 }
 
@@ -916,27 +881,35 @@ func (f *NetworkRule) loadShortcut() {
 
 	// shortcut needs to be at least longer than 1 character
 	if len(shortcut) > 1 {
-		f.Shortcut = shortcut
+		f.Shortcut = strings.ToLower(shortcut)
 	}
 }
 
-// findShortcut searches for the longest substring of the pattern that
-// does not contain any special characters: *,^,|.
-func findShortcut(pattern string) string {
-	longest := ""
-	parts := strings.FieldsFunc(pattern, func(r rune) bool {
-		switch r {
-		case '*', '^', '|':
-			return true
+// findShortcut searches for the longest substring of the pattern that does not
+// contain any of the special characters which are:
+//
+//   *
+//   ^
+//   |
+//
+func findShortcut(pattern string) (shortcut string) {
+	for pattern != "" {
+		i := strings.IndexAny(pattern, "*^|")
+		if i == -1 {
+			if len(pattern) > len(shortcut) {
+				return pattern
+			}
+
+			break
 		}
-		return false
-	})
-	for _, part := range parts {
-		if len(part) > len(longest) {
-			longest = part
+
+		if i > len(shortcut) {
+			shortcut = pattern[:i]
 		}
+		pattern = pattern[i+1:]
 	}
-	return strings.ToLower(longest)
+
+	return shortcut
 }
 
 // findRegexpShortcut searches for a shortcut inside of a regexp pattern.
@@ -975,7 +948,7 @@ func findRegexpShortcut(pattern string) string {
 		}
 	}
 
-	return strings.ToLower(longest)
+	return longest
 }
 
 // parseRuleText splits the rule text in multiple parts:

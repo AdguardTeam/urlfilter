@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"net/url"
 	"strings"
 
 	"github.com/AdguardTeam/urlfilter/filterutil"
@@ -130,17 +131,21 @@ func NewRequest(url, sourceURL string, requestType RequestType) *Request {
 // NewRequestForHostname creates a new instance of "Request" for matching hostname.
 // It uses "http://" as a protocol and TypeDocument as a request type.
 func NewRequestForHostname(hostname string) *Request {
+	urlStr := (&url.URL{
+		Scheme: "http",
+		Host:   hostname,
+	}).String()
+
 	r := Request{
 		RequestType:       TypeDocument,
-		URL:               "http://" + hostname + "/",
-		URLLowerCase:      "http://" + hostname + "/",
+		URL:               urlStr,
+		URLLowerCase:      urlStr,
 		Hostname:          hostname,
 		ThirdParty:        false,
 		IsHostnameRequest: true,
 	}
 
-	domain, err := publicsuffix.EffectiveTLDPlusOne(r.Hostname)
-	if err == nil && domain != "" {
+	if domain, err := publicsuffix.EffectiveTLDPlusOne(r.Hostname); err == nil && domain != "" {
 		r.Domain = domain
 	} else {
 		r.Domain = r.Hostname
