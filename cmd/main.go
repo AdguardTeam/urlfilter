@@ -13,6 +13,7 @@ import (
 	"github.com/AdguardTeam/golibs/log"
 	"github.com/AdguardTeam/gomitmproxy"
 	"github.com/AdguardTeam/gomitmproxy/mitm"
+	"github.com/AdguardTeam/urlfilter/filterutil"
 	"github.com/AdguardTeam/urlfilter/proxy"
 	goFlags "github.com/jessevdk/go-flags"
 )
@@ -105,7 +106,7 @@ func run(options Options) {
 }
 
 func createServerConfig(options Options) proxy.Config {
-	listenIP := net.ParseIP(options.ListenAddr)
+	listenIP := filterutil.ParseIP(options.ListenAddr)
 	if listenIP == nil {
 		log.Fatalf("cannot parse %s", options.ListenAddr)
 	}

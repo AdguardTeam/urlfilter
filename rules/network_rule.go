@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/AdguardTeam/golibs/errors"
+	"github.com/AdguardTeam/urlfilter/filterutil"
 )
 
 const (
@@ -215,7 +216,7 @@ func (f *NetworkRule) Match(r *Request) (ok bool) {
 		f.IsOptionEnabled(OptionThirdParty) && !r.ThirdParty,
 		f.IsOptionDisabled(OptionThirdParty) && r.ThirdParty,
 		!f.matchRequestType(r.RequestType),
-		!f.matchRequestDomain(r.Hostname),
+		!f.matchRequestDomain(r.Hostname, r.IsHostnameRequest),
 		!f.matchSourceDomain(r.SourceHostname),
 		!f.matchDNSType(r.DNSType),
 		!f.matchClientTags(r.SortedClientTags),
@@ -474,25 +475,33 @@ func (f *NetworkRule) matchShortcut(r *Request) bool {
 }
 
 // matchRequestDomain checks if the filtering rule is allowed to match this
-// request domain, e.g. it checks it against the $denyallow modifier
-//
-// Please pay attention at how $denyallow works:  the rule will work if the
-// request hostname **does not** belong to $denyallow domains.
-// The idea is to allow rules that block anything EXCEPT FOR some domains.
-// For instance, if we have a website that we know to load a lot of
-// third-party crap, but some of the domains are crucial for this website,
-// we may want to add something like this:
-// `*$script,domain=example.org,denyallow=essentialdomain1.com|essentialdomain2.com`
-func (f *NetworkRule) matchRequestDomain(domain string) bool {
+// request domain, e.g. it checks it against the $denyallow modifier. Please,
+// pay attention at how $denyallow works:  the rule will work if the request
+// hostname **does not** belong to $denyallow domains.  The idea is to allow
+// rules that block anything EXCEPT FOR some domains.  For instance, if we have
+// a website that we know to load a lot of third-party crap, but some of the
+// domains are crucial for this website, we may want to add something like this:
+// "*$script,domain=example.org,denyallow=essential1.com|essential2.com".
+func (f *NetworkRule) matchRequestDomain(domain string, hostnameRequest bool) (ok bool) {
 	if len(f.denyAllowDomains) == 0 {
 		return true
+	}
+
+	// If this is a hostname request, we're probably dealing with DNS filtering.
+	// In this case, we should avoid matching IP addresses here since they can
+	// only come from CNAME filtering.  So regardless of whether it actually
+	// matches the "denyallow" list, we consider that it does not.
+	// Original issue: https://github.com/AdguardTeam/AdGuardHome/issues/3175.
+	if hostnameRequest && filterutil.ParseIP(domain) != nil {
+		return false
 	}
 
 	return !isDomainOrSubdomainOfAny(domain, f.denyAllowDomains)
 }
 
-// matchSourceDomain checks if the specified filtering rule is allowed on this domain
-// e.g. it checks the domain against what's specified in the $domain modifier
+// matchSourceDomain checks if the specified filtering rule is allowed on this
+// domain e.g. it checks the domain against what's specified in the $domain
+// modifier.
 func (f *NetworkRule) matchSourceDomain(domain string) bool {
 	if len(f.permittedDomains) == 0 && len(f.restrictedDomains) == 0 {
 		return true

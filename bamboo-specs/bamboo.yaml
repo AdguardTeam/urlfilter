@@ -1,29 +1,31 @@
 ---
-version: 2
-plan:
-  project-key: AGH
-  key: URLFLTSPECS
-  name: urlfilter - Build and run tests
-  dockerGo: golang:1.16
+'version': 2
+'plan':
+  'project-key': 'AGH'
+  'key': 'URLFLTSPECS'
+  'name': 'urlfilter - Build and run tests'
+'variables':
+  'dockerGo': 'golang:1.17.5'
+  'dockerLint': 'golangci/golangci-lint'
 
-stages:
-  - Test:
-      manual: 'false'
-      final: 'false'
-      jobs:
-        - Lint
-        - Test
+'stages':
+  - 'Test':
+      'manual': 'false'
+      'final': 'false'
+      'jobs':
+        - 'Lint'
+        - 'Test'
 
-Lint:
-  docker:
-    image: golangci/golangci-lint
-  key: LINT
-  tasks:
-    - checkout:
-        force-clean-build: 'false'
-    - script:
-        interpreter: SHELL
-        scripts:
+'Lint':
+  'docker':
+    'image': '${bamboo.dockerLint}'
+  'key': 'LINT'
+  'tasks':
+    - 'checkout':
+        'force-clean-build': 'false'
+    - 'script':
+        'interpreter': 'SHELL'
+        'scripts':
           - |-
             set -x
             set -e
@@ -34,23 +36,23 @@ Lint:
             # Run linter
             golangci-lint run
 
-  requirements:
-    - adg-docker: 'true'
+  'requirements':
+    - 'adg-docker': 'true'
 
 
-Test:
-  docker:
-    image: ${bamboo.dockerGo}
-    volumes:
-      ${system.GO_CACHE_DIR}: "${bamboo.cacheGo}"
-      ${system.GO_PKG_CACHE_DIR}: "${bamboo.cacheGoPkg}"
-  key: TEST
-  tasks:
-    - checkout:
-        force-clean-build: 'false'
-    - script:
-        interpreter: SHELL
-        scripts:
+'Test':
+  'docker':
+    'image': '${bamboo.dockerGo}'
+    'volumes':
+      '${system.GO_CACHE_DIR}': '${bamboo.cacheGo}'
+      '${system.GO_PKG_CACHE_DIR}': '${bamboo.cacheGoPkg}'
+  'key': 'TEST'
+  'tasks':
+    - 'checkout':
+        'force-clean-build': 'false'
+    - 'script':
+        'interpreter': SHELL
+        'scripts':
           - |-
             set -x
             set -e
@@ -60,22 +62,22 @@ Test:
 
             # Run tests
             go test -race -v -bench="." -coverprofile="coverage.txt" -covermode=atomic ./...
-  requirements:
-    - adg-docker: 'true'
+  'requirements':
+    - 'adg-docker': 'true'
 
-branches:
-  create: for-pull-request
-  delete:
-    after-deleted-days: '7'
-    after-inactive-days: '30'
-  integration:
-    push-on-success: 'false'
-    merge-from: urlfilter - Build and run tests
-  link-to-jira: 'true'
+'branches':
+  'create': 'for-pull-request'
+  'delete':
+    'after-deleted-days': '7'
+    'after-inactive-days': '30'
+  'integration':
+    'push-on-success': 'false'
+    'merge-from': 'urlfilter - Build and run tests'
+  'link-to-jira': 'true'
 
-notifications: []
+'notifications': [ ]
 
-labels: []
+'labels': [ ]
 
-other:
-  concurrent-build-plugin: system-default
+'other':
+  'concurrent-build-plugin': 'system-default'

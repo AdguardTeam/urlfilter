@@ -2,11 +2,11 @@ package rules
 
 import (
 	"fmt"
-	"net"
 	"strconv"
 	"strings"
 
 	"github.com/AdguardTeam/golibs/errors"
+	"github.com/AdguardTeam/urlfilter/filterutil"
 	"github.com/miekg/dns"
 )
 
@@ -144,7 +144,7 @@ func loadDNSRewriteShort(s string) (rewrite *DNSRewrite, err error) {
 		return nil, fmt.Errorf("unknown keyword: %q", s)
 	}
 
-	ip := net.ParseIP(s)
+	ip := filterutil.ParseIP(s)
 	if ip != nil {
 		if ip4 := ip.To4(); ip4 != nil {
 			return &DNSRewrite{
@@ -387,7 +387,7 @@ func svcbDNSRewriteRRHandler(rcode RCode, rr RRType, valStr string) (dnsr *DNSRe
 // handlers.
 var dnsRewriteRRHandlers = map[RRType]dnsRewriteRRHandler{
 	dns.TypeA: func(rcode RCode, rr RRType, valStr string) (dnsr *DNSRewrite, err error) {
-		ip := net.ParseIP(valStr)
+		ip := filterutil.ParseIP(valStr)
 		if ip4 := ip.To4(); ip4 == nil {
 			return nil, fmt.Errorf("invalid ipv4: %q", valStr)
 		}
@@ -400,7 +400,7 @@ var dnsRewriteRRHandlers = map[RRType]dnsRewriteRRHandler{
 	},
 
 	dns.TypeAAAA: func(rcode RCode, rr RRType, valStr string) (dnsr *DNSRewrite, err error) {
-		ip := net.ParseIP(valStr)
+		ip := filterutil.ParseIP(valStr)
 		if ip == nil {
 			return nil, fmt.Errorf("invalid ipv6: %q", valStr)
 		} else if ip4 := ip.To4(); ip4 != nil {

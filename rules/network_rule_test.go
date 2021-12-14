@@ -388,12 +388,13 @@ func TestNetworkRule_DomainRestrictions(t *testing.T) {
 
 func TestNetworkRule_Denyallow(t *testing.T) {
 	testCases := []struct {
-		testName   string
-		ruleText   string
-		requestURL string
-		sourceURL  string
-		fail       bool
-		match      bool
+		testName           string
+		ruleText           string
+		requestURL         string
+		sourceURL          string
+		requestForHostname bool
+		fail               bool
+		match              bool
 	}{
 		{
 			testName: "denyallow_invalid_inversion",
@@ -463,6 +464,14 @@ func TestNetworkRule_Denyallow(t *testing.T) {
 			fail:       false,
 			match:      false,
 		},
+		{
+			testName:           "denyallow_does_not_match_ips",
+			ruleText:           "*$denyallow=com",
+			requestURL:         "https://192.168.1.1/",
+			requestForHostname: true,
+			fail:               false,
+			match:              false,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -475,6 +484,7 @@ func TestNetworkRule_Denyallow(t *testing.T) {
 			require.NoError(t, err)
 
 			r := NewRequest(tc.requestURL, tc.sourceURL, TypeScript)
+			r.IsHostnameRequest = tc.requestForHostname
 			require.Equal(t, tc.match, f.Match(r))
 		})
 	}

@@ -74,7 +74,7 @@ func NewHostRule(ruleText string, filterListID int) (*HostRule, error) {
 		h.IP = net.IPv4(0, 0, 0, 0)
 
 	} else {
-		h.IP = net.ParseIP(first)
+		h.IP = filterutil.ParseIP(first)
 		if h.IP == nil {
 			return nil, &RuleSyntaxError{msg: "cannot parse IP", ruleText: ruleText}
 		}

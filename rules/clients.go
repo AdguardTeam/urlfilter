@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"net"
 	"sort"
+
+	"github.com/AdguardTeam/urlfilter/filterutil"
 )
 
 // set representation for $client modifiers
@@ -59,7 +61,7 @@ func (c *clients) add(client string) {
 		return
 	}
 
-	ip := net.ParseIP(client)
+	ip := filterutil.ParseIP(client)
 	if ip != nil {
 		mask := net.CIDRMask(32, 32)
 		if ip.To4() == nil {
@@ -92,7 +94,7 @@ func (c *clients) containsAny(host, ipStr string) bool {
 		return true
 	}
 
-	ip := net.ParseIP(ipStr)
+	ip := filterutil.ParseIP(ipStr)
 	if ip != nil {
 		for _, subnet := range c.nets {
 			if subnet.Contains(ip) {
