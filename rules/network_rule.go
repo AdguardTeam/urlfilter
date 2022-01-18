@@ -161,9 +161,8 @@ func NewNetworkRule(ruleText string, filterListID int) (r *NetworkRule, err erro
 		pattern:      pattern,
 	}
 
-	// parse options
-	err = r.loadOptions(options)
-	if err != nil {
+	// Parse options.
+	if err = r.loadOptions(options); err != nil {
 		return nil, err
 	}
 
@@ -659,38 +658,39 @@ func (f *NetworkRule) setOptionEnabled(option NetworkRuleOption, enabled bool) e
 	return nil
 }
 
-// loadOptions loads all the filtering rule options
-// read the details on each here: https://kb.adguard.com/en/general/how-to-create-your-own-ad-filters#basic-rules
-func (f *NetworkRule) loadOptions(options string) error {
+// loadOptions parses and adds all the options to f.
+//
+// See https://kb.adguard.com/en/general/how-to-create-your-own-ad-filters#basic-rules.
+func (f *NetworkRule) loadOptions(options string) (err error) {
 	if options == "" {
 		return nil
 	}
 
-	optionsParts := splitWithEscapeCharacter(options, ',', '\\', false)
-	for i := 0; i < len(optionsParts); i++ {
-		option := optionsParts[i]
-		valueIndex := strings.Index(option, "=")
-		optionName := option
-		optionValue := ""
-		if valueIndex > 0 {
-			optionName = option[:valueIndex]
-			optionValue = option[valueIndex+1:]
+	for _, o := range splitWithEscapeCharacter(options, ',', '\\', false) {
+		if eqIdx := strings.IndexByte(o, '='); eqIdx > 0 {
+			err = f.loadOption(o[:eqIdx], o[eqIdx+1:])
+		} else {
+			err = f.loadOption(o, "")
 		}
-
-		err := f.loadOption(optionName, optionValue)
 		if err != nil {
 			return err
 		}
 	}
 
-	// Rules of these types can be applied to documents only
-	// $jsinject, $elemhide, $urlblock, $genericblock, $generichide and $content for whitelist rules.
-	// $popup - for url blocking
-	if f.IsOptionEnabled(OptionJsinject) || f.IsOptionEnabled(OptionElemhide) ||
-		f.IsOptionEnabled(OptionContent) || f.IsOptionEnabled(OptionUrlblock) ||
-		f.IsOptionEnabled(OptionGenericblock) || f.IsOptionEnabled(OptionGenerichide) ||
-		f.IsOptionEnabled(OptionExtension) || f.IsOptionEnabled(OptionPopup) {
+	switch {
+	case
+		f.IsOptionEnabled(OptionJsinject),
+		f.IsOptionEnabled(OptionElemhide),
+		f.IsOptionEnabled(OptionContent),
+		f.IsOptionEnabled(OptionUrlblock),
+		f.IsOptionEnabled(OptionGenericblock),
+		f.IsOptionEnabled(OptionGenerichide),
+		f.IsOptionEnabled(OptionExtension),
+		f.IsOptionEnabled(OptionPopup):
+		// Rules of these types can be applied to documents only.
 		f.permittedRequestTypes = TypeDocument
+	default:
+		// Go on.
 	}
 
 	return nil
@@ -960,53 +960,49 @@ func findRegexpShortcut(pattern string) string {
 	return longest
 }
 
-// parseRuleText splits the rule text in multiple parts:
-// pattern -- a basic rule pattern (which can be easily converted into a regex)
-// options -- a string with all rule options
-// whitelist -- indicates if rule is "whitelist" (e.g. it should unblock requests, not block them)
+// parseRuleText splits the rule's text into:
+//
+//   pattern, which is a basic rule pattern that can be easily converted into a regular expression;
+//   options, a string containing all the rule's options.
+//
+// whitelist is true if the rule should unblock requests instead of blocking them.
 func parseRuleText(ruleText string) (pattern, options string, whitelist bool, err error) {
-	startIndex := 0
+	if ruleText == "" || ruleText == maskWhiteList {
+		return "", "", whitelist, fmt.Errorf("the rule %s is too short", ruleText)
+	}
+
 	if strings.HasPrefix(ruleText, maskWhiteList) {
 		whitelist = true
-		startIndex = len(maskWhiteList)
+		ruleText = ruleText[len(maskWhiteList):]
 	}
 
-	if len(ruleText) <= startIndex {
-		err = fmt.Errorf("the rule is too short: %s", ruleText)
-		return
+	// Avoid parsing options inside of a regex rule.
+	if strings.HasPrefix(ruleText, maskRegexRule) &&
+		strings.HasSuffix(ruleText, maskRegexRule) &&
+		!strings.Contains(ruleText, replaceOption+"=") {
+		return ruleText, "", whitelist, nil
 	}
 
-	// Setting pattern to rule text (for the case of empty options)
-	pattern = ruleText[startIndex:]
+	hasEscaped := false
+	for idx := len(ruleText) - 2; idx >= 0; idx-- {
+		c := ruleText[idx]
+		if c != optionsDelimiter {
+			continue
+		} else if !hasEscaped && idx > 0 && ruleText[idx-1] == escapeCharacter {
+			hasEscaped = true
 
-	// Avoid parsing options inside of a regex rule
-	if strings.HasPrefix(pattern, maskRegexRule) &&
-		strings.HasSuffix(pattern, maskRegexRule) &&
-		!strings.Contains(pattern, replaceOption+"=") {
-		return
-	}
-
-	foundEscaped := false
-	for i := len(ruleText) - 2; i >= startIndex; i-- {
-		c := ruleText[i]
-
-		if c == optionsDelimiter {
-			if i > startIndex && ruleText[i-1] == escapeCharacter {
-				foundEscaped = true
-			} else {
-				pattern = ruleText[startIndex:i]
-				options = ruleText[i+1:]
-
-				if foundEscaped {
-					// Find and replace escaped options delimiter
-					options = reEscapedOptionsDelimiter.ReplaceAllString(options, string(optionsDelimiter))
-				}
-
-				// Options delimiter was found, exiting loop
-				break
-			}
+			continue
 		}
+
+		ruleText, options = ruleText[:idx], ruleText[idx+1:]
+		if hasEscaped {
+			options = reEscapedOptionsDelimiter.ReplaceAllString(options, string(optionsDelimiter))
+		}
+
+		// Exit the loop since the options delimiter has been found.
+		break
+
 	}
 
-	return
+	return ruleText, options, whitelist, nil
 }

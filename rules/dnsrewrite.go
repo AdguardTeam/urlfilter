@@ -131,17 +131,22 @@ func validateHost(host string) (err error) {
 // loadDNSRewritesShort loads the shorthand version of the $dnsrewrite modifier.
 func loadDNSRewriteShort(s string) (rewrite *DNSRewrite, err error) {
 	if s == "" {
-		// Return an empty DNSRewrite, because an empty string most
-		// probably means that this is a disabling allowlist case.
+		// Return an empty DNSRewrite, because an empty string most probably
+		// means that this is a disabling allowlist case.
 		return &DNSRewrite{}, nil
 	} else if allUppercaseASCII(s) {
-		if s == "REFUSED" {
+		switch s {
+		case
+			"NOERROR",
+			"SERVFAIL",
+			"NXDOMAIN",
+			"REFUSED":
 			return &DNSRewrite{
-				RCode: dns.RcodeRefused,
+				RCode: dns.StringToRcode[s],
 			}, nil
+		default:
+			return nil, fmt.Errorf("unknown keyword: %q", s)
 		}
-
-		return nil, fmt.Errorf("unknown keyword: %q", s)
 	}
 
 	ip := filterutil.ParseIP(s)
@@ -464,18 +469,20 @@ func loadDNSRewriteNormal(rcodeStr, rrStr, valStr string) (rewrite *DNSRewrite, 
 		return nil, fmt.Errorf("unknown rcode: %q", rcodeStr)
 	}
 
-	if rcode != dns.RcodeSuccess {
+	if rcode != dns.RcodeSuccess || (rrStr == "" && valStr == "") {
 		return &DNSRewrite{
 			RCode: rcode,
 		}, nil
 	}
 
-	rr, err := strToRRType(rrStr)
+	var rr RRType
+	rr, err = strToRRType(rrStr)
 	if err != nil {
 		return nil, err
 	}
 
-	handler, ok := dnsRewriteRRHandlers[rr]
+	var handler dnsRewriteRRHandler
+	handler, ok = dnsRewriteRRHandlers[rr]
 	if !ok {
 		return &DNSRewrite{
 			RCode:  rcode,

@@ -3,122 +3,237 @@ package rules
 import (
 	"testing"
 
+	"github.com/AdguardTeam/golibs/testutil"
 	"github.com/miekg/dns"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestNetworkRule_ParseRuleText(t *testing.T) {
-	pattern, options, whitelist, err := parseRuleText("||example.org^")
-	assert.Equal(t, "||example.org^", pattern)
-	assert.Equal(t, "", options)
-	assert.Equal(t, false, whitelist)
-	assert.Nil(t, err)
+	testCases := []struct {
+		wantWhitelist assert.BoolAssertionFunc
+		name          string
+		in            string
+		wantPattern   string
+		wantOptions   string
+	}{{
+		wantWhitelist: assert.False,
+		name:          "url",
+		in:            "||example.org^",
+		wantPattern:   "||example.org^",
+		wantOptions:   "",
+	}, {
+		wantWhitelist: assert.False,
+		name:          "url_with_options",
+		in:            "||example.org^$third-party",
+		wantPattern:   "||example.org^",
+		wantOptions:   "third-party",
+	}, {
+		wantWhitelist: assert.True,
+		name:          "whitelist_url_with_options",
+		in:            "@@||example.org^$third-party",
+		wantPattern:   "||example.org^",
+		wantOptions:   "third-party",
+	}, {
+		wantWhitelist: assert.False,
+		name:          "path_with_options",
+		in:            "||example.org/this$is$path$third-party",
+		wantPattern:   "||example.org/this$is$path",
+		wantOptions:   "third-party",
+	}, {
+		wantWhitelist: assert.True,
+		name:          "whitelist_path_with_options",
+		in:            "@@||example.org/this$is$path$third-party",
+		wantPattern:   "||example.org/this$is$path",
+		wantOptions:   "third-party",
+	}, {
+		wantWhitelist: assert.False,
+		name:          "regex",
+		in:            "/regex/",
+		wantPattern:   "/regex/",
+		wantOptions:   "",
+	}, {
+		wantWhitelist: assert.True,
+		name:          "whitelist_regex",
+		in:            "@@/regex/",
+		wantPattern:   "/regex/",
+		wantOptions:   "",
+	}, {
+		wantWhitelist: assert.False,
+		name:          "regex_with_options",
+		in:            "/regex/$replace=/test/test2/",
+		wantPattern:   "/regex/",
+		wantOptions:   "replace=/test/test2/",
+	}, {
+		wantWhitelist: assert.True,
+		name:          "whitelist_regex_with_options",
+		in:            "@@/regex/$replace=/test/test2/",
+		wantPattern:   "/regex/",
+		wantOptions:   "replace=/test/test2/",
+	}, {
+		wantWhitelist: assert.False,
+		name:          "escaped_dollar",
+		in:            "||example.org^$client='\\$-client'",
+		wantPattern:   "||example.org^",
+		wantOptions:   "client='$-client'",
+	}}
 
-	pattern, options, whitelist, err = parseRuleText("||example.org^$third-party")
-	assert.Equal(t, "||example.org^", pattern)
-	assert.Equal(t, "third-party", options)
-	assert.Equal(t, false, whitelist)
-	assert.Nil(t, err)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			pattern, options, whitelist, err := parseRuleText(tc.in)
+			require.NoError(t, err)
 
-	pattern, options, whitelist, err = parseRuleText("@@||example.org^$third-party")
-	assert.Equal(t, "||example.org^", pattern)
-	assert.Equal(t, "third-party", options)
-	assert.Equal(t, true, whitelist)
-	assert.Nil(t, err)
-
-	pattern, options, whitelist, err = parseRuleText("@@||example.org/this$is$path$third-party")
-	assert.Equal(t, "||example.org/this$is$path", pattern)
-	assert.Equal(t, "third-party", options)
-	assert.Equal(t, true, whitelist)
-	assert.Nil(t, err)
-
-	pattern, options, whitelist, err = parseRuleText("||example.org/this$is$path$third-party")
-	assert.Equal(t, "||example.org/this$is$path", pattern)
-	assert.Equal(t, "third-party", options)
-	assert.Equal(t, false, whitelist)
-	assert.Nil(t, err)
-
-	pattern, options, whitelist, err = parseRuleText("/regex/")
-	assert.Equal(t, "/regex/", pattern)
-	assert.Equal(t, "", options)
-	assert.Equal(t, false, whitelist)
-	assert.Nil(t, err)
-
-	pattern, options, whitelist, err = parseRuleText("@@/regex/")
-	assert.Equal(t, "/regex/", pattern)
-	assert.Equal(t, "", options)
-	assert.Equal(t, true, whitelist)
-	assert.Nil(t, err)
-
-	pattern, options, whitelist, err = parseRuleText("@@/regex/$replace=/test/test2/")
-	assert.Equal(t, "/regex/", pattern)
-	assert.Equal(t, "replace=/test/test2/", options)
-	assert.Equal(t, true, whitelist)
-	assert.Nil(t, err)
-
-	pattern, options, whitelist, err = parseRuleText("/regex/$replace=/test/test2/")
-	assert.Equal(t, "/regex/", pattern)
-	assert.Equal(t, "replace=/test/test2/", options)
-	assert.Equal(t, false, whitelist)
-	assert.Nil(t, err)
-
-	_, _, _, err = parseRuleText("@@")
-	assert.NotNil(t, err)
-}
-
-func checkModifier(t *testing.T, name string, option NetworkRuleOption, enabled bool) {
-	ruleText := "||example.org$" + name
-	if (option & OptionWhitelistOnly) == option {
-		ruleText = "@@" + ruleText
+			assert.Equal(t, tc.wantPattern, pattern)
+			assert.Equal(t, tc.wantOptions, options)
+			tc.wantWhitelist(t, whitelist)
+		})
 	}
 
-	f, err := NewNetworkRule(ruleText, 0)
-	assert.Nil(t, err)
-	assert.NotNil(t, f)
-
-	if enabled {
-		assert.True(t, f.IsOptionEnabled(option))
-	} else {
-		assert.True(t, f.IsOptionDisabled(option))
-	}
+	t.Run("bad_rule", func(t *testing.T) {
+		_, _, _, err := parseRuleText("@@")
+		testutil.AssertErrorMsg(t, "the rule @@ is too short", err)
+	})
 }
 
 func TestNetworkRule_ParseModifiers(t *testing.T) {
-	checkModifier(t, "important", OptionImportant, true)
-	checkModifier(t, "third-party", OptionThirdParty, true)
-	checkModifier(t, "~first-party", OptionThirdParty, true)
-	checkModifier(t, "first-party", OptionThirdParty, false)
-	checkModifier(t, "~third-party", OptionThirdParty, false)
-	checkModifier(t, "match-case", OptionMatchCase, true)
-	checkModifier(t, "~match-case", OptionMatchCase, false)
+	testCases := []struct {
+		name        string
+		option      NetworkRuleOption
+		wantEnabled bool
+	}{{
+		name:        "important",
+		option:      OptionImportant,
+		wantEnabled: true,
+	}, {
+		name:        "third-party",
+		option:      OptionThirdParty,
+		wantEnabled: true,
+	}, {
+		name:        "~first-party",
+		option:      OptionThirdParty,
+		wantEnabled: true,
+	}, {
+		name:        "first-party",
+		option:      OptionThirdParty,
+		wantEnabled: false,
+	}, {
+		name:        "~third-party",
+		option:      OptionThirdParty,
+		wantEnabled: false,
+	}, {
+		name:        "match-case",
+		option:      OptionMatchCase,
+		wantEnabled: true,
+	}, {
+		name:        "~match-case",
+		option:      OptionMatchCase,
+		wantEnabled: false,
+	}, {
+		name:        "elemhide",
+		option:      OptionElemhide,
+		wantEnabled: true,
+	}, {
+		name:        "generichide",
+		option:      OptionGenerichide,
+		wantEnabled: true,
+	}, {
+		name:        "genericblock",
+		option:      OptionGenericblock,
+		wantEnabled: true,
+	}, {
+		name:        "jsinject",
+		option:      OptionJsinject,
+		wantEnabled: true,
+	}, {
+		name:        "urlblock",
+		option:      OptionUrlblock,
+		wantEnabled: true,
+	}, {
+		name:        "content",
+		option:      OptionContent,
+		wantEnabled: true,
+	}, {
+		name:        "extension",
+		option:      OptionExtension,
+		wantEnabled: true,
+	}, {
+		name:        "document",
+		option:      OptionElemhide,
+		wantEnabled: true,
+	}, {
+		name:        "document",
+		option:      OptionJsinject,
+		wantEnabled: true,
+	}, {
+		name:        "document",
+		option:      OptionUrlblock,
+		wantEnabled: true,
+	}, {
+		name:        "document",
+		option:      OptionContent,
+		wantEnabled: true,
+	}, {
+		name:        "document",
+		option:      OptionExtension,
+		wantEnabled: true,
+	}, {
+		name:        "stealth",
+		option:      OptionStealth,
+		wantEnabled: true,
+	}, {
+		name:        "popup",
+		option:      OptionPopup,
+		wantEnabled: true,
+	}, {
+		name:        "empty",
+		option:      OptionEmpty,
+		wantEnabled: true,
+	}, {
+		name:        "mp4",
+		option:      OptionMp4,
+		wantEnabled: true,
+	}}
 
-	checkModifier(t, "elemhide", OptionElemhide, true)
-	checkModifier(t, "generichide", OptionGenerichide, true)
-	checkModifier(t, "genericblock", OptionGenericblock, true)
-	checkModifier(t, "jsinject", OptionJsinject, true)
-	checkModifier(t, "urlblock", OptionUrlblock, true)
-	checkModifier(t, "content", OptionContent, true)
-	checkModifier(t, "extension", OptionExtension, true)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			var ruleText string
+			if (tc.option & OptionWhitelistOnly) != 0 {
+				ruleText = "@@"
+			}
+			ruleText += "||example.org$" + tc.name
 
-	checkModifier(t, "document", OptionElemhide, true)
-	checkModifier(t, "document", OptionJsinject, true)
-	checkModifier(t, "document", OptionUrlblock, true)
-	checkModifier(t, "document", OptionContent, true)
-	checkModifier(t, "document", OptionExtension, true)
+			f, err := NewNetworkRule(ruleText, 0)
+			require.NoError(t, err)
+			require.NotNil(t, f)
 
-	checkModifier(t, "stealth", OptionStealth, true)
-
-	checkModifier(t, "popup", OptionPopup, true)
-	checkModifier(t, "empty", OptionEmpty, true)
-	checkModifier(t, "mp4", OptionMp4, true)
+			if tc.wantEnabled {
+				assert.True(t, f.IsOptionEnabled(tc.option))
+			} else {
+				assert.True(t, f.IsOptionDisabled(tc.option))
+			}
+		})
+	}
 }
 
 func TestNetworkRule_CountModifiers(t *testing.T) {
-	assert.Equal(t, 1, OptionImportant.Count())
-	assert.Equal(t, 2, (OptionImportant | OptionStealth).Count())
-	assert.Equal(t, 4, (OptionImportant | OptionStealth | OptionRedirect | OptionUrlblock).Count())
-	assert.Equal(t, 0, NetworkRuleOption(0).Count())
+	for _, tc := range []struct {
+		option  NetworkRuleOption
+		wantNum int
+	}{{
+		option:  OptionImportant,
+		wantNum: 1,
+	}, {
+		option:  OptionImportant | OptionStealth,
+		wantNum: 2,
+	}, {
+		option:  OptionImportant | OptionStealth | OptionRedirect | OptionUrlblock,
+		wantNum: 4,
+	}, {
+		option:  0,
+		wantNum: 0,
+	}} {
+		assert.Equal(t, tc.option.Count(), tc.wantNum)
+	}
 }
 
 func TestNetworkRule_DisablingExtensionModifier(t *testing.T) {
