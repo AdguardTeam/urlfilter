@@ -19,7 +19,9 @@ type DNSEngine struct {
 
 // DNSResult is the result of matching a DNS filtering request.
 type DNSResult struct {
-	// NetworkRule is the main network rule, if any.
+	// NetworkRule is the matched network rule, if any.  If it is nil,
+	// HostRulesV4 and HostRulesV6 may still contain matched hosts-file style
+	// rules.
 	NetworkRule *rules.NetworkRule
 
 	// HostRulesV4 and HostRulesV6 are the host rules with IPv4 and IPv6

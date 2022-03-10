@@ -21,6 +21,8 @@ func (res *DNSResult) DNSRewritesAll() (nrules []*rules.NetworkRule) {
 	return nrules
 }
 
+// removeNetworkRule changes nrules in-place to remove the element at index
+// i and returns the resulting slice.
 func removeNetworkRule(nrules []*rules.NetworkRule, i int) (flt []*rules.NetworkRule) {
 	// See https://github.com/golang/go/wiki/SliceTricks#delete.
 	//
@@ -28,6 +30,8 @@ func removeNetworkRule(nrules []*rules.NetworkRule, i int) (flt []*rules.Network
 	return append(nrules[:i], nrules[i+1:]...)
 }
 
+// removeMatchingException changes nrules in-place to remove the elements that
+// match DNS rewrite exception rule exc and returns the resulting slice.
 func removeMatchingException(nrules []*rules.NetworkRule, exc *rules.NetworkRule) (flt []*rules.NetworkRule) {
 	if exc.DNSRewrite == nil {
 		return nrules
