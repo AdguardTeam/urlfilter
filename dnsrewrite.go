@@ -5,14 +5,14 @@ import (
 	"github.com/miekg/dns"
 )
 
-// DNSRewritesAll returns all $dnsrewrite network rules.  To get the
-// rules with exception logic applied, use (*DNSResult).DNSRewrites.
+// DNSRewritesAll returns all $dnsrewrite network rules.  To get the rules with
+// exception logic applied, use (*DNSResult).DNSRewrites.
 func (res *DNSResult) DNSRewritesAll() (nrules []*rules.NetworkRule) {
 	if res == nil {
 		return nil
 	}
 
-	for _, nr := range res.networkRules {
+	for _, nr := range res.NetworkRules {
 		if nr.DNSRewrite != nil {
 			nrules = append(nrules, nr)
 		}
@@ -23,10 +23,12 @@ func (res *DNSResult) DNSRewritesAll() (nrules []*rules.NetworkRule) {
 
 func removeNetworkRule(nrules []*rules.NetworkRule, i int) (flt []*rules.NetworkRule) {
 	// See https://github.com/golang/go/wiki/SliceTricks#delete.
+	//
+	// TODO(a.garipov): Use golang.org/x/exp/slices in Go 1.18.
 	return append(nrules[:i], nrules[i+1:]...)
 }
 
-func (res *DNSResult) removeMatchingException(nrules []*rules.NetworkRule, exc *rules.NetworkRule) (flt []*rules.NetworkRule) {
+func removeMatchingException(nrules []*rules.NetworkRule, exc *rules.NetworkRule) (flt []*rules.NetworkRule) {
 	if exc.DNSRewrite == nil {
 		return nrules
 	}
@@ -41,8 +43,8 @@ func (res *DNSResult) removeMatchingException(nrules []*rules.NetworkRule, exc *
 		return nil
 	}
 
-	// Use the three-statement form as opposed to the range form,
-	// because we change the slice in-place.
+	// Use the three-statement form as opposed to the range form, because we
+	// change the slice in-place.
 	for i := 0; i < len(nrules); i++ {
 		nr := nrules[i]
 		nrdnsr := nr.DNSRewrite
@@ -68,8 +70,8 @@ func (res *DNSResult) removeMatchingException(nrules []*rules.NetworkRule, exc *
 	return nrules
 }
 
-// DNSRewrites returns $dnsrewrite network rules applying exception
-// logic.  For example, rules like:
+// DNSRewrites returns $dnsrewrite network rules applying exception logic.  For
+// example, rules like:
 //
 //   ||example.com^$dnsrewrite=127.0.0.1
 //   ||example.com^$dnsrewrite=127.0.0.2
@@ -77,7 +79,7 @@ func (res *DNSResult) removeMatchingException(nrules []*rules.NetworkRule, exc *
 //
 // Will result in example.com being rewritten to only return 127.0.0.2.
 //
-// To get all rules without applying exception logic, use
+// To get all DNS rewrite rules without applying any exception logic, use
 // (*DNSResult).DNSRewritesAll.
 func (res *DNSResult) DNSRewrites() (nrules []*rules.NetworkRule) {
 	// This is currently an O(m×n) algorithm, but the m--the number
@@ -90,13 +92,13 @@ func (res *DNSResult) DNSRewrites() (nrules []*rules.NetworkRule) {
 
 	nrules = res.DNSRewritesAll()
 
-	// Use the three-statement form as opposed to the range form,
-	// because we change the slice in-place.
+	// Use the three-statement form as opposed to the range form, because we
+	// change the slice in-place.
 	for i := 0; i < len(nrules); i++ {
 		nr := nrules[i]
 		if nr.Whitelist {
 			nrules = removeNetworkRule(nrules, i)
-			nrules = res.removeMatchingException(nrules, nr)
+			nrules = removeMatchingException(nrules, nr)
 		}
 	}
 

@@ -499,7 +499,7 @@ func TestDNSEngine_MatchRequest_dnsRewrite(t *testing.T) {
 	})
 
 	t.Run("https-type", func(t *testing.T) {
-		r := DNSRequest{
+		r := &DNSRequest{
 			Hostname: path.Base(t.Name()),
 			DNSType:  dns.TypeHTTPS,
 		}
@@ -513,7 +513,7 @@ func TestDNSEngine_MatchRequest_dnsRewrite(t *testing.T) {
 		nr := dnsr[0]
 		assert.Equal(t, dns.RcodeRefused, nr.DNSRewrite.RCode)
 
-		r = DNSRequest{
+		r = &DNSRequest{
 			Hostname: "https-type",
 			DNSType:  dns.TypeA,
 		}
