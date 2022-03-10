@@ -17,14 +17,21 @@ type DNSEngine struct {
 	rulesStorage  *filterlist.RuleStorage
 }
 
-// DNSResult - the return value of Match() function
+// DNSResult is the result of matching a DNS filtering request.
 type DNSResult struct {
-	NetworkRule *rules.NetworkRule // a network rule or nil
-	HostRulesV4 []*rules.HostRule  // host rules for IPv4 or nil
-	HostRulesV6 []*rules.HostRule  // host rules for IPv6 or nil
+	// NetworkRule is the matched network rule, if any.  If it is nil,
+	// HostRulesV4 and HostRulesV6 may still contain matched hosts-file style
+	// rules.
+	NetworkRule *rules.NetworkRule
 
-	// networkRules are all matched network rules.
-	networkRules []*rules.NetworkRule
+	// HostRulesV4 and HostRulesV6 are the host rules with IPv4 and IPv6
+	// addresses respectively.
+	HostRulesV4 []*rules.HostRule
+	HostRulesV6 []*rules.HostRule
+
+	// NetworkRules are all matched network rules.  These include unprocessed
+	// DNS rewrites, exception rules, and so on.
+	NetworkRules []*rules.NetworkRule
 }
 
 // DNSRequest represents a DNS query with associated metadata.
@@ -86,30 +93,29 @@ func NewDNSEngine(s *filterlist.RuleStorage) *DNSEngine {
 	return &d
 }
 
-// Match finds a matching rule for the specified hostname.
+// Match finds a matching rule for the specified hostname.  It returns true and
+// the list of rules found or false and nil.  A list of rules is returned when
+// there are multiple host rules matching the same domain, for example:
 //
-// It returns true and the list of rules found or false and nil.
-// The list of rules can be found when there're multiple host rules matching the same domain.
-// For instance:
-// 192.168.0.1 example.local
-// 2000::1 example.local
-func (d *DNSEngine) Match(hostname string) (*DNSResult, bool) {
-	return d.MatchRequest(DNSRequest{Hostname: hostname, ClientIP: "0.0.0.0"})
+//   192.168.0.1 example.local
+//   2000::1 example.local
+//
+func (d *DNSEngine) Match(hostname string) (res *DNSResult, matched bool) {
+	return d.MatchRequest(&DNSRequest{Hostname: hostname, ClientIP: "0.0.0.0"})
 }
 
-// MatchRequest matches the specified DNS request.  The return parameter
-// matched is true if the result has a basic network rule or some host
-// rules.
+// MatchRequest matches the specified DNS request.  The return parameter matched
+// is true if the result has a basic network rule or some host rules.
 //
-// For compatibility reasons, it is also false when there are DNS
-// rewrite and other kinds of special network rules, so users who need
-// those will need to ignore the matched return parameter and instead
-// inspect the results of the corresponding DNSResult getters.
+// For compatibility reasons, it is also false when there are DNS rewrite and
+// other kinds of special network rules, so users who need those will need to
+// ignore the matched return parameter and instead inspect the results of the
+// corresponding DNSResult getters.
 //
 // TODO(ameshkov): return nil when there's no match. Currently, the logic is
-// flawed because it analyzes the DNSResult even when matched is false and
-// looks for $dnsrewrite rules.
-func (d *DNSEngine) MatchRequest(dReq DNSRequest) (res *DNSResult, matched bool) {
+// flawed because it analyzes the DNSResult even when matched is false and looks
+// for $dnsrewrite rules.
+func (d *DNSEngine) MatchRequest(dReq *DNSRequest) (res *DNSResult, matched bool) {
 	res = &DNSResult{}
 
 	if dReq.Hostname == "" {
@@ -122,9 +128,9 @@ func (d *DNSEngine) MatchRequest(dReq DNSRequest) (res *DNSResult, matched bool)
 	r.ClientName = dReq.ClientName
 	r.DNSType = dReq.DNSType
 
-	res.networkRules = d.networkEngine.MatchAll(r)
+	res.NetworkRules = d.networkEngine.MatchAll(r)
 
-	result := rules.NewMatchingResult(res.networkRules, nil)
+	result := rules.NewMatchingResult(res.NetworkRules, nil)
 	resultRule := result.GetBasicResult()
 	if resultRule != nil {
 		// Network rules always have higher priority.
