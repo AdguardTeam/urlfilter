@@ -98,6 +98,9 @@ func TestNetworkRule_Match_dnsRewrite(t *testing.T) {
 			name: "svcb_dot",
 			in:   "||example.org^$dnsrewrite=noerror;svcb;30 . alpn=h3",
 		}, {
+			name: "svcb_dohpath",
+			in:   "||example.org^$dnsrewrite=noerror;svcb;30 example.net alpn=h3 dohpath=/dns-query{?dns}",
+		}, {
 			name: "https",
 			in:   "||example.org^$dnsrewrite=noerror;https;30 example.net",
 		}, {
