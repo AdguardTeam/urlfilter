@@ -216,6 +216,7 @@ func TestDNSEngine_MatchRequest_dnsRewrite(t *testing.T) {
 
 |https-record^$dnsrewrite=NOERROR;HTTPS;32 https-record-host alpn=h3
 |svcb-record^$dnsrewrite=NOERROR;SVCB;32 svcb-record-host alpn=h3
+|svcb-record-dohpath^$dnsrewrite=NOERROR;SVCB;32 svcb-record-host-dohpath alpn=h3 dohpath=/dns-query{?dns}
 
 |https-type^$dnstype=HTTPS,dnsrewrite=REFUSED
 
@@ -493,6 +494,29 @@ func TestDNSEngine_MatchRequest_dnsRewrite(t *testing.T) {
 		svcb := &rules.DNSSVCB{
 			Params:   p,
 			Target:   "svcb-record-host",
+			Priority: 32,
+		}
+		assert.Equal(t, svcb, nr.DNSRewrite.Value)
+	})
+
+	t.Run("svcb-record-dohpath", func(t *testing.T) {
+		res, ok := dnsEngine.Match(path.Base(t.Name()))
+		assert.False(t, ok)
+
+		dnsr := res.DNSRewritesAll()
+		require.Len(t, dnsr, 1)
+
+		nr := dnsr[0]
+		assert.Equal(t, dns.RcodeSuccess, nr.DNSRewrite.RCode)
+		assert.Equal(t, dns.TypeSVCB, nr.DNSRewrite.RRType)
+
+		p := map[string]string{
+			"alpn":    "h3",
+			"dohpath": "/dns-query{?dns}",
+		}
+		svcb := &rules.DNSSVCB{
+			Params:   p,
+			Target:   "svcb-record-host-dohpath",
 			Priority: 32,
 		}
 		assert.Equal(t, svcb, nr.DNSRewrite.Value)
