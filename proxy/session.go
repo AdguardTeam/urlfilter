@@ -78,6 +78,12 @@ func (s *Session) SetResponse(res *http.Response) {
 // req -- HTTP request
 // res -- HTTP response or null if we don't know it at the moment
 func assumeRequestType(req *http.Request, res *http.Response) rules.RequestType {
+	// Check for websocket handshakes
+	upgradeHeader := req.Header.Get("Upgrade")
+	if upgradeHeader == "websocket" {
+		return rules.TypeWebsocket
+	}
+
 	fetchDestHeader := req.Header.Get("Sec-Fetch-Dest")
 	requestType := assumeRequestTypeFromFetchDest(fetchDestHeader)
 	if requestType != rules.TypeOther {
