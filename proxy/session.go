@@ -78,6 +78,12 @@ func (s *Session) SetResponse(res *http.Response) {
 // req -- HTTP request
 // res -- HTTP response or null if we don't know it at the moment
 func assumeRequestType(req *http.Request, res *http.Response) rules.RequestType {
+	fetchDestHeader := req.Header.Get("Sec-Fetch-Dest")
+	requestType := assumeRequestTypeFromFetchDest(fetchDestHeader)
+	if requestType != rules.TypeOther {
+		return requestType
+	}
+
 	if res != nil {
 		contentType := res.Header.Get("Content-Type")
 		mediaType, _, _ := mime.ParseMediaType(contentType)
@@ -85,11 +91,45 @@ func assumeRequestType(req *http.Request, res *http.Response) rules.RequestType 
 	}
 
 	acceptHeader := req.Header.Get("Accept")
-	requestType := assumeRequestTypeFromMediaType(acceptHeader)
+	requestType = assumeRequestTypeFromMediaType(acceptHeader)
 
 	if requestType == rules.TypeOther {
 		// Try to get it from the URL
 		requestType = assumeRequestTypeFromURL(req.URL)
+	}
+
+	return requestType
+}
+
+var fetchDestValues = map[string]rules.RequestType{
+	"audio":         rules.TypeMedia,
+	"audioworklet":  rules.TypeScript,
+	"document":      rules.TypeDocument,
+	"embed":         rules.TypeOther,
+	"empty":         rules.TypeXmlhttprequest,
+	"font":          rules.TypeFont,
+	"frame":         rules.TypeSubdocument,
+	"iframe":        rules.TypeSubdocument,
+	"image":         rules.TypeImage,
+	"manifest":      rules.TypeOther,
+	"object":        rules.TypeObject,
+	"paintworklet":  rules.TypeScript,
+	"report":        rules.TypeOther,
+	"script":        rules.TypeScript,
+	"serviceworker": rules.TypeScript,
+	"sharedworker":  rules.TypeScript,
+	"style":         rules.TypeStylesheet,
+	"track":         rules.TypeOther,
+	"video":         rules.TypeMedia,
+	"worker":        rules.TypeScript,
+	"xslt":          rules.TypeOther,
+}
+
+// assumeRequestTypeFromFetchDest assumes the request type from the "Sec-Fetch-Dest" header
+func assumeRequestTypeFromFetchDest(fetchDest string) rules.RequestType {
+	requestType, ok := fetchDestValues[fetchDest]
+	if !ok {
+		return rules.TypeOther
 	}
 
 	return requestType
