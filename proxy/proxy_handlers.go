@@ -54,6 +54,11 @@ func (s *Server) onResponse(sess *gomitmproxy.Session) *http.Response {
 		return nil
 	}
 
+	if sess.Request().Method == http.MethodConnect {
+		// Do nothing for CONNECT requests
+		return nil
+	}
+
 	v, ok := sess.GetProp(sessionPropKey)
 	if !ok {
 		log.Error("urlfilter: id=%s: session not found", sess.ID())
