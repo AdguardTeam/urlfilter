@@ -78,7 +78,7 @@ func (s *Server) onResponse(sess *gomitmproxy.Session) *http.Response {
 		return newBlockedResponse(session, rule)
 	}
 
-	if session.Request.RequestType == rules.TypeDocument &&
+	if (session.Request.RequestType == rules.TypeDocument || session.Request.RequestType == rules.TypeSubdocument) &&
 		session.Result.GetCosmeticOption() != rules.CosmeticOptionNone {
 		err := s.filterHTML(session)
 		if err != nil {
