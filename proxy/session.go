@@ -84,6 +84,13 @@ func assumeRequestType(req *http.Request, res *http.Response) rules.RequestType 
 		return rules.TypeWebsocket
 	}
 
+	// Check for ping requests
+	// https://html.spec.whatwg.org/multipage/links.html#the-ping-headers
+	pingHeader := req.Header.Get("Ping-To")
+	if pingHeader != "" {
+		return rules.TypePing
+	}
+
 	fetchDestHeader := req.Header.Get("Sec-Fetch-Dest")
 	requestType := assumeRequestTypeFromFetchDest(fetchDestHeader)
 	if requestType != rules.TypeOther {
@@ -188,6 +195,8 @@ func assumeRequestTypeFromMediaType(mediaType string) rules.RequestType {
 	// $json
 	case strings.Index(mediaType, "application/json") == 0:
 		return rules.TypeXmlhttprequest
+	case strings.Index(mediaType, "text/ping") == 0:
+		return rules.TypePing
 	}
 
 	return rules.TypeOther
