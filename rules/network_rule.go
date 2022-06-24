@@ -866,6 +866,12 @@ func (f *NetworkRule) loadOption(name, value string) error {
 	case "~websocket":
 		f.setRequestType(TypeWebsocket, false)
 		return nil
+	case "ping":
+		f.setRequestType(TypePing, true)
+		return nil
+	case "~ping":
+		f.setRequestType(TypePing, false)
+		return nil
 	case "other":
 		f.setRequestType(TypeOther, true)
 		return nil
