@@ -114,6 +114,9 @@ func assumeRequestType(req *http.Request, res *http.Response) rules.RequestType 
 	return requestType
 }
 
+// fetchDestValues maps Sec-Fetch-Dest header values to the corresponding
+// resource types.  The list of the possible Sec-Fetch-Dest header values:
+// https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Sec-Fetch-Dest.
 var fetchDestValues = map[string]rules.RequestType{
 	"audio":         rules.TypeMedia,
 	"audioworklet":  rules.TypeScript,
@@ -138,7 +141,8 @@ var fetchDestValues = map[string]rules.RequestType{
 	"xslt":          rules.TypeOther,
 }
 
-// assumeRequestTypeFromFetchDest assumes the request type from the "Sec-Fetch-Dest" header
+// assumeRequestTypeFromFetchDest assumes the request type from the
+// "Sec-Fetch-Dest" header.
 func assumeRequestTypeFromFetchDest(fetchDest string) rules.RequestType {
 	requestType, ok := fetchDestValues[fetchDest]
 	if !ok {
