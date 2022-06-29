@@ -812,71 +812,38 @@ func (f *NetworkRule) loadOption(name, value string) error {
 		return f.setOptionEnabled(OptionMp4, true)
 
 	// Content type options
-	case "script":
-		f.setRequestType(TypeScript, true)
+	case "script", "~script":
+		f.setRequestType(TypeScript, name[0] != '~')
 		return nil
-	case "~script":
-		f.setRequestType(TypeScript, false)
+	case "stylesheet", "~stylesheet":
+		f.setRequestType(TypeStylesheet, name[0] != '~')
 		return nil
-	case "stylesheet":
-		f.setRequestType(TypeStylesheet, true)
+	case "subdocument", "~subdocument":
+		f.setRequestType(TypeSubdocument, name[0] != '~')
 		return nil
-	case "~stylesheet":
-		f.setRequestType(TypeStylesheet, false)
+	case "object", "~object":
+		f.setRequestType(TypeObject, name[0] != '~')
 		return nil
-	case "subdocument":
-		f.setRequestType(TypeSubdocument, true)
+	case "image", "~image":
+		f.setRequestType(TypeImage, name[0] != '~')
 		return nil
-	case "~subdocument":
-		f.setRequestType(TypeSubdocument, false)
+	case "xmlhttprequest", "~xmlhttprequest":
+		f.setRequestType(TypeXmlhttprequest, name[0] != '~')
 		return nil
-	case "object":
-		f.setRequestType(TypeObject, true)
+	case "media", "~media":
+		f.setRequestType(TypeMedia, name[0] != '~')
 		return nil
-	case "~object":
-		f.setRequestType(TypeObject, false)
+	case "font", "~font":
+		f.setRequestType(TypeFont, name[0] != '~')
 		return nil
-	case "image":
-		f.setRequestType(TypeImage, true)
+	case "websocket", "~websocket":
+		f.setRequestType(TypeWebsocket, name[0] != '~')
 		return nil
-	case "~image":
-		f.setRequestType(TypeImage, false)
+	case "ping", "~ping":
+		f.setRequestType(TypePing, name[0] != '~')
 		return nil
-	case "xmlhttprequest":
-		f.setRequestType(TypeXmlhttprequest, true)
-		return nil
-	case "~xmlhttprequest":
-		f.setRequestType(TypeXmlhttprequest, false)
-		return nil
-	case "media":
-		f.setRequestType(TypeMedia, true)
-		return nil
-	case "~media":
-		f.setRequestType(TypeMedia, false)
-		return nil
-	case "font":
-		f.setRequestType(TypeFont, true)
-		return nil
-	case "~font":
-		f.setRequestType(TypeFont, false)
-		return nil
-	case "websocket":
-		f.setRequestType(TypeWebsocket, true)
-		return nil
-	case "~websocket":
-		f.setRequestType(TypeWebsocket, false)
-		return nil
-	case "ping":
-		f.setRequestType(TypePing, true)
-		return nil
-	case "~ping":
-		f.setRequestType(TypePing, false)
-		return nil
-	case "other":
-		f.setRequestType(TypeOther, true)
-		return nil
-	case "~other":
-		f.setRequestType(TypeOther, false)
+	case "other", "~other":
+		f.setRequestType(TypeOther, name[0] != '~')
 		return nil
 	}
 

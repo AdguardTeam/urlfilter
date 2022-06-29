@@ -84,8 +84,8 @@ func (s *Server) onResponse(sess *gomitmproxy.Session) *http.Response {
 	}
 
 	// Filter HTML for main frames and iframes.
-	if (session.Request.RequestType == rules.TypeDocument ||
-		session.Request.RequestType == rules.TypeSubdocument) &&
+	rt := session.Request.RequestType
+	if (rt == rules.TypeDocument || rt == rules.TypeSubdocument) &&
 		session.Result.GetCosmeticOption() != rules.CosmeticOptionNone {
 		err := s.filterHTML(session)
 		if err != nil {

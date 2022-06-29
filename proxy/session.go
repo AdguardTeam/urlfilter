@@ -156,50 +156,51 @@ func assumeRequestTypeFromFetchDest(fetchDest string) rules.RequestType {
 func assumeRequestTypeFromMediaType(mediaType string) rules.RequestType {
 	switch {
 	// $document
-	case strings.Index(mediaType, "application/xhtml") == 0:
+	case strings.HasPrefix(mediaType, "application/xhtml"):
 		return rules.TypeDocument
 	// We should recognize m3u file as html (in terms of filtering), because m3u play list can contains refs to video ads.
 	// So if we recognize it as html we can filter it and in particular apply replace rules
 	// for more details see https://github.com/AdguardTeam/AdguardForWindows/issues/1428
 	// TODO: Change this -- save media type to session parameters
-	case strings.Index(mediaType, "audio/x-mpegURL") == 0:
+	case strings.HasPrefix(mediaType, "audio/x-mpegURL"):
 		return rules.TypeDocument
-	case strings.Index(mediaType, "text/html") == 0:
+	case strings.HasPrefix(mediaType, "text/html"):
 		return rules.TypeDocument
 	// $stylesheet
-	case strings.Index(mediaType, "text/css") == 0:
+	case strings.HasPrefix(mediaType, "text/css"):
 		return rules.TypeStylesheet
 	// $script
-	case strings.Index(mediaType, "application/javascript") == 0:
+	case strings.HasPrefix(mediaType, "application/javascript"):
 		return rules.TypeScript
-	case strings.Index(mediaType, "application/x-javascript") == 0:
+	case strings.HasPrefix(mediaType, "application/x-javascript"):
 		return rules.TypeScript
-	case strings.Index(mediaType, "text/javascript") == 0:
+	case strings.HasPrefix(mediaType, "text/javascript"):
 		return rules.TypeScript
 	// $image
-	case strings.Index(mediaType, "image/") == 0:
+	case strings.HasPrefix(mediaType, "image/"):
 		return rules.TypeImage
 	// $object
-	case strings.Index(mediaType, "application/x-shockwave-flash") == 0:
+	case strings.HasPrefix(mediaType, "application/x-shockwave-flash"):
 		return rules.TypeObject
 	// $font
-	case strings.Index(mediaType, "application/font") == 0:
+	case strings.HasPrefix(mediaType, "application/font"):
 		return rules.TypeFont
-	case strings.Index(mediaType, "application/vnd.ms-fontobject") == 0:
+	case strings.HasPrefix(mediaType, "application/vnd.ms-fontobject"):
 		return rules.TypeFont
-	case strings.Index(mediaType, "application/x-font-") == 0:
+	case strings.HasPrefix(mediaType, "application/x-font-"):
 		return rules.TypeFont
-	case strings.Index(mediaType, "font/") == 0:
+	case strings.HasPrefix(mediaType, "font/"):
 		return rules.TypeFont
 	// $media
-	case strings.Index(mediaType, "audio/") == 0:
+	case strings.HasPrefix(mediaType, "audio/"):
 		return rules.TypeMedia
-	case strings.Index(mediaType, "video/") == 0:
+	case strings.HasPrefix(mediaType, "video/"):
 		return rules.TypeMedia
 	// $json
-	case strings.Index(mediaType, "application/json") == 0:
+	case strings.HasPrefix(mediaType, "application/json"):
 		return rules.TypeXmlhttprequest
-	case strings.Index(mediaType, "text/ping") == 0:
+	// $ping
+	case strings.HasPrefix(mediaType, "text/ping"):
 		return rules.TypePing
 	}
 
