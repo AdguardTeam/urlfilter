@@ -289,6 +289,9 @@ func TestNetworkRule_ParseRequestTypeModifiers(t *testing.T) {
 	checkRequestType(t, "websocket", TypeWebsocket, true)
 	checkRequestType(t, "~websocket", TypeWebsocket, false)
 
+	checkRequestType(t, "ping", TypePing, true)
+	checkRequestType(t, "~ping", TypePing, false)
+
 	checkRequestType(t, "other", TypeOther, true)
 	checkRequestType(t, "~other", TypeOther, false)
 }

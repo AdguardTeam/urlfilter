@@ -37,6 +37,8 @@ const (
 	TypeFont
 	// TypeWebsocket (a websocket connection) $websocket
 	TypeWebsocket
+	// TypePing (navigator.sendBeacon() or ping attribute on links) $ping
+	TypePing
 	// TypeOther - any other request type
 	TypeOther
 )

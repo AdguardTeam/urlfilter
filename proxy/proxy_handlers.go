@@ -54,6 +54,11 @@ func (s *Server) onResponse(sess *gomitmproxy.Session) *http.Response {
 		return nil
 	}
 
+	if sess.Request().Method == http.MethodConnect {
+		// Do nothing for CONNECT requests
+		return nil
+	}
+
 	v, ok := sess.GetProp(sessionPropKey)
 	if !ok {
 		log.Error("urlfilter: id=%s: session not found", sess.ID())
@@ -78,7 +83,9 @@ func (s *Server) onResponse(sess *gomitmproxy.Session) *http.Response {
 		return newBlockedResponse(session, rule)
 	}
 
-	if session.Request.RequestType == rules.TypeDocument &&
+	// Filter HTML for main frames and iframes.
+	rt := session.Request.RequestType
+	if (rt == rules.TypeDocument || rt == rules.TypeSubdocument) &&
 		session.Result.GetCosmeticOption() != rules.CosmeticOptionNone {
 		err := s.filterHTML(session)
 		if err != nil {

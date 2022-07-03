@@ -78,6 +78,25 @@ func (s *Session) SetResponse(res *http.Response) {
 // req -- HTTP request
 // res -- HTTP response or null if we don't know it at the moment
 func assumeRequestType(req *http.Request, res *http.Response) rules.RequestType {
+	// Check for websocket handshakes
+	upgradeHeader := req.Header.Get("Upgrade")
+	if upgradeHeader == "websocket" {
+		return rules.TypeWebsocket
+	}
+
+	// Check for ping requests
+	// https://html.spec.whatwg.org/multipage/links.html#the-ping-headers
+	pingHeader := req.Header.Get("Ping-To")
+	if pingHeader != "" {
+		return rules.TypePing
+	}
+
+	fetchDestHeader := req.Header.Get("Sec-Fetch-Dest")
+	requestType := assumeRequestTypeFromFetchDest(fetchDestHeader)
+	if requestType != rules.TypeOther {
+		return requestType
+	}
+
 	if res != nil {
 		contentType := res.Header.Get("Content-Type")
 		mediaType, _, _ := mime.ParseMediaType(contentType)
@@ -85,7 +104,7 @@ func assumeRequestType(req *http.Request, res *http.Response) rules.RequestType 
 	}
 
 	acceptHeader := req.Header.Get("Accept")
-	requestType := assumeRequestTypeFromMediaType(acceptHeader)
+	requestType = assumeRequestTypeFromMediaType(acceptHeader)
 
 	if requestType == rules.TypeOther {
 		// Try to get it from the URL
@@ -95,53 +114,94 @@ func assumeRequestType(req *http.Request, res *http.Response) rules.RequestType 
 	return requestType
 }
 
+// fetchDestValues maps Sec-Fetch-Dest header values to the corresponding
+// resource types.  The list of the possible Sec-Fetch-Dest header values:
+// https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Sec-Fetch-Dest.
+var fetchDestValues = map[string]rules.RequestType{
+	"audio":         rules.TypeMedia,
+	"audioworklet":  rules.TypeScript,
+	"document":      rules.TypeDocument,
+	"embed":         rules.TypeOther,
+	"empty":         rules.TypeXmlhttprequest,
+	"font":          rules.TypeFont,
+	"frame":         rules.TypeSubdocument,
+	"iframe":        rules.TypeSubdocument,
+	"image":         rules.TypeImage,
+	"manifest":      rules.TypeOther,
+	"object":        rules.TypeObject,
+	"paintworklet":  rules.TypeScript,
+	"report":        rules.TypeOther,
+	"script":        rules.TypeScript,
+	"serviceworker": rules.TypeScript,
+	"sharedworker":  rules.TypeScript,
+	"style":         rules.TypeStylesheet,
+	"track":         rules.TypeOther,
+	"video":         rules.TypeMedia,
+	"worker":        rules.TypeScript,
+	"xslt":          rules.TypeOther,
+}
+
+// assumeRequestTypeFromFetchDest assumes the request type from the
+// "Sec-Fetch-Dest" header.
+func assumeRequestTypeFromFetchDest(fetchDest string) rules.RequestType {
+	requestType, ok := fetchDestValues[fetchDest]
+	if !ok {
+		return rules.TypeOther
+	}
+
+	return requestType
+}
+
 // assumeRequestTypeFromMediaType tries to detect the content type from the specified media type
 func assumeRequestTypeFromMediaType(mediaType string) rules.RequestType {
 	switch {
 	// $document
-	case strings.Index(mediaType, "application/xhtml") == 0:
+	case strings.HasPrefix(mediaType, "application/xhtml"):
 		return rules.TypeDocument
 	// We should recognize m3u file as html (in terms of filtering), because m3u play list can contains refs to video ads.
 	// So if we recognize it as html we can filter it and in particular apply replace rules
 	// for more details see https://github.com/AdguardTeam/AdguardForWindows/issues/1428
 	// TODO: Change this -- save media type to session parameters
-	case strings.Index(mediaType, "audio/x-mpegURL") == 0:
+	case strings.HasPrefix(mediaType, "audio/x-mpegURL"):
 		return rules.TypeDocument
-	case strings.Index(mediaType, "text/html") == 0:
+	case strings.HasPrefix(mediaType, "text/html"):
 		return rules.TypeDocument
 	// $stylesheet
-	case strings.Index(mediaType, "text/css") == 0:
+	case strings.HasPrefix(mediaType, "text/css"):
 		return rules.TypeStylesheet
 	// $script
-	case strings.Index(mediaType, "application/javascript") == 0:
+	case strings.HasPrefix(mediaType, "application/javascript"):
 		return rules.TypeScript
-	case strings.Index(mediaType, "application/x-javascript") == 0:
+	case strings.HasPrefix(mediaType, "application/x-javascript"):
 		return rules.TypeScript
-	case strings.Index(mediaType, "text/javascript") == 0:
+	case strings.HasPrefix(mediaType, "text/javascript"):
 		return rules.TypeScript
 	// $image
-	case strings.Index(mediaType, "image/") == 0:
+	case strings.HasPrefix(mediaType, "image/"):
 		return rules.TypeImage
 	// $object
-	case strings.Index(mediaType, "application/x-shockwave-flash") == 0:
+	case strings.HasPrefix(mediaType, "application/x-shockwave-flash"):
 		return rules.TypeObject
 	// $font
-	case strings.Index(mediaType, "application/font") == 0:
+	case strings.HasPrefix(mediaType, "application/font"):
 		return rules.TypeFont
-	case strings.Index(mediaType, "application/vnd.ms-fontobject") == 0:
+	case strings.HasPrefix(mediaType, "application/vnd.ms-fontobject"):
 		return rules.TypeFont
-	case strings.Index(mediaType, "application/x-font-") == 0:
+	case strings.HasPrefix(mediaType, "application/x-font-"):
 		return rules.TypeFont
-	case strings.Index(mediaType, "font/") == 0:
+	case strings.HasPrefix(mediaType, "font/"):
 		return rules.TypeFont
 	// $media
-	case strings.Index(mediaType, "audio/") == 0:
+	case strings.HasPrefix(mediaType, "audio/"):
 		return rules.TypeMedia
-	case strings.Index(mediaType, "video/") == 0:
+	case strings.HasPrefix(mediaType, "video/"):
 		return rules.TypeMedia
 	// $json
-	case strings.Index(mediaType, "application/json") == 0:
+	case strings.HasPrefix(mediaType, "application/json"):
 		return rules.TypeXmlhttprequest
+	// $ping
+	case strings.HasPrefix(mediaType, "text/ping"):
+		return rules.TypePing
 	}
 
 	return rules.TypeOther
