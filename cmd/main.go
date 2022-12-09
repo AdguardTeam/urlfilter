@@ -1,3 +1,5 @@
+// Package main is responsible for the command-line interface of the urlfilter
+// content filtering proxy.
 package main
 
 import (

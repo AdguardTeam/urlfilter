@@ -77,9 +77,9 @@ func removeMatchingException(nrules []*rules.NetworkRule, exc *rules.NetworkRule
 // DNSRewrites returns $dnsrewrite network rules applying exception logic.  For
 // example, rules like:
 //
-//   ||example.com^$dnsrewrite=127.0.0.1
-//   ||example.com^$dnsrewrite=127.0.0.2
-//   @@||example.com^$dnsrewrite=127.0.0.1
+//	||example.com^$dnsrewrite=127.0.0.1
+//	||example.com^$dnsrewrite=127.0.0.2
+//	@@||example.com^$dnsrewrite=127.0.0.1
 //
 // Will result in example.com being rewritten to only return 127.0.0.2.
 //

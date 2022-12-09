@@ -1,7 +1,6 @@
 package rules
 
 import (
-	"net/url"
 	"strings"
 
 	"github.com/AdguardTeam/urlfilter/filterutil"
@@ -109,15 +108,15 @@ func NewRequest(url, sourceURL string, requestType RequestType) *Request {
 		SourceHostname: filterutil.ExtractHostname(sourceURL),
 	}
 
-	domain, err := publicsuffix.EffectiveTLDPlusOne(r.Hostname)
-	if err == nil && domain != "" {
+	domain := effectiveTLDPlusOne(r.Hostname)
+	if domain != "" {
 		r.Domain = domain
 	} else {
 		r.Domain = r.Hostname
 	}
 
-	sourceDomain, err := publicsuffix.EffectiveTLDPlusOne(r.SourceHostname)
-	if err == nil && sourceDomain != "" {
+	sourceDomain := effectiveTLDPlusOne(r.SourceHostname)
+	if sourceDomain != "" {
 		r.SourceDomain = sourceDomain
 	} else {
 		r.SourceDomain = r.SourceHostname
@@ -130,15 +129,15 @@ func NewRequest(url, sourceURL string, requestType RequestType) *Request {
 	return &r
 }
 
-// NewRequestForHostname creates a new instance of "Request" for matching hostname.
-// It uses "http://" as a protocol and TypeDocument as a request type.
-func NewRequestForHostname(hostname string) *Request {
-	urlStr := (&url.URL{
-		Scheme: "http",
-		Host:   hostname,
-	}).String()
+// NewRequestForHostname creates a new instance of "Request" for matching a
+// hostname.  It uses "http://" as a protocol and TypeDocument as a request
+// type.
+func NewRequestForHostname(hostname string) (r *Request) {
+	// Do not use fmt.Sprintf or url.URL to achieve better performance.
+	// Hostname validation should be performed by the function caller.
+	urlStr := "http://" + hostname
 
-	r := Request{
+	r = &Request{
 		RequestType:       TypeDocument,
 		URL:               urlStr,
 		URLLowerCase:      urlStr,
@@ -147,11 +146,33 @@ func NewRequestForHostname(hostname string) *Request {
 		IsHostnameRequest: true,
 	}
 
-	if domain, err := publicsuffix.EffectiveTLDPlusOne(r.Hostname); err == nil && domain != "" {
+	if domain := effectiveTLDPlusOne(r.Hostname); domain != "" {
 		r.Domain = domain
 	} else {
 		r.Domain = r.Hostname
 	}
 
-	return &r
+	return r
+}
+
+// effectiveTLDPlusOne is a faster version of publicsuffix.EffectiveTLDPlusOne
+// that avoids using fmt.Errorf when the domain is less or equal the suffix.
+func effectiveTLDPlusOne(hostname string) (domain string) {
+	hostnameLen := len(hostname)
+	if hostnameLen < 1 {
+		return ""
+	}
+
+	if hostname[0] == '.' || hostname[hostnameLen-1] == '.' {
+		return ""
+	}
+
+	suffix, _ := publicsuffix.PublicSuffix(hostname)
+
+	i := hostnameLen - len(suffix) - 1
+	if i < 0 || hostname[i] != '.' {
+		return ""
+	}
+
+	return hostname[1+strings.LastIndex(hostname[:i], "."):]
 }

@@ -15,16 +15,17 @@ import (
 // Throughout the HTTP request lifetime, session data is updated with new information.
 //
 // There are two main stages of the HTTP request lifetime:
-// 1. Received the HTTP request headers.
-//    At this point, we can find all the rules matching the request using what we know.
-//    We assume the resource type by URL and "Accept" headers and look for matching rules.
-//    If there's a match, and the request should be blocked, we simply block it.
-//    Otherwise, we continue the HTTP request execution.
-// 2. Received the HTTP response headers.
-//    At this point we've got the content-type header so we know for sure what type
-//    of resource we're dealing with. We are looking for matching rules again, and
-//    update them.
-//    The possible outcomes are:
+//  1. Received the HTTP request headers.
+//     At this point, we can find all the rules matching the request using what we know.
+//     We assume the resource type by URL and "Accept" headers and look for matching rules.
+//     If there's a match, and the request should be blocked, we simply block it.
+//     Otherwise, we continue the HTTP request execution.
+//  2. Received the HTTP response headers.
+//     At this point we've got the content-type header so we know for sure what type
+//     of resource we're dealing with. We are looking for matching rules again, and
+//     update them.
+//     The possible outcomes are:
+//
 // 2.1. The request must be blocked.
 // 2.2. The response must be modified (with a $replace or a $csp rule, for instance).
 // 2.3. This is an HTML response so we need to filter the response body and apply cosmetic filters.

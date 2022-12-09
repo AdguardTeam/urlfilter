@@ -78,7 +78,9 @@ func TestBenchDNSEngine(t *testing.T) {
 	totalMatches := 0
 	totalElapsed := time.Duration(0)
 	minElapsedMatch := time.Hour
+	minElapsedHostname := ""
 	maxElapsedMatch := time.Duration(0)
+	maxElapsedHostname := ""
 
 	for i, reqHostname := range testHostnames {
 		if i != 0 && i%10000 == 0 {
@@ -91,9 +93,11 @@ func TestBenchDNSEngine(t *testing.T) {
 		totalElapsed += elapsedMatch
 		if elapsedMatch > maxElapsedMatch {
 			maxElapsedMatch = elapsedMatch
+			maxElapsedHostname = reqHostname
 		}
 		if elapsedMatch < minElapsedMatch {
 			minElapsedMatch = elapsedMatch
+			minElapsedHostname = reqHostname
 		}
 
 		if found {
@@ -110,8 +114,8 @@ func TestBenchDNSEngine(t *testing.T) {
 	t.Logf("Total matches: %d", totalMatches)
 	t.Logf("Total elapsed: %v", totalElapsed)
 	t.Logf("Average per request: %v", time.Duration(int64(totalElapsed)/int64(len(testHostnames))))
-	t.Logf("Max per request: %v", maxElapsedMatch)
-	t.Logf("Min per request: %v", minElapsedMatch)
+	t.Logf("Max per request: %v, on %s", maxElapsedMatch, maxElapsedHostname)
+	t.Logf("Min per request: %v, on %s", minElapsedMatch, minElapsedHostname)
 	t.Logf("Storage cache length: %d", ruleStorage.GetCacheSize())
 
 	matchHeap, matchRSS := alloc(t)

@@ -16,13 +16,13 @@ const (
 // ShortcutsTable is a table that relies on the rule "shortcuts" to quickly
 // find matching rules. Here's how it works:
 //
-//   1. We extract from the rule the longest substring without special
-//      characters from, this string is called a "shortcut".
-//   2. We take a part of it of length "shortcutLength" and put it to the
-//      internal hashmap.
-//   3. When we match a request, we take all substrings of length
-//      "shortcutsLength" from it and check if there're any rules in the
-//		hashmap.
+//  1. We extract from the rule the longest substring without special
+//     characters from, this string is called a "shortcut".
+//  2. We take a part of it of length "shortcutLength" and put it to the
+//     internal hashmap.
+//  3. When we match a request, we take all substrings of length
+//     "shortcutsLength" from it and check if there're any rules in the
+//     hashmap.
 //
 // Note that only the rules with a shortcut are eligible for this table.
 type ShortcutsTable struct {

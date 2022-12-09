@@ -45,7 +45,7 @@ const (
 
 // According to [MDN], the special characters are:
 //
-//   . * + ? ^ $ { } ( ) | [ ] / \
+//	. * + ? ^ $ { } ( ) | [ ] / \
 //
 // Make an exception for our own special characters of "*", "|", and "^" which
 // require additional processing.

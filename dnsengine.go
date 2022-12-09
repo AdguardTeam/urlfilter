@@ -97,9 +97,8 @@ func NewDNSEngine(s *filterlist.RuleStorage) *DNSEngine {
 // the list of rules found or false and nil.  A list of rules is returned when
 // there are multiple host rules matching the same domain, for example:
 //
-//   192.168.0.1 example.local
-//   2000::1 example.local
-//
+//	192.168.0.1 example.local
+//	2000::1 example.local
 func (d *DNSEngine) Match(hostname string) (res *DNSResult, matched bool) {
 	return d.MatchRequest(&DNSRequest{Hostname: hostname, ClientIP: "0.0.0.0"})
 }

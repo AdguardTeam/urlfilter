@@ -46,13 +46,16 @@ func ExtractHostname(url string) string {
 // Syntax: [label.]... label.label
 //
 // Each label is 1 to 63 characters long, and may contain:
-//   . ASCII letters a-z and A-Z
-//   . digits 0-9
-//   . hyphen ('-')
+//
+//	. ASCII letters a-z and A-Z
+//	. digits 0-9
+//	. hyphen ('-')
+//
 // . labels cannot start or end with hyphens (RFC 952)
 // . max length of ascii hostname including dots is 253 characters
 // . TLD is >=2 characters
 // . TLD is [a-zA-Z]+ or "xn--[a-zA-Z0-9]+"
+//
 //nolint:gocyclo
 func IsDomainName(name string) bool {
 	if len(name) > 253 {

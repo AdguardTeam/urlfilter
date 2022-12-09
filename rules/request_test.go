@@ -52,3 +52,37 @@ func TestCountRequestType(t *testing.T) {
 	assert.Equal(t, 1, TypeDocument.Count())
 	assert.Equal(t, 2, (TypeDocument | TypeOther).Count())
 }
+
+func TestEffectiveTLDPlusOne(t *testing.T) {
+	testCases := []struct {
+		name     string
+		hostname string
+		want     string
+	}{{
+		name:     "simple_domain",
+		hostname: "example.org",
+		want:     "example.org",
+	}, {
+		name:     "simple_subdomain",
+		hostname: "test.example.org",
+		want:     "example.org",
+	}, {
+		name:     "invalid_domain",
+		hostname: ".",
+		want:     "",
+	}, {
+		name:     "invalid_domain_prefix",
+		hostname: ".example.org",
+		want:     "",
+	}, {
+		name:     "invalid_domain_suffix",
+		hostname: "example.org.",
+		want:     "",
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, effectiveTLDPlusOne(tc.hostname))
+		})
+	}
+}

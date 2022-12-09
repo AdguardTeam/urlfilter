@@ -5,8 +5,8 @@
   'key': 'URLFLTSPECS'
   'name': 'urlfilter - Build and run tests'
 'variables':
-  'dockerGo': 'golang:1.17.5'
-  'dockerLint': 'golangci/golangci-lint'
+  'dockerGo': 'golang:1.18.9'
+  'dockerLint': 'golangci/golangci-lint:v1.50.0'
 
 'stages':
   - 'Test':

@@ -176,8 +176,11 @@ func NewNetworkRule(ruleText string, filterListID int) (r *NetworkRule, err erro
 		pattern == MaskAnyCharacter || pattern == "" ||
 		len(pattern) < 3 {
 		if len(r.permittedDomains) == 0 &&
+			len(r.restrictedDomains) == 0 &&
 			r.permittedClients.Len() == 0 &&
+			r.restrictedClients.Len() == 0 &&
 			len(r.permittedClientTags) == 0 &&
+			len(r.restrictedClientTags) == 0 &&
 			len(r.permittedDNSTypes) == 0 &&
 			len(r.restrictedDNSTypes) == 0 &&
 			len(r.denyAllowDomains) == 0 {
@@ -870,10 +873,9 @@ func (f *NetworkRule) loadShortcut() {
 // findShortcut searches for the longest substring of the pattern that does not
 // contain any of the special characters which are:
 //
-//   *
-//   ^
-//   |
-//
+//	*
+//	^
+//	|
 func findShortcut(pattern string) (shortcut string) {
 	for pattern != "" {
 		i := strings.IndexAny(pattern, "*^|")
@@ -935,8 +937,8 @@ func findRegexpShortcut(pattern string) string {
 
 // parseRuleText splits the rule's text into:
 //
-//   pattern, which is a basic rule pattern that can be easily converted into a regular expression;
-//   options, a string containing all the rule's options.
+//	pattern, which is a basic rule pattern that can be easily converted into a regular expression;
+//	options, a string containing all the rule's options.
 //
 // whitelist is true if the rule should unblock requests instead of blocking them.
 func parseRuleText(ruleText string) (pattern, options string, whitelist bool, err error) {
