@@ -241,6 +241,9 @@ func TestDNSEngine_MatchRequest_dnsRewrite(t *testing.T) {
 ||bad-shorthand^$dnsrewrite=A:NOERROR:127.0.0.1
 
 |srv-record^$dnsrewrite=NOERROR;SRV;30 60 8080 srv-record-host
+
+|wildcard-interference^$dnsrewrite=127.0.0.1
+|*-interference^$dnsrewrite=127.0.0.2
 `
 
 	ruleStorage := newTestRuleStorage(t, 1, rulesText)
@@ -657,5 +660,16 @@ func TestDNSEngine_MatchRequest_dnsRewrite(t *testing.T) {
 			Port:     8080,
 		}
 		assert.Equal(t, srv, nr.DNSRewrite.Value)
+	})
+
+	t.Run("wildcard-interference", func(t *testing.T) {
+		res, ok := dnsEngine.Match(path.Base(t.Name()))
+		assert.False(t, ok)
+
+		dnsrAll := res.DNSRewritesAll()
+		require.Len(t, dnsrAll, 2)
+
+		dnsr := res.DNSRewritesAll()
+		assert.Len(t, dnsr, 2)
 	})
 }

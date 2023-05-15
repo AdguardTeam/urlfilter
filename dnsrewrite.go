@@ -1,6 +1,8 @@
 package urlfilter
 
 import (
+	"sort"
+
 	"github.com/AdguardTeam/urlfilter/rules"
 	"github.com/miekg/dns"
 )
@@ -106,5 +108,29 @@ func (res *DNSResult) DNSRewrites() (nrules []*rules.NetworkRule) {
 		}
 	}
 
+	sort.Slice(nrules, func(i, j int) bool {
+		return len(nrules[i].Shortcut) > len(nrules[j].Shortcut)
+	})
+
+	for i, nr := range nrules {
+		if i > 0 && containsWildcard(nr) {
+			nrules = nrules[:i]
+
+			break
+		}
+	}
+
 	return nrules
+}
+
+func containsWildcard(nr *rules.NetworkRule) (ok bool) {
+	for _, c := range nr.RuleText {
+		if c == '*' {
+			return true
+		} else if c == '^' {
+			break
+		}
+	}
+
+	return false
 }
