@@ -72,6 +72,18 @@ func TestNetworkRule_ParseRuleText(t *testing.T) {
 		wantOptions:   "replace=/test/test2/",
 	}, {
 		wantWhitelist: assert.False,
+		name:          "empty_regex",
+		in:            "//",
+		wantPattern:   "//",
+		wantOptions:   "",
+	}, {
+		wantWhitelist: assert.False,
+		name:          "single_slash",
+		in:            "/",
+		wantPattern:   "/",
+		wantOptions:   "",
+	}, {
+		wantWhitelist: assert.False,
 		name:          "escaped_dollar",
 		in:            "||example.org^$client='\\$-client'",
 		wantPattern:   "||example.org^",
@@ -885,6 +897,15 @@ func TestNetworkRule_InvalidRule(t *testing.T) {
 	r, err = NewNetworkRule("$client=127.0.0.1", -1)
 	assert.NotNil(t, r)
 	assert.Nil(t, err)
+
+	// This one is valid because it has $client restriction
+	r, err = NewNetworkRule("/$client=127.0.0.1", -1)
+	require.NotNil(t, r)
+	require.NoError(t, err)
+
+	req := NewRequest("https://example.org/", "", TypeOther)
+	req.ClientIP = "127.0.0.1"
+	assert.True(t, r.Match(req))
 }
 
 func TestNetworkRule_BadfilterRule(t *testing.T) {

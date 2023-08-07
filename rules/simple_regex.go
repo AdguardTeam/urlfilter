@@ -75,7 +75,7 @@ func patternToRegexp(pattern string) string {
 		return RegexAnyCharacter
 	}
 
-	if strings.HasPrefix(pattern, "/") && strings.HasSuffix(pattern, "/") {
+	if isRegexPattern(pattern) {
 		return pattern[1 : len(pattern)-1]
 	}
 

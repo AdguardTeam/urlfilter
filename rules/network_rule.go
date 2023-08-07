@@ -267,10 +267,15 @@ func (f *NetworkRule) IsHostLevelNetworkRule() bool {
 	return true
 }
 
-// IsRegexRule returns true if rule's pattern is a regular expression
-func (f *NetworkRule) IsRegexRule() bool {
-	return strings.HasPrefix(f.pattern, maskRegexRule) &&
-		strings.HasSuffix(f.pattern, maskRegexRule)
+// isRegexPattern returns true if pattern may be treated as a regular expression
+// rule.
+func isRegexPattern(pattern string) bool {
+	return len(pattern) > 1 && pattern[0] == '/' && pattern[len(pattern)-1] == '/'
+}
+
+// IsRegexRule returns true if the rule is a regular expression rule
+func (f *NetworkRule) IsRegexRule() (ok bool) {
+	return isRegexPattern(f.pattern)
 }
 
 // IsGeneric returns true if the rule is considered "generic"

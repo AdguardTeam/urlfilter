@@ -568,6 +568,16 @@ func TestDNSEngine_MatchRequest_dnsType(t *testing.T) {
 	})
 }
 
+func TestSlash(t *testing.T) {
+	ruleStorage := newTestRuleStorage(t, 1, "/$client=127.0.0.1")
+	dnsEngine := NewDNSEngine(ruleStorage)
+	assert.NotNil(t, dnsEngine)
+
+	r, ok := dnsEngine.MatchRequest(&DNSRequest{Hostname: "example.org", ClientIP: "0.0.0.0"})
+	assert.False(t, ok)
+	assert.True(t, r.NetworkRule == nil && r.HostRulesV4 == nil && r.HostRulesV6 == nil)
+}
+
 func assertMatchRuleText(t *testing.T, rulesText string, rules *DNSResult, ok bool) {
 	assert.True(t, ok)
 	if ok {

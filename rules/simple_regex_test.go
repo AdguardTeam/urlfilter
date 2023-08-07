@@ -24,6 +24,14 @@ func TestPatternToRegex(t *testing.T) {
 		name:    "url_without_path",
 		pattern: "|https://example.org|",
 		want:    RegexStartString + "https:\\/\\/example\\.org" + RegexEndString,
+	}, {
+		name:    "empty_regexp",
+		pattern: "/",
+		want:    "\\/",
+	}, {
+		name:    "empty_regexp",
+		pattern: "//",
+		want:    "",
 	}}
 
 	for _, tc := range testCases {
