@@ -46,7 +46,7 @@ check: go-deps go-tools go-lint test
 
 init: ; git config core.hooksPath ./scripts/hooks
 
-ci: check go-bench
+ci: go-deps go-test go-bench
 
 test: go-test
 

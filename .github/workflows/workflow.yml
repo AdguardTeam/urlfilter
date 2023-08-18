@@ -6,52 +6,49 @@
 'on':
     'push':
         'branches':
-        - '*'
+          - '*'
         'tags':
-        - 'v*'
+          - 'v*'
     'pull_request':
 
 'jobs':
     'test':
-        'runs-on': '${{ matrix.os }}'
+        'runs-on': 'ubuntu-latest'
         'env':
             'GO111MODULE': 'on'
             'GOPROXY': 'https://goproxy.cn'
-        'strategy':
-            'fail-fast': false
-            'matrix':
-                'os':
-                - 'ubuntu-latest'
-                - 'macOS-latest'
-                - 'windows-latest'
         'steps':
-        - 'name': 'Checkout'
+          - 'name': 'Checkout'
             'uses': 'actions/checkout@v2'
             'with':
                 'fetch-depth': 0
-        - 'name': 'Set up Go'
+          - 'name': 'Set up Go'
             'uses': 'actions/setup-go@v3'
             'with':
                 'go-version': '${{ env.GO_VERSION }}'
-        - 'name': 'Set up Go modules cache'
+          - 'name': 'Set up Go'
+            'uses': 'actions/setup-go@v3'
+            'with':
+                'go-version': '${{ env.GO_VERSION }}'
+          - 'name': 'Set up Go modules cache'
             'uses': 'actions/cache@v2'
             'with':
                 'path': '~/go/pkg/mod'
                 'key': "${{ runner.os }}-go-${{ hashFiles('go.sum') }}"
                 'restore-keys': '${{ runner.os }}-go-'
-        - 'name': 'Run make ci'
+          - 'name': 'Run make ci'
             'shell': 'bash'
             'run': 'make VERBOSE=1 ci'
-        - 'name': 'Upload coverage'
+          - 'name': 'Upload coverage'
             'uses': 'codecov/codecov-action@v1'
-            'if': "success() && matrix.os == 'ubuntu-latest'"
+            'if': "success()"
             'with':
                 'token': '${{ secrets.CODECOV_TOKEN }}'
                 'file': './coverage.txt'
 
     'notify':
         'needs':
-        - 'test'
+          - 'test'
         # Secrets are not passed to workflows that are triggered by a pull request
         # from a fork.
         #
@@ -68,9 +65,9 @@
             }}
         'runs-on': 'ubuntu-latest'
         'steps':
-        - 'name': 'Conclusion'
+          - 'name': 'Conclusion'
             'uses': 'technote-space/workflow-conclusion-action@v1'
-        - 'name': 'Send Slack notif'
+          - 'name': 'Send Slack notif'
             'uses': '8398a7/action-slack@v3'
             'with':
                 'status': '${{ env.WORKFLOW_CONCLUSION }}'
