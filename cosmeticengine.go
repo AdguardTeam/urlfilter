@@ -120,8 +120,8 @@ func (e *CosmeticEngine) Match(hostname string, includeCSS, includeJS, includeGe
 // cosmeticLookupTable is a helper structure to speed up cosmetic rules matching
 type cosmeticLookupTable struct {
 	byHostname   map[string][]*rules.CosmeticRule // map with rules grouped by the permitted domains names
-	genericRules []*rules.CosmeticRule            // list of generic rules
 	whitelist    map[string][]*rules.CosmeticRule // map with whitelist rules. key is the rule content
+	genericRules []*rules.CosmeticRule            // list of generic rules
 }
 
 // newCosmeticLookupTable creates a new empty instance of the lookup table

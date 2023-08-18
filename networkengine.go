@@ -8,9 +8,6 @@ import (
 
 // NetworkEngine is the engine that supports quick search over network rules.
 type NetworkEngine struct {
-	// RulesCount is the count of rules added to the engine.
-	RulesCount int
-
 	// ruleStorage is a storage for the network rules.  We try to avoid keeping
 	// rules.NetworkRule structs in memory so instead of that we use their
 	// indexes and retrieve them from the storage when it's needed.
@@ -21,6 +18,9 @@ type NetworkEngine struct {
 	// important, we'll try to add rules to the faster table first. If it's not
 	// eligible for that lookup table, we'll then proceed to a slower one.
 	lookupTables []lookup.Table
+
+	// RulesCount is the count of rules added to the engine.
+	RulesCount int
 }
 
 // NewNetworkEngine builds an instance of the network engine. This method scans

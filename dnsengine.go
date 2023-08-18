@@ -11,10 +11,18 @@ import (
 // First, it looks over network rules and returns first rule found.
 // Then, if nothing found, it looks up the host rules.
 type DNSEngine struct {
-	RulesCount    int                // count of rules loaded to the engine
-	networkEngine *NetworkEngine     // networkEngine is constructed from the network rules
-	lookupTable   map[uint32][]int64 // map for hosts hashes mapped to the list of rule indexes
-	rulesStorage  *filterlist.RuleStorage
+	// lookupTable is a map for hosts hashes mapped to the list of rule indexes.
+	lookupTable map[uint32][]int64
+
+	// networkEngine is a network rules engine constructed from the network
+	// rules.
+	networkEngine *NetworkEngine
+
+	// rulesStorage is the storage of all rules.
+	rulesStorage *filterlist.RuleStorage
+
+	// RulesCount is the count of rules loaded to the engine.
+	RulesCount int
 }
 
 // DNSResult is the result of matching a DNS filtering request.
@@ -36,17 +44,23 @@ type DNSResult struct {
 
 // DNSRequest represents a DNS query with associated metadata.
 type DNSRequest struct {
-	Hostname string // Hostname (or IP address)
+	// Hostname is a hostname (or IP address).
+	Hostname string
+	// ClientIP is the address of client.
+	ClientIP string
+	// ClientName is the name of client.
+	ClientName string
 
-	Answer           bool     // If true - this hostname or IP is from a DNS response
-	SortedClientTags []string // Sorted list of client tags ($ctag)
-	ClientIP         string   // Client IP address
-	ClientName       string   // Client name
+	// SortedClientTags is the sorted list of client tags ($ctag).
+	SortedClientTags []string
 
 	// DNSType is the type of the resource record (RR) of a DNS request, for
 	// example "A" or "AAAA".  See package github.com/miekg/dns for all
 	// acceptable constants.
 	DNSType rules.RRType
+
+	// Answer is true if this hostname or IP is from a DNS response.
+	Answer bool
 }
 
 // NewDNSEngine parses the specified filter lists and returns a DNSEngine built from them.
@@ -58,9 +72,10 @@ func NewDNSEngine(s *filterlist.RuleStorage) *DNSEngine {
 	scan := s.NewRuleStorageScanner()
 	for scan.Scan() {
 		f, _ := scan.Rule()
-		if hostRule, ok := f.(*rules.HostRule); ok {
-			hostRulesCount += len(hostRule.Hostnames)
-		} else if _, ok := f.(*rules.NetworkRule); ok {
+		switch f := f.(type) {
+		case *rules.HostRule:
+			hostRulesCount += len(f.Hostnames)
+		case *rules.NetworkRule:
 			networkRulesCount++
 		}
 	}
@@ -78,18 +93,19 @@ func NewDNSEngine(s *filterlist.RuleStorage) *DNSEngine {
 	scanner := s.NewRuleStorageScanner()
 	for scanner.Scan() {
 		f, idx := scanner.Rule()
-
-		if hostRule, ok := f.(*rules.HostRule); ok {
-			d.addRule(hostRule, idx)
-		} else if networkRule, ok := f.(*rules.NetworkRule); ok {
-			if networkRule.IsHostLevelNetworkRule() {
-				networkEngine.AddRule(networkRule, idx)
+		switch f := f.(type) {
+		case *rules.HostRule:
+			d.addRule(f, idx)
+		case *rules.NetworkRule:
+			if f.IsHostLevelNetworkRule() {
+				networkEngine.AddRule(f, idx)
 			}
 		}
 	}
 
 	d.RulesCount += networkEngine.RulesCount
 	d.networkEngine = networkEngine
+
 	return &d
 }
 
@@ -143,8 +159,8 @@ func (d *DNSEngine) MatchRequest(dReq *DNSRequest) (res *DNSResult, matched bool
 	}
 
 	for _, rule := range rr {
-		hostRule, ok := rule.(*rules.HostRule)
-		if !ok {
+		hostRule, idHostRule := rule.(*rules.HostRule)
+		if !idHostRule {
 			continue
 		}
 

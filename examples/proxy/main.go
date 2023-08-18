@@ -21,7 +21,17 @@ func main() {
 	log.SetLevel(log.DEBUG)
 
 	go func() {
-		log.Println(http.ListenAndServe("localhost:6060", nil))
+		lsnr, err := net.Listen("tcp", "localhost:6060")
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		srv := &http.Server{
+			ReadTimeout:  10 * time.Second,
+			WriteTimeout: 10 * time.Second,
+		}
+
+		log.Println(srv.Serve(lsnr))
 	}()
 
 	// READ CERT AND KEY
@@ -51,6 +61,8 @@ func main() {
 	}
 	tlsConfig := &tls.Config{
 		Certificates: []tls.Certificate{*proxyCert},
+		// gosec is triggered when the TLS version is set to less than 1.2.
+		MinVersion: tls.VersionTLS12,
 	}
 
 	addr := &net.TCPAddr{

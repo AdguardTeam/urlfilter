@@ -70,7 +70,6 @@ func IsDomainName(name string) bool {
 	xn := 0
 
 	for _, c := range []byte(name) {
-
 		switch st {
 		case 0:
 			fallthrough

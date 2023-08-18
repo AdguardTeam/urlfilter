@@ -1,83 +1,109 @@
 ---
 'version': 2
 'plan':
-  'project-key': 'AGH'
-  'key': 'URLFLTSPECS'
-  'name': 'urlfilter - Build and run tests'
+    'project-key': 'AGH'
+    'key': 'URLFLTSPECS'
+    'name': 'urlfilter - Lint and Run tests'
 'variables':
-  'dockerGo': 'golang:1.18.9'
-  'dockerLint': 'golangci/golangci-lint:v1.50.0'
+    'dockerFpm': 'alanfranz/fpm-within-docker:ubuntu-bionic'
+    # When there is a patch release of Go available, set this property to an
+    # exact patch version as opposed to a minor one to make sure that this exact
+    # version is actually used and not whatever the docker daemon on the CI has
+    # cached a few months ago.
+    'dockerGo': 'golang:1.20.7'
+    'maintainer': 'Adguard Go Team'
+    'name': 'urlfilter'
 
 'stages':
+  - 'Lint':
+        'manual': false
+        'final': false
+        'jobs':
+          - 'Lint'
   - 'Test':
-      'manual': 'false'
-      'final': 'false'
-      'jobs':
-        - 'Lint'
-        - 'Test'
+        'manual': false
+        'final': false
+        'jobs':
+          - 'Test'
 
 'Lint':
-  'docker':
-    'image': '${bamboo.dockerLint}'
-  'key': 'LINT'
-  'tasks':
-    - 'checkout':
-        'force-clean-build': 'false'
-    - 'script':
-        'interpreter': 'SHELL'
-        'scripts':
-          - |-
-            set -x
-            set -e
+    'docker':
+        'image': '${bamboo.dockerGo}'
+        'volumes':
+            '${system.GO_CACHE_DIR}': '${bamboo.cacheGo}'
+            '${system.GO_PKG_CACHE_DIR}': '${bamboo.cacheGoPkg}'
+    'key': 'LINT'
+    'other':
+        'clean-working-dir': true
+    'requirements':
+      - 'adg-docker': true
+    'tasks':
+      - 'checkout':
+            'force-clean-build': true
+      - 'script':
+            'interpreter': 'SHELL'
+            'scripts':
+              - |
+                set -e -f -u -x
 
-            # Print versions
-            golangci-lint --version
-
-            # Run linter
-            golangci-lint run
-
-  'requirements':
-    - 'adg-docker': 'true'
-
+                make VERBOSE=1 go-tools go-lint
 
 'Test':
-  'docker':
-    'image': '${bamboo.dockerGo}'
-    'volumes':
-      '${system.GO_CACHE_DIR}': '${bamboo.cacheGo}'
-      '${system.GO_PKG_CACHE_DIR}': '${bamboo.cacheGoPkg}'
-  'key': 'TEST'
-  'tasks':
-    - 'checkout':
-        'force-clean-build': 'false'
-    - 'script':
-        'interpreter': SHELL
-        'scripts':
-          - |-
-            set -x
-            set -e
+    'docker':
+        'image': '${bamboo.dockerGo}'
+        'volumes':
+            '${system.GO_CACHE_DIR}': '${bamboo.cacheGo}'
+            '${system.GO_PKG_CACHE_DIR}': '${bamboo.cacheGoPkg}'
+    'key': 'TEST'
+    'other':
+        'clean-working-dir': true
+    'requirements':
+      - 'adg-docker': true
+    'tasks':
+      - 'checkout':
+            'force-clean-build': true
+      - 'script':
+            'interpreter': 'SHELL'
+            # Projects that have go-bench and/or go-fuzz targets should add them
+            # here as well.
+            'scripts':
+              - |
+                set -e -f -u -x
 
-            # Print versions
-            go version
-
-            # Run tests
-            go test -race -v -bench="." -coverprofile="coverage.txt" -covermode=atomic ./...
-  'requirements':
-    - 'adg-docker': 'true'
+                make VERBOSE=1 go-deps go-test
 
 'branches':
-  'create': 'for-pull-request'
-  'delete':
-    'after-deleted-days': '7'
-    'after-inactive-days': '30'
-  'integration':
-    'push-on-success': 'false'
-    'merge-from': 'urlfilter - Build and run tests'
-  'link-to-jira': 'true'
+    'create': 'for-pull-request'
+    'delete':
+        'after-deleted-days': 1
+        'after-inactive-days': 5
+    'link-to-jira': true
 
-'notifications': [ ]
+# Run only the "Lint" and "Test" stages in any branch save for "main".  For
+# projects that use "master", use that here too.
+'branch-overrides':
+  - '^((?!main).)*$':
+        'stages':
+          - 'Lint':
+                'manual': false
+                'final': false
+                'jobs':
+                  - 'Lint'
+          - 'Test':
+                'manual': false
+                'final': false
+                'jobs':
+                  - 'Test'
 
-'labels': [ ]
+'notifications':
+  - 'events':
+      - 'plan-status-changed'
+    'recipients':
+      - 'webhook':
+            'name': 'Build webhook'
+            'url': 'http://prod.jirahub.service.eu.consul/v1/webhook/bamboo'
+
+'labels': []
 
 'other':
-  'concurrent-build-plugin': 'system-default'
+    'concurrent-build-plugin': 'system-default'

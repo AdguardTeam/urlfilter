@@ -12,13 +12,13 @@ import (
 
 func TestAssumeRequestType(t *testing.T) {
 	testCases := []struct {
+		headers         map[string]string
+		responseHeaders map[string]string
 		method          string
 		name            string
 		url             string
-		headers         map[string]string
-		response        bool
-		responseHeaders map[string]string
 		expectedType    rules.RequestType
+		response        bool
 	}{{
 		name: "sec-fetch-dest-video",
 		headers: map[string]string{

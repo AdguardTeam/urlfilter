@@ -54,7 +54,7 @@ module.exports = {
     /**
      * Generated file with the golang template
      */
-    goTemplatePath: '../content_script_tmpl.go',
+    goTemplatePath: '../contentscripttmpl.go',
 
     /**
      * Name of the variable that will be replaced by a golang template.

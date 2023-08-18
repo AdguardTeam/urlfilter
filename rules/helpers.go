@@ -1,20 +1,21 @@
 package rules
 
 import (
-	"sort"
 	"strings"
 
+	"golang.org/x/exp/slices"
 	"golang.org/x/net/publicsuffix"
 )
 
 // findSorted - finds value in a sorted array
 // returns value index or -1 if nothing found
 func findSorted(sortedArray []string, val string) int {
-	i := sort.SearchStrings(sortedArray, val)
-	if i == len(sortedArray) || sortedArray[i] != val {
-		return -1
+	i, ok := slices.BinarySearch(sortedArray, val)
+	if ok && sortedArray[i] == val {
+		return i
 	}
-	return i
+
+	return -1
 }
 
 // splitWithEscapeCharacter splits string by the specified separator if it is not escaped
@@ -100,19 +101,4 @@ func isDomainOrSubdomainOfAny(domain string, domains []string) bool {
 		}
 	}
 	return false
-}
-
-// sort.Interface
-type byLength []string
-
-func (s byLength) Len() int {
-	return len(s)
-}
-
-func (s byLength) Swap(i, j int) {
-	s[i], s[j] = s[j], s[i]
-}
-
-func (s byLength) Less(i, j int) bool {
-	return len(s[i]) < len(s[j])
 }

@@ -19,7 +19,7 @@ const (
 	hostsPath         = testResourcesDir + "/hosts"
 )
 
-func TestBenchDNSEngine(t *testing.T) {
+func TestDNSEngine_bench(t *testing.T) {
 	debug.SetGCPercent(10)
 
 	filterRuleList, err := filterlist.NewFileRuleList(1, networkFilterPath, true)

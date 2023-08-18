@@ -15,6 +15,7 @@ import (
 
 	"github.com/AdguardTeam/golibs/errors"
 	"github.com/AdguardTeam/golibs/log"
+	"github.com/AdguardTeam/golibs/testutil"
 	"github.com/AdguardTeam/urlfilter/filterlist"
 	"github.com/AdguardTeam/urlfilter/rules"
 	"github.com/shirou/gopsutil/v3/process"
@@ -136,7 +137,8 @@ func TestBenchNetworkEngine(t *testing.T) {
 	startParse := time.Now()
 	engine := buildNetworkEngine(t)
 	assert.NotNil(t, engine)
-	defer engine.ruleStorage.Close()
+	testutil.CleanupAndRequireSuccess(t, engine.ruleStorage.Close)
+
 	t.Logf("Elapsed on parsing rules: %v", time.Since(startParse))
 
 	loadHeap, loadRSS := alloc(t)
@@ -271,7 +273,7 @@ func loadRequests(t *testing.T) []testRequest {
 	if err != nil {
 		t.Fatalf("cannot load %s: %s", requestsPath, err)
 	}
-	defer file.Close()
+	testutil.CleanupAndRequireSuccess(t, file.Close)
 
 	var requests []testRequest
 
@@ -282,7 +284,7 @@ func loadRequests(t *testing.T) []testRequest {
 		line := strings.TrimSpace(scanner.Text())
 		if line != "" {
 			var req testRequest
-			err := json.Unmarshal([]byte(line), &req)
+			err = json.Unmarshal([]byte(line), &req)
 			if err == nil && isSupportedURL(req.URL) && isSupportedURL(req.FrameURL) {
 				req.Line = line
 				req.LineNumber = lineNumber
@@ -291,7 +293,7 @@ func loadRequests(t *testing.T) []testRequest {
 		}
 	}
 
-	if err := scanner.Err(); err != nil {
+	if err = scanner.Err(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -299,13 +301,13 @@ func loadRequests(t *testing.T) []testRequest {
 	return requests
 }
 
-func unzip(src, dest string) error {
+func unzip(src, dest string) (err error) {
 	r, err := zip.OpenReader(src)
 	if err != nil {
 		return err
 	}
 	defer func() {
-		if err := r.Close(); err != nil {
+		if err = r.Close(); err != nil {
 			panic(err)
 		}
 	}()
@@ -313,24 +315,28 @@ func unzip(src, dest string) error {
 	_ = os.MkdirAll(dest, 0o755)
 
 	// Closure to address file descriptors issue with all the deferred .Close() methods
-	extractAndWriteFile := func(f *zip.File) error {
-		rc, err := f.Open()
+	extractAndWriteFile := func(zipFile *zip.File) (err error) {
+		var rc io.ReadCloser
+		rc, err = zipFile.Open()
 		if err != nil {
 			return err
 		}
+
 		defer func() {
-			if err := rc.Close(); err != nil {
-				panic(err)
+			if rcErr := rc.Close(); err != nil {
+				panic(rcErr)
 			}
 		}()
 
-		path := filepath.Join(dest, f.Name)
+		path := filepath.Join(dest, zipFile.Name)
 
-		if f.FileInfo().IsDir() {
-			_ = os.MkdirAll(path, f.Mode())
+		if zipFile.FileInfo().IsDir() {
+			_ = os.MkdirAll(path, zipFile.Mode())
 		} else {
-			_ = os.MkdirAll(filepath.Dir(path), f.Mode())
-			f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+			_ = os.MkdirAll(filepath.Dir(path), zipFile.Mode())
+
+			var f *os.File
+			f, err = os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, zipFile.Mode())
 			if err != nil {
 				return err
 			}
@@ -349,7 +355,7 @@ func unzip(src, dest string) error {
 	}
 
 	for _, f := range r.File {
-		err := extractAndWriteFile(f)
+		err = extractAndWriteFile(f)
 		if err != nil {
 			return err
 		}

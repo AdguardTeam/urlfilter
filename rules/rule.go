@@ -2,12 +2,12 @@ package rules
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 
 	"github.com/AdguardTeam/golibs/errors"
 	"github.com/AdguardTeam/urlfilter/filterutil"
 	"github.com/miekg/dns"
+	"golang.org/x/exp/slices"
 )
 
 // RuleSyntaxError represents an error while parsing a filtering rule
@@ -206,8 +206,8 @@ func loadCTags(value, sep string) (permittedCTags, restrictedCTags []string, err
 	}
 
 	// Sorting tags so that we could use binary search
-	sort.Strings(permittedCTags)
-	sort.Strings(restrictedCTags)
+	slices.Sort(permittedCTags)
+	slices.Sort(restrictedCTags)
 
 	return
 }

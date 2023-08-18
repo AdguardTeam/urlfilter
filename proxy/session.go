@@ -31,16 +31,27 @@ import (
 // 2.3. This is an HTML response so we need to filter the response body and apply cosmetic filters.
 // 2.4. We should continue execution and do nothing with the response.
 type Session struct {
-	ID      string         // Session identifier
-	Request *rules.Request // Request data
+	// Request is the original request data.
+	Request *rules.Request
 
-	HTTPRequest  *http.Request  // HTTP request data
-	HTTPResponse *http.Response // HTTP response data
+	// HTTPRequest is the original HTTP request data.
+	HTTPRequest *http.Request
 
-	MediaType string // Mime media type
-	Charset   string // Response charset (if it's possible to parse it from content-type)
+	// HTTPResponse is the original HTTP response data.
+	HTTPResponse *http.Response
 
-	Result *rules.MatchingResult // Filtering engine result
+	// Result is the filtering engine result.
+	Result *rules.MatchingResult
+
+	// ID is the session identifier.
+	ID string
+
+	// MediaType is MIME media type.
+	MediaType string
+
+	// Charset is the response charset (if it's possible to parse it from
+	// content-type).
+	Charset string
 }
 
 // NewSession creates a new instance of the Session struct and initializes it.

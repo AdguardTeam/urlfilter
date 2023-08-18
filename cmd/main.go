@@ -22,17 +22,11 @@ import (
 
 // Options -- console arguments
 type Options struct {
-	// Verbose - should we write debug-level log
-	Verbose bool `short:"v" long:"verbose" description:"Verbose output (optional)." optional:"yes" optional-value:"true"`
-
 	// LogOutput - path to the log file
 	LogOutput string `short:"o" long:"output" description:"Path to the log file. If not set, it writes to stderr." default:""`
 
 	// ListenAddr - server listen address
 	ListenAddr string `short:"l" long:"listen" description:"Listen address." default:"0.0.0.0"`
-
-	// ListenPort - server listen port
-	ListenPort int `short:"p" long:"port" description:"Listen port. Zero value disables TCP and UDP listeners." default:"8080"`
 
 	// TLSCertPath - path to the .crt with the certificate chain
 	TLSCertPath string `short:"c" long:"ca-cert" description:"Path to a file with the root certificate." required:"true"`
@@ -40,25 +34,31 @@ type Options struct {
 	// TLSKeyPath - path to the file with the private key
 	TLSKeyPath string `short:"k" long:"ca-key" description:"Path to a file with the CA private key." required:"true"`
 
-	// FilterLists - paths to the filter lists
-	FilterLists []string `short:"f" long:"filter" description:"Path to the filter list. Can be specified multiple times."`
-
 	// Proxy username
 	ProxyUser string `short:"u" long:"username" description:"Proxy auth username. If specified, proxy authorization is required."`
 
 	// ProxyPassword - proxy password
 	ProxyPassword string `short:"a" long:"password" description:"Proxy auth password. If specified, proxy authorization is required."`
 
+	// HTTPSHostname - server name for the HTTPS proxy.
+	HTTPSHostname string `short:"n" long:"https-name" description:"Server name or IP address of the HTTPS proxy."`
+
+	// FilterLists - paths to the filter lists
+	FilterLists []string `short:"f" long:"filter" description:"Path to the filter list. Can be specified multiple times."`
+
+	// ListenPort - server listen port
+	ListenPort int `short:"p" long:"port" description:"Listen port. Zero value disables TCP and UDP listeners." default:"8080"`
+
 	// HTTPSProxy - if specified, start a HTTPS proxy. Otherwise, it will start an HTTP proxy.
 	HTTPSProxy bool `short:"t" long:"https" description:"Run an HTTPS proxy (otherwise, it runs plain HTTP proxy)." optional:"yes" optional-value:"true"`
 
-	// HTTPSHostname - server name for the HTTPS proxy.
-	HTTPSHostname string `short:"n" long:"https-name" description:"Server name or IP address of the HTTPS proxy."`
+	// Verbose - should we write debug-level log
+	Verbose bool `short:"v" long:"verbose" description:"Verbose output (optional)." optional:"yes" optional-value:"true"`
 }
 
 func main() {
 	var options Options
-	var parser = goFlags.NewParser(&options, goFlags.Default)
+	parser := goFlags.NewParser(&options, goFlags.Default)
 
 	_, err := parser.Parse()
 	if err != nil {
@@ -78,11 +78,11 @@ func run(options Options) {
 	}
 	if options.LogOutput != "" {
 		// nolint: gosec
-		file, err := os.OpenFile(options.LogOutput, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
+		file, err := os.OpenFile(options.LogOutput, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o600)
 		if err != nil {
 			log.Fatalf("cannot create a log file: %s", err)
 		}
-		defer file.Close() //nolint
+		defer log.OnCloserError(file, log.ERROR)
 		log.SetOutput(file)
 	}
 
@@ -128,6 +128,8 @@ func createServerConfig(options Options) proxy.Config {
 		tlsConfig = &tls.Config{
 			Certificates: []tls.Certificate{*proxyCert},
 			ServerName:   options.HTTPSHostname,
+			// gosec is triggered when the TLS version is set to less than 1.2.
+			MinVersion: tls.VersionTLS12,
 		}
 	}
 

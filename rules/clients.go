@@ -3,15 +3,15 @@ package rules
 import (
 	"bytes"
 	"net"
-	"sort"
 
 	"github.com/AdguardTeam/urlfilter/filterutil"
+	"golang.org/x/exp/slices"
 )
 
 // set representation for $client modifiers
 type clients struct {
 	hosts []string
-	nets  ipNets
+	nets  []*net.IPNet
 }
 
 func (c *clients) Len() int {
@@ -48,8 +48,8 @@ func (c *clients) Equal(other *clients) bool {
 
 func (c *clients) finalize() {
 	if c != nil {
-		sort.Strings(c.hosts)
-		sort.Sort(c.nets)
+		slices.Sort(c.hosts)
+		slices.SortFunc(c.nets, compareIPNets)
 	}
 }
 
@@ -57,17 +57,21 @@ func (c *clients) finalize() {
 func (c *clients) add(client string) {
 	_, subnet, err := net.ParseCIDR(client)
 	if err == nil {
-		c.nets = append(c.nets, *subnet)
+		c.nets = append(c.nets, subnet)
+
 		return
 	}
 
 	ip := filterutil.ParseIP(client)
 	if ip != nil {
-		mask := net.CIDRMask(32, 32)
+		var mask net.IPMask
 		if ip.To4() == nil {
 			mask = net.CIDRMask(128, 128)
+		} else {
+			mask = net.CIDRMask(32, 32)
 		}
-		c.nets = append(c.nets, net.IPNet{IP: ip, Mask: mask})
+		c.nets = append(c.nets, &net.IPNet{IP: ip, Mask: mask})
+
 		return
 	}
 
@@ -106,45 +110,27 @@ func (c *clients) containsAny(host, ipStr string) bool {
 	return false
 }
 
-type ipNets []net.IPNet
-
-var _ sort.Interface = (*ipNets)(nil)
-
-func (n ipNets) Len() int {
-	return len(n)
-}
-
-func (n ipNets) Less(i, j int) bool {
+func compareIPNets(i, j *net.IPNet) int {
 	// ipv4 < ipv6
-	if n[i].IP.To4() == nil {
-		if n[j].IP.To4() != nil {
-			return false
+	if i.IP.To4() == nil {
+		if j.IP.To4() != nil {
+			return 1
 		}
 	} else {
-		if n[j].IP.To4() == nil {
-			return true
+		if j.IP.To4() == nil {
+			return -1
 		}
 	}
 
 	// bigger subnets < smaller subnets
-	iMaskSize, _ := n[i].Mask.Size()
-	jMaskSize, _ := n[j].Mask.Size()
+	iMaskSize, _ := i.Mask.Size()
+	jMaskSize, _ := j.Mask.Size()
 	if iMaskSize < jMaskSize {
-		return true
+		return -1
 	} else if iMaskSize > jMaskSize {
-		return false
+		return 1
 	}
 
 	// normalized network number byte order
-	if bytes.Compare(n[i].IP.To16(), n[j].IP.To16()) == -1 {
-		return true
-	}
-
-	return false
-}
-
-func (n ipNets) Swap(i, j int) {
-	t := n[i]
-	n[i] = n[j]
-	n[j] = t
+	return bytes.Compare(i.IP.To16(), j.IP.To16())
 }

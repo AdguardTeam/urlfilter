@@ -13,8 +13,10 @@ import (
 	"github.com/AdguardTeam/urlfilter"
 )
 
-const sessionPropKey = "session"
-const requestBlockedKey = "blocked"
+const (
+	sessionPropKey    = "session"
+	requestBlockedKey = "blocked"
+)
 
 var defaultInjectionsHost = "injections.adguard.org"
 

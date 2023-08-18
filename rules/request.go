@@ -62,30 +62,50 @@ func (t RequestType) Count() int {
 
 // Request represents a web request with all it's necessary properties
 type Request struct {
-	RequestType RequestType // request type
-	ThirdParty  bool        // true if request is third-party
+	// URL is the request URL.
+	URL string
 
-	// IsHostnameRequest means that the request is for a given Hostname,
-	//  and not for a URL, and we don't really know what protocol it is.
-	// This can be true for DNS requests, or for HTTP CONNECT, or SNI matching.
-	IsHostnameRequest bool
+	// URLLowerCase is the request URL in lower case.
+	URLLowerCase string
 
-	URL          string // Request URL
-	URLLowerCase string // Request URL in lower case
-	Hostname     string // Request hostname
-	Domain       string // Request domain (eTLD+1)
+	// Hostname is the request hostname.
+	Hostname string
 
-	// DNSType is the type of the resource record (RR) of a DNS request.
-	// See package github.com/miekg/dns for all acceptable constants.
+	// Domain is the request domain (eTLD+1).
+	Domain string
+
+	// SourceURL is the source URL.
+	SourceURL string
+
+	// SourceHostname is the source hostname.
+	SourceHostname string
+
+	// SourceDomain is the source domain (eTLD+1).
+	SourceDomain string
+
+	// ClientIP is the client IP address.
+	ClientIP string
+
+	// ClientName is the client name.
+	ClientName string
+
+	// SortedClientTags is the sorted list of client tags ($ctag).
+	SortedClientTags []string
+
+	// RequestType is the type of the request.
+	RequestType RequestType
+
+	// DNSType is the type of the resource record (RR) of a DNS request.  See
+	// package github.com/miekg/dns for all acceptable constants.
 	DNSType uint16
 
-	SourceURL      string // Source URL
-	SourceHostname string // Source hostname
-	SourceDomain   string // Source domain (eTLD+1)
+	// ThirdParty is true if request is third-party.
+	ThirdParty bool
 
-	SortedClientTags []string // Sorted list of client tags ($ctag)
-	ClientIP         string   // Client IP address
-	ClientName       string   // Client name
+	// IsHostnameRequest means that the request is for a given Hostname, and not
+	// for a URL, and we don't really know what protocol it is.  This can be
+	// true for DNS requests, or for HTTP CONNECT, or SNI matching.
+	IsHostnameRequest bool
 }
 
 // NewRequest creates a new instance of "Request" and populates it's fields
