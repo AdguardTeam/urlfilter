@@ -163,15 +163,15 @@ func TestNetworkRule_Match_dnsRewrite(t *testing.T) {
 		}, {
 			name:       "a_bad_ip",
 			in:         "||example.org^$dnsrewrite=noerror;a;badip",
-			wantErrMsg: `invalid ipv4: "badip"`,
+			wantErrMsg: `"badip" is not a valid ipv4`,
 		}, {
 			name:       "aaaa_bad_ip",
 			in:         "||example.org^$dnsrewrite=noerror;aaaa;badip",
-			wantErrMsg: `invalid ipv6: "badip"`,
+			wantErrMsg: `"badip" is not a valid ipv6`,
 		}, {
 			name:       "aaaa_ipv4",
 			in:         "||example.org^$dnsrewrite=noerror;aaaa;127.0.0.1",
-			wantErrMsg: `want ipv6, got ipv4: "127.0.0.1"`,
+			wantErrMsg: `"127.0.0.1" is an ipv4, not an ipv6`,
 		}, {
 			name: "cname_bad_host",
 			in:   "||example.org^$dnsrewrite=noerror;cname;!!badstuff",

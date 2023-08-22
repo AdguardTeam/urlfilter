@@ -1,7 +1,7 @@
 package urlfilter
 
 import (
-	"net"
+	"net/netip"
 	"path"
 	"testing"
 
@@ -9,6 +9,13 @@ import (
 	"github.com/miekg/dns"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+)
+
+var (
+	testIPv4    = netip.MustParseAddr("127.0.0.1")
+	anotherIPv4 = netip.MustParseAddr("127.0.0.2")
+	testIPv6    = netip.MustParseAddr("::1")
+	anotherIPv6 = netip.MustParseAddr("::2")
 )
 
 func TestDNSResult_DNSRewrites(t *testing.T) {
@@ -54,9 +61,6 @@ func TestDNSResult_DNSRewrites(t *testing.T) {
 	dnsEngine := NewDNSEngine(ruleStorage)
 	assert.NotNil(t, dnsEngine)
 
-	ipv4p1 := net.IPv4(127, 0, 0, 1)
-	ipv4p2 := net.IPv4(127, 0, 0, 2)
-
 	t.Run("disable-one", func(t *testing.T) {
 		res, ok := dnsEngine.Match(path.Base(t.Name()))
 		assert.False(t, ok)
@@ -67,7 +71,7 @@ func TestDNSResult_DNSRewrites(t *testing.T) {
 		dr := dnsr[0].DNSRewrite
 		assert.Equal(t, dns.RcodeSuccess, dr.RCode)
 		assert.Equal(t, dns.TypeA, dr.RRType)
-		assert.Equal(t, ipv4p2, dr.Value)
+		assert.Equal(t, anotherIPv4, dr.Value)
 	})
 
 	t.Run("priority", func(t *testing.T) {
@@ -84,7 +88,7 @@ func TestDNSResult_DNSRewrites(t *testing.T) {
 		dr := dnsr[0].DNSRewrite
 		assert.Equal(t, dns.RcodeSuccess, dr.RCode)
 		assert.Equal(t, dns.TypeA, dr.RRType)
-		assert.Equal(t, ipv4p1, dr.Value)
+		assert.Equal(t, testIPv4, dr.Value)
 	})
 
 	t.Run("priority-important", func(t *testing.T) {
@@ -103,7 +107,7 @@ func TestDNSResult_DNSRewrites(t *testing.T) {
 		dr := dnsr[0].DNSRewrite
 		assert.Equal(t, dns.RcodeSuccess, dr.RCode)
 		assert.Equal(t, dns.TypeA, dr.RRType)
-		assert.Equal(t, ipv4p1, dr.Value)
+		assert.Equal(t, testIPv4, dr.Value)
 	})
 
 	t.Run("simple-exc", func(t *testing.T) {
@@ -120,7 +124,7 @@ func TestDNSResult_DNSRewrites(t *testing.T) {
 		dr := dnsr[0].DNSRewrite
 		assert.Equal(t, dns.RcodeSuccess, dr.RCode)
 		assert.Equal(t, dns.TypeA, dr.RRType)
-		assert.Equal(t, ipv4p1, dr.Value)
+		assert.Equal(t, testIPv4, dr.Value)
 	})
 
 	t.Run("exc-exc", func(t *testing.T) {
@@ -154,7 +158,7 @@ func TestDNSResult_DNSRewrites(t *testing.T) {
 		assert.Equal(t, "", dr.NewCNAME)
 		assert.Equal(t, dns.RcodeSuccess, dr.RCode)
 		assert.Equal(t, dns.TypeA, dr.RRType)
-		assert.Equal(t, ipv4p1, dr.Value)
+		assert.Equal(t, testIPv4, dr.Value)
 	})
 
 	t.Run("disable-cname-many", func(t *testing.T) {
@@ -168,7 +172,7 @@ func TestDNSResult_DNSRewrites(t *testing.T) {
 		assert.Equal(t, "", dr.NewCNAME)
 		assert.Equal(t, dns.RcodeSuccess, dr.RCode)
 		assert.Equal(t, dns.TypeA, dr.RRType)
-		assert.Equal(t, ipv4p1, dr.Value)
+		assert.Equal(t, testIPv4, dr.Value)
 
 		dr = dnsr[1].DNSRewrite
 		assert.Equal(t, "new-cname-2", dr.NewCNAME)
@@ -247,10 +251,10 @@ func TestDNSEngine_MatchRequest_dnsRewrite(t *testing.T) {
 	dnsEngine := NewDNSEngine(ruleStorage)
 	assert.NotNil(t, dnsEngine)
 
-	ipv4p1 := net.IPv4(127, 0, 0, 1)
-	ipv4p2 := net.IPv4(127, 0, 0, 2)
-	ipv6p1 := net.IP{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}
-	ipv6p2 := net.IP{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2}
+	ipv4p1 := testIPv4
+	ipv4p2 := netip.MustParseAddr("127.0.0.2")
+	ipv6p1 := testIPv6
+	ipv6p2 := netip.MustParseAddr("::2")
 
 	t.Run("short-v4", func(t *testing.T) {
 		res, ok := dnsEngine.Match(path.Base(t.Name()))

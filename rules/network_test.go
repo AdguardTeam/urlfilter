@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"net/netip"
 	"testing"
 
 	"github.com/AdguardTeam/golibs/testutil"
@@ -763,40 +764,40 @@ func TestNetworkRule_MatchClients(t *testing.T) {
 	assert.NotNil(t, f)
 
 	r := NewRequestForHostname("example.org")
-	r.ClientIP = "127.0.0.1"
+	r.ClientIP = netip.MustParseAddr("127.0.0.1")
 	assert.True(t, f.Match(r))
 
-	r.ClientIP = "127.0.0.2"
+	r.ClientIP = netip.MustParseAddr("127.0.0.2")
 	assert.False(t, f.Match(r))
 
 	f, err = NewNetworkRule("||example.org^$client=127.0.0.0/8", 0)
 	assert.Nil(t, err)
 	assert.NotNil(t, f)
 
-	r.ClientIP = "127.1.1.1"
+	r.ClientIP = netip.MustParseAddr("127.1.1.1")
 	assert.True(t, f.Match(r))
 
-	r.ClientIP = "126.0.0.0"
+	r.ClientIP = netip.MustParseAddr("126.0.0.0")
 	assert.False(t, f.Match(r))
 
 	f, err = NewNetworkRule("||example.org^$client=2001::0:00c0:ffee", 0)
 	assert.Nil(t, err)
 	assert.NotNil(t, f)
 
-	r.ClientIP = "2001::c0:ffee"
+	r.ClientIP = netip.MustParseAddr("2001::c0:ffee")
 	assert.True(t, f.Match(r))
 
-	r.ClientIP = "2001::c0:ffef"
+	r.ClientIP = netip.MustParseAddr("2001::c0:ffef")
 	assert.False(t, f.Match(r))
 
 	f, err = NewNetworkRule("||example.org^$client=2001::0:00c0:ffee/112", 0)
 	assert.Nil(t, err)
 	assert.NotNil(t, f)
 
-	r.ClientIP = "2001::0:c0:0"
+	r.ClientIP = netip.MustParseAddr("2001::0:c0:0")
 	assert.True(t, f.Match(r))
 
-	r.ClientIP = "2001::c1:ffee"
+	r.ClientIP = netip.MustParseAddr("2001::c1:ffee")
 	assert.False(t, f.Match(r))
 
 	f, err = NewNetworkRule("||example.org^$client=~'Frank\\'s laptop'", 0)
@@ -813,11 +814,11 @@ func TestNetworkRule_MatchClients(t *testing.T) {
 	assert.Nil(t, err)
 	assert.NotNil(t, f)
 
-	r.ClientIP = "127.0.0.1"
+	r.ClientIP = netip.MustParseAddr("127.0.0.1")
 	r.ClientName = "name"
 	assert.True(t, f.Match(r))
 
-	r.ClientIP = "127.0.0.1"
+	r.ClientIP = netip.MustParseAddr("127.0.0.1")
 	r.ClientName = "another-name"
 	assert.False(t, f.Match(r))
 }
@@ -904,27 +905,111 @@ func TestNetworkRule_InvalidRule(t *testing.T) {
 	require.NoError(t, err)
 
 	req := NewRequest("https://example.org/", "", TypeOther)
-	req.ClientIP = "127.0.0.1"
+	req.ClientIP = netip.MustParseAddr("127.0.0.1")
 	assert.True(t, r.Match(req))
 }
 
-func TestNetworkRule_BadfilterRule(t *testing.T) {
-	assertBadfilterNegates(t, "*$image,domain=example.org", "*$image,domain=example.org,badfilter", true)
-	assertBadfilterNegates(t, "*$image,domain=example.org", "*$domain=example.org,badfilter", false)
-	assertBadfilterNegates(t, "*$image,domain=example.org", "*$image,badfilter,domain=example.org", true)
-	assertBadfilterNegates(t, "*$image,domain=example.org|example.com", "*$image,domain=example.org,badfilter", false)
-	assertBadfilterNegates(t, "@@*$image,domain=example.org", "@@*$image,domain=example.org,badfilter", true)
-	assertBadfilterNegates(t, "@@*$image,domain=example.org", "*$image,domain=example.org,badfilter", false)
-	assertBadfilterNegates(t, "*$ctag=phone", "*$ctag=pc,badfilter", false)
-	assertBadfilterNegates(t, "*$ctag=phone|pc", "*$ctag=pc|phone,badfilter", true)
-	assertBadfilterNegates(t, "*$client=127.0.0.1", "*$client=127.0.0.2,badfilter", false)
-	assertBadfilterNegates(t, "*$client=127.0.0.1", "*$client=127.0.0.1,badfilter", true)
-	assertBadfilterNegates(t, "*$client=::|127.0.0.1", "*$client=127.0.0.1|::,badfilter", true)
-	assertBadfilterNegates(t, "*$client=127.0.0.1/8|10.0.0.0/8", "*$client=10.0.0.0/8|127.0.0.1/8,badfilter", true)
-	assertBadfilterNegates(t, "*$client=::", "*$client=0:0000::0,badfilter", true)
-	assertBadfilterNegates(t, "*$client=127.0.0.1/24|127.0.0.1/16", "*$client=127.0.0.1/16|127.0.0.1/24,badfilter", true)
-	assertBadfilterNegates(t, "*$client=fe01::/16|127.0.0.1|1::/16", "*$client=127.0.0.1|1::/16|fe01::/16,badfilter", true)
-	assertBadfilterNegates(t, "*$client=::/64", "*$client=::/63,badfilter", false)
+func TestNetworkRule_negatesBadfilter(t *testing.T) {
+	testCases := []struct {
+		want      assert.BoolAssertionFunc
+		name      string
+		rule      string
+		badfilter string
+	}{{
+		want:      assert.True,
+		name:      "success",
+		rule:      "*$image,domain=example.org",
+		badfilter: "*$image,domain=example.org,badfilter",
+	}, {
+		want:      assert.False,
+		name:      "no_image",
+		rule:      "*$image,domain=example.org",
+		badfilter: "*$domain=example.org,badfilter",
+	}, {
+		want:      assert.True,
+		name:      "badfilter_first",
+		rule:      "*$image,domain=example.org",
+		badfilter: "*$image,badfilter,domain=example.org",
+	}, {
+		want:      assert.False,
+		name:      "several_domains",
+		rule:      "*$image,domain=example.org|example.com",
+		badfilter: "*$image,domain=example.org,badfilter",
+	}, {
+		want:      assert.True,
+		name:      "whitelist_success",
+		rule:      "@@*$image,domain=example.org",
+		badfilter: "@@*$image,domain=example.org,badfilter",
+	}, {
+		want:      assert.False,
+		name:      "whitelist_over_badfilter",
+		rule:      "@@*$image,domain=example.org",
+		badfilter: "*$image,domain=example.org,badfilter",
+	}, {
+		want:      assert.False,
+		name:      "different_ctags",
+		rule:      "*$ctag=phone",
+		badfilter: "*$ctag=pc,badfilter",
+	}, {
+		want:      assert.True,
+		name:      "different_ctags_order",
+		rule:      "*$ctag=phone|pc",
+		badfilter: "*$ctag=pc|phone,badfilter",
+	}, {
+		want:      assert.False,
+		name:      "different_clients",
+		rule:      "*$client=127.0.0.1",
+		badfilter: "*$client=127.0.0.2,badfilter",
+	}, {
+		want:      assert.True,
+		name:      "same_clients",
+		rule:      "*$client=127.0.0.1",
+		badfilter: "*$client=127.0.0.1,badfilter",
+	}, {
+		want:      assert.True,
+		name:      "different_clients_order",
+		rule:      "*$client=::|127.0.0.1",
+		badfilter: "*$client=127.0.0.1|::,badfilter",
+	}, {
+		want:      assert.True,
+		name:      "different_client_subnets_order",
+		rule:      "*$client=127.0.0.1/8|10.0.0.0/8",
+		badfilter: "*$client=10.0.0.0/8|127.0.0.1/8,badfilter",
+	}, {
+		want:      assert.True,
+		name:      "different_client_subnets",
+		rule:      "*$client=::",
+		badfilter: "*$client=0:0000::0,badfilter",
+	}, {
+		want:      assert.True,
+		name:      "different_ipv4_subnets_order",
+		rule:      "*$client=127.0.0.1/24|127.0.0.1/16",
+		badfilter: "*$client=127.0.0.1/16|127.0.0.1/24,badfilter",
+	}, {
+		want:      assert.True,
+		name:      "different_mixed_subnets_order",
+		rule:      "*$client=fe01::/16|127.0.0.1|1::/16",
+		badfilter: "*$client=127.0.0.1|1::/16|fe01::/16,badfilter",
+	}, {
+		want:      assert.False,
+		name:      "different_ipv6_subnets_length",
+		rule:      "*$client=::/64",
+		badfilter: "*$client=::/63,badfilter",
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			r, err := NewNetworkRule(tc.rule, -1)
+			require.NoError(t, err)
+			require.NotNil(t, r)
+
+			b, err := NewNetworkRule(tc.badfilter, -1)
+			require.NoError(t, err)
+			require.NotNil(t, b)
+
+			tc.want(t, b.negatesBadfilter(r))
+		})
+	}
 }
 
 func TestNetworkRule_IsHostLevelNetworkRule(t *testing.T) {
@@ -978,18 +1063,6 @@ func TestNetworkRule_MatchIPAddress(t *testing.T) {
 	assert.False(t, f.Match(r))
 	r = NewRequestForHostname("2sub.host.org")
 	assert.False(t, f.Match(r))
-}
-
-func assertBadfilterNegates(t *testing.T, rule, badfilter string, expected bool) {
-	r, err := NewNetworkRule(rule, -1)
-	assert.Nil(t, err)
-	assert.NotNil(t, r)
-
-	b, err := NewNetworkRule(badfilter, -1)
-	assert.Nil(t, err)
-	assert.NotNil(t, b)
-
-	assert.Equal(t, expected, b.negatesBadfilter(r), "")
 }
 
 func compareRulesPriority(t *testing.T, left, right string, expected bool) {

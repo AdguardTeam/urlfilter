@@ -1,6 +1,8 @@
 package urlfilter
 
 import (
+	"net/netip"
+
 	"github.com/AdguardTeam/urlfilter/filterlist"
 	"github.com/AdguardTeam/urlfilter/filterutil"
 	"github.com/AdguardTeam/urlfilter/rules"
@@ -32,9 +34,10 @@ type DNSResult struct {
 	// rules.
 	NetworkRule *rules.NetworkRule
 
-	// HostRulesV4 and HostRulesV6 are the host rules with IPv4 and IPv6
-	// addresses respectively.
+	// HostRulesV4 are the host rules with IPv4 addresses.
 	HostRulesV4 []*rules.HostRule
+
+	// HostRulesV6 are the host rules with IPv6 addresses.
 	HostRulesV6 []*rules.HostRule
 
 	// NetworkRules are all matched network rules.  These include unprocessed
@@ -44,22 +47,26 @@ type DNSResult struct {
 
 // DNSRequest represents a DNS query with associated metadata.
 type DNSRequest struct {
-	// Hostname is a hostname (or IP address).
-	Hostname string
-	// ClientIP is the address of client.
-	ClientIP string
-	// ClientName is the name of client.
+	// ClientIP is the IP address to match against $client modifiers.  The
+	// default zero value won't be considered.
+	ClientIP netip.Addr
+
+	// ClientName is the name to match against $client modifiers.  The default
+	// empty value won't be considered.
 	ClientName string
 
-	// SortedClientTags is the sorted list of client tags ($ctag).
+	// Hostname is the hostname to filter.
+	Hostname string
+
+	// SortedClientTags is the list of tags to match against $ctag modifiers.
 	SortedClientTags []string
 
 	// DNSType is the type of the resource record (RR) of a DNS request, for
-	// example "A" or "AAAA".  See package github.com/miekg/dns for all
-	// acceptable constants.
+	// example "A" or "AAAA".  See [rules.RRValue] for all acceptable constants
+	// and their corresponding values.
 	DNSType rules.RRType
 
-	// Answer is true if this hostname or IP is from a DNS response.
+	// Answer if the filtering request is for filtering a DNS response.
 	Answer bool
 }
 
@@ -116,7 +123,7 @@ func NewDNSEngine(s *filterlist.RuleStorage) *DNSEngine {
 //	192.168.0.1 example.local
 //	2000::1 example.local
 func (d *DNSEngine) Match(hostname string) (res *DNSResult, matched bool) {
-	return d.MatchRequest(&DNSRequest{Hostname: hostname, ClientIP: "0.0.0.0"})
+	return d.MatchRequest(&DNSRequest{Hostname: hostname})
 }
 
 // MatchRequest matches the specified DNS request.  The return parameter matched
@@ -164,7 +171,7 @@ func (d *DNSEngine) MatchRequest(dReq *DNSRequest) (res *DNSResult, matched bool
 			continue
 		}
 
-		if hostRule.IP.To4() != nil {
+		if hostRule.IP.Is4() {
 			res.HostRulesV4 = append(res.HostRulesV4, hostRule)
 		} else {
 			res.HostRulesV6 = append(res.HostRulesV6, hostRule)

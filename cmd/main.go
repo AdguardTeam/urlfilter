@@ -7,6 +7,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"net"
+	"net/netip"
 	"os"
 	"os/signal"
 	"syscall"
@@ -15,7 +16,6 @@ import (
 	"github.com/AdguardTeam/golibs/log"
 	"github.com/AdguardTeam/gomitmproxy"
 	"github.com/AdguardTeam/gomitmproxy/mitm"
-	"github.com/AdguardTeam/urlfilter/filterutil"
 	"github.com/AdguardTeam/urlfilter/proxy"
 	goFlags "github.com/jessevdk/go-flags"
 )
@@ -108,9 +108,9 @@ func run(options Options) {
 }
 
 func createServerConfig(options Options) proxy.Config {
-	listenIP := filterutil.ParseIP(options.ListenAddr)
-	if listenIP == nil {
-		log.Fatalf("cannot parse %s", options.ListenAddr)
+	listenIP, err := netip.ParseAddr(options.ListenAddr)
+	if err != nil {
+		log.Fatalf("parsing listen addr: %s", err)
 	}
 
 	mitmConfig := createMITMConfig(options)
@@ -121,7 +121,8 @@ func createServerConfig(options Options) proxy.Config {
 			log.Fatalf("HTTPS hostname must be specified")
 		}
 
-		proxyCert, err := mitmConfig.GetOrCreateCert(options.HTTPSHostname)
+		var proxyCert *tls.Certificate
+		proxyCert, err = mitmConfig.GetOrCreateCert(options.HTTPSHostname)
 		if err != nil {
 			log.Fatalf("failed to generate HTTPS proxy certificate for %s: %v", options.HTTPSHostname, err)
 		}
@@ -141,7 +142,8 @@ func createServerConfig(options Options) proxy.Config {
 		config.FiltersPaths[i] = v
 	}
 
-	addr := &net.TCPAddr{IP: listenIP, Port: options.ListenPort}
+	// TODO(e.burkov):  Use netip.AddrPort when gomitmproxy will support it.
+	addr := &net.TCPAddr{IP: listenIP.AsSlice(), Port: options.ListenPort}
 	config.ProxyConfig = gomitmproxy.Config{
 		ListenAddr: addr,
 		TLSConfig:  tlsConfig,

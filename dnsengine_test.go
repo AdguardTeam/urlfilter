@@ -1,7 +1,7 @@
 package urlfilter
 
 import (
-	"net"
+	"net/netip"
 	"runtime/debug"
 	"strings"
 	"testing"
@@ -181,24 +181,24 @@ func TestDNSEngineMatchHostname(t *testing.T) {
 	require.True(t, ok)
 	require.Len(t, r.HostRulesV4, 2)
 
-	assert.Equal(t, r.HostRulesV4[0].IP, net.ParseIP("0.0.0.0"))
-	assert.Equal(t, r.HostRulesV4[1].IP, net.ParseIP("127.0.0.1"))
+	assert.Equal(t, r.HostRulesV4[0].IP, netip.MustParseAddr("0.0.0.0"))
+	assert.Equal(t, r.HostRulesV4[1].IP, testIPv4)
 
 	r, ok = dnsEngine.Match("v6.com")
 	require.True(t, ok)
 	require.Len(t, r.HostRulesV6, 1)
 
-	assert.Equal(t, r.HostRulesV6[0].IP, net.ParseIP("::"))
+	assert.Equal(t, r.HostRulesV6[0].IP, netip.MustParseAddr("::"))
 
 	r, ok = dnsEngine.Match("v4and6.com")
 	require.True(t, ok)
 	require.Len(t, r.HostRulesV4, 2)
 	require.Len(t, r.HostRulesV6, 2)
 
-	assert.Equal(t, r.HostRulesV4[0].IP, net.ParseIP("127.0.0.1"))
-	assert.Equal(t, r.HostRulesV4[1].IP, net.ParseIP("127.0.0.2"))
-	assert.Equal(t, r.HostRulesV6[0].IP, net.ParseIP("::1"))
-	assert.Equal(t, r.HostRulesV6[1].IP, net.ParseIP("::2"))
+	assert.Equal(t, r.HostRulesV4[0].IP, testIPv4)
+	assert.Equal(t, r.HostRulesV4[1].IP, anotherIPv4)
+	assert.Equal(t, r.HostRulesV6[0].IP, testIPv6)
+	assert.Equal(t, r.HostRulesV6[1].IP, anotherIPv6)
 
 	_, ok = dnsEngine.Match("example.net")
 	assert.False(t, ok)
@@ -322,7 +322,7 @@ func TestClientTags(t *testing.T) {
 }
 
 func TestClient(t *testing.T) {
-	rulesText := []string{
+	ruleTexts := []string{
 		"||host0^$client=127.0.0.1",
 		"||host1^$client=~127.0.0.1",
 		"||host2^$client=2001::c0:ffee",
@@ -332,82 +332,125 @@ func TestClient(t *testing.T) {
 		"||host6^$client=2001::c0:ffee/120",
 		"||host7^$client=~2001::c0:ffee/120",
 		"||host8^$client='Frank\\'s laptop'",
+		"||host9^$client=0.0.0.0",
+		"||host10^$client=::",
 	}
-	ruleStorage := newTestRuleStorage(t, 1, strings.Join(rulesText, "\n"))
+	ruleStorage := newTestRuleStorage(t, 1, strings.Join(ruleTexts, "\n"))
 	dnsEngine := NewDNSEngine(ruleStorage)
 	assert.NotNil(t, dnsEngine)
 
-	// match client IPv4
-	res, ok := dnsEngine.MatchRequest(&DNSRequest{Hostname: "host0", ClientIP: "127.0.0.1"})
-	assertMatchRuleText(t, rulesText[0], res, ok)
+	testCases := []struct {
+		req     *DNSRequest
+		wantRes string
+		name    string
+	}{{
+		req:     &DNSRequest{Hostname: "host0", ClientIP: testIPv4},
+		wantRes: ruleTexts[0],
+		name:    "match_ipv4",
+	}, {
+		req:     &DNSRequest{Hostname: "host0", ClientIP: anotherIPv4},
+		wantRes: "",
+		name:    "mismatch_ipv4",
+	}, {
+		req:     &DNSRequest{Hostname: "host1", ClientIP: testIPv4},
+		wantRes: "",
+		name:    "restricted_ipv4",
+	}, {
+		req:     &DNSRequest{Hostname: "host1", ClientIP: anotherIPv4},
+		wantRes: ruleTexts[1],
+		name:    "non_restricted_ipv4",
+	}, {
+		req:     &DNSRequest{Hostname: "host2", ClientIP: netip.MustParseAddr("2001::c0:ffee")},
+		wantRes: ruleTexts[2],
+		name:    "match_ipv6",
+	}, {
+		req:     &DNSRequest{Hostname: "host2", ClientIP: netip.MustParseAddr("2001::c0:ffef")},
+		wantRes: "",
+		name:    "mismatch_ipv6",
+	}, {
+		req:     &DNSRequest{Hostname: "host3", ClientIP: netip.MustParseAddr("2001::c0:ffee")},
+		wantRes: "",
+		name:    "restricted_ipv6",
+	}, {
+		req:     &DNSRequest{Hostname: "host3", ClientIP: netip.MustParseAddr("2001::c0:ffef")},
+		wantRes: ruleTexts[3],
+		name:    "non_restricted_ipv6",
+	}, {
+		req:     &DNSRequest{Hostname: "host4", ClientIP: netip.MustParseAddr("127.0.0.254")},
+		wantRes: ruleTexts[4],
+		name:    "match_ipv4_subnet",
+	}, {
+		req:     &DNSRequest{Hostname: "host4", ClientIP: netip.MustParseAddr("127.0.1.1")},
+		wantRes: "",
+		name:    "mismatch_ipv4_subnet",
+	}, {
+		req:     &DNSRequest{Hostname: "host5", ClientIP: netip.MustParseAddr("127.0.0.254")},
+		wantRes: "",
+		name:    "restricted_ipv4_subnet",
+	}, {
+		req:     &DNSRequest{Hostname: "host5", ClientIP: netip.MustParseAddr("127.0.1.1")},
+		wantRes: ruleTexts[5],
+		name:    "non_restricted_ipv4_subnet",
+	}, {
+		req:     &DNSRequest{Hostname: "host6", ClientIP: netip.MustParseAddr("2001::c0:ff07")},
+		wantRes: ruleTexts[6],
+		name:    "match_ipv6_subnet",
+	}, {
+		req:     &DNSRequest{Hostname: "host6", ClientIP: netip.MustParseAddr("2001::c0:feee")},
+		wantRes: "",
+		name:    "mismatch_ipv6_subnet",
+	}, {
+		req:     &DNSRequest{Hostname: "host7", ClientIP: netip.MustParseAddr("2001::c0:ff07")},
+		wantRes: "",
+		name:    "restricted_ipv6_subnet",
+	}, {
+		req:     &DNSRequest{Hostname: "host7", ClientIP: netip.MustParseAddr("2001::c0:feee")},
+		wantRes: ruleTexts[7],
+		name:    "non_restricted_ipv6_subnet",
+	}, {
+		req:     &DNSRequest{Hostname: "host8", ClientName: "Frank's laptop"},
+		wantRes: ruleTexts[8],
+		name:    "match_name",
+	}, {
+		req:     &DNSRequest{Hostname: "host8", ClientName: "Franks laptop"},
+		wantRes: "",
+		name:    "mismatch_name",
+	}, {
+		req:     &DNSRequest{Hostname: "host9", ClientIP: netip.IPv4Unspecified()},
+		wantRes: ruleTexts[9],
+		name:    "match_unspecified_ipv4",
+	}, {
+		req:     &DNSRequest{Hostname: "host9", ClientIP: testIPv4},
+		wantRes: "",
+		name:    "mismatch_unspecified_ipv4",
+	}, {
+		req:     &DNSRequest{Hostname: "host10"},
+		wantRes: "",
+		name:    "no_ipv4",
+	}, {
+		req:     &DNSRequest{Hostname: "host10", ClientIP: netip.IPv6Unspecified()},
+		wantRes: ruleTexts[10],
+		name:    "match_unspecified_ipv6",
+	}, {
+		req:     &DNSRequest{Hostname: "host10", ClientIP: testIPv6},
+		wantRes: "",
+		name:    "mismatch_unspecified_ipv6",
+	}, {
+		req:     &DNSRequest{Hostname: "host10"},
+		wantRes: "",
+		name:    "no_ipv6",
+	}}
 
-	// not match client IPv4
-	_, ok = dnsEngine.MatchRequest(&DNSRequest{Hostname: "host0", ClientIP: "127.0.0.2"})
-	assert.False(t, ok)
-
-	// restricted client IPv4
-	_, ok = dnsEngine.MatchRequest(&DNSRequest{Hostname: "host1", ClientIP: "127.0.0.1"})
-	assert.False(t, ok)
-
-	// non-restricted client IPv4
-	res, ok = dnsEngine.MatchRequest(&DNSRequest{Hostname: "host1", ClientIP: "127.0.0.2"})
-	assertMatchRuleText(t, rulesText[1], res, ok)
-
-	// match client IPv6
-	res, ok = dnsEngine.MatchRequest(&DNSRequest{Hostname: "host2", ClientIP: "2001::c0:ffee"})
-	assertMatchRuleText(t, rulesText[2], res, ok)
-
-	// not match client IPv6
-	_, ok = dnsEngine.MatchRequest(&DNSRequest{Hostname: "host2", ClientIP: "2001::c0:ffef"})
-	assert.False(t, ok)
-
-	// restricted client IPv6
-	_, ok = dnsEngine.MatchRequest(&DNSRequest{Hostname: "host3", ClientIP: "2001::c0:ffee"})
-	assert.False(t, ok)
-
-	// non-restricted client IPv6
-	res, ok = dnsEngine.MatchRequest(&DNSRequest{Hostname: "host3", ClientIP: "2001::c0:ffef"})
-	assertMatchRuleText(t, rulesText[3], res, ok)
-
-	// match network IPv4
-	res, ok = dnsEngine.MatchRequest(&DNSRequest{Hostname: "host4", ClientIP: "127.0.0.254"})
-	assertMatchRuleText(t, rulesText[4], res, ok)
-
-	// not match network IPv4
-	_, ok = dnsEngine.MatchRequest(&DNSRequest{Hostname: "host4", ClientIP: "127.0.1.1"})
-	assert.False(t, ok)
-
-	// restricted network IPv4
-	_, ok = dnsEngine.MatchRequest(&DNSRequest{Hostname: "host5", ClientIP: "127.0.0.254"})
-	assert.False(t, ok)
-
-	// non-restricted network IPv4
-	res, ok = dnsEngine.MatchRequest(&DNSRequest{Hostname: "host5", ClientIP: "127.0.1.1"})
-	assertMatchRuleText(t, rulesText[5], res, ok)
-
-	// match network IPv6
-	res, ok = dnsEngine.MatchRequest(&DNSRequest{Hostname: "host6", ClientIP: "2001::c0:ff07"})
-	assertMatchRuleText(t, rulesText[6], res, ok)
-
-	// not match network IPv6
-	_, ok = dnsEngine.MatchRequest(&DNSRequest{Hostname: "host6", ClientIP: "2001::c0:feee"})
-	assert.False(t, ok)
-
-	// restricted network IPv6
-	_, ok = dnsEngine.MatchRequest(&DNSRequest{Hostname: "host7", ClientIP: "2001::c0:ff07"})
-	assert.False(t, ok)
-
-	// non-restricted network IPv6
-	res, ok = dnsEngine.MatchRequest(&DNSRequest{Hostname: "host7", ClientIP: "2001::c0:feee"})
-	assertMatchRuleText(t, rulesText[7], res, ok)
-
-	// match client name
-	res, ok = dnsEngine.MatchRequest(&DNSRequest{Hostname: "host8", ClientName: "Frank's laptop"})
-	assertMatchRuleText(t, rulesText[8], res, ok)
-
-	// not match client name
-	_, ok = dnsEngine.MatchRequest(&DNSRequest{Hostname: "host8", ClientName: "Franks laptop"})
-	assert.False(t, ok)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			res, ok := dnsEngine.MatchRequest(tc.req)
+			if tc.wantRes == "" {
+				assert.False(t, ok)
+			} else {
+				assertMatchRuleText(t, tc.wantRes, res, ok)
+			}
+		})
+	}
 }
 
 func TestBadfilterRules(t *testing.T) {
@@ -523,7 +566,7 @@ func TestDNSEngine_MatchRequest_dnsType(t *testing.T) {
 		r := &DNSRequest{
 			Hostname: "simple_client",
 			DNSType:  dns.TypeAAAA,
-			ClientIP: "127.0.0.1",
+			ClientIP: testIPv4,
 		}
 
 		_, ok := dnsEngine.MatchRequest(r)
@@ -532,7 +575,7 @@ func TestDNSEngine_MatchRequest_dnsType(t *testing.T) {
 		r = &DNSRequest{
 			Hostname: "simple_client",
 			DNSType:  dns.TypeAAAA,
-			ClientIP: "127.0.0.2",
+			ClientIP: anotherIPv4,
 		}
 		_, ok = dnsEngine.MatchRequest(r)
 		assert.False(t, ok)
@@ -540,7 +583,7 @@ func TestDNSEngine_MatchRequest_dnsType(t *testing.T) {
 		r = &DNSRequest{
 			Hostname: "simple_client",
 			DNSType:  dns.TypeA,
-			ClientIP: "127.0.0.1",
+			ClientIP: testIPv4,
 		}
 		_, ok = dnsEngine.MatchRequest(r)
 		assert.False(t, ok)
@@ -550,7 +593,7 @@ func TestDNSEngine_MatchRequest_dnsType(t *testing.T) {
 		r := &DNSRequest{
 			Hostname: "priority",
 			DNSType:  dns.TypeAAAA,
-			ClientIP: "127.0.0.1",
+			ClientIP: testIPv4,
 		}
 
 		res, ok := dnsEngine.MatchRequest(r)
@@ -560,7 +603,7 @@ func TestDNSEngine_MatchRequest_dnsType(t *testing.T) {
 		r = &DNSRequest{
 			Hostname: "priority",
 			DNSType:  dns.TypeA,
-			ClientIP: "127.0.0.1",
+			ClientIP: testIPv4,
 		}
 		res, ok = dnsEngine.MatchRequest(r)
 		assert.True(t, ok)
@@ -573,7 +616,7 @@ func TestSlash(t *testing.T) {
 	dnsEngine := NewDNSEngine(ruleStorage)
 	assert.NotNil(t, dnsEngine)
 
-	r, ok := dnsEngine.MatchRequest(&DNSRequest{Hostname: "example.org", ClientIP: "0.0.0.0"})
+	r, ok := dnsEngine.Match("example.org")
 	assert.False(t, ok)
 	assert.True(t, r.NetworkRule == nil && r.HostRulesV4 == nil && r.HostRulesV6 == nil)
 }

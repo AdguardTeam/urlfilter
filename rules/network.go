@@ -2,12 +2,14 @@ package rules
 
 import (
 	"fmt"
+	"net/netip"
 	"regexp"
 	"strings"
 	"sync"
 
 	"github.com/AdguardTeam/golibs/errors"
 	"github.com/AdguardTeam/urlfilter/filterutil"
+	"golang.org/x/exp/slices"
 )
 
 const (
@@ -410,10 +412,10 @@ func (f *NetworkRule) negatesBadfilter(r *NetworkRule) bool {
 		f.restrictedRequestTypes != r.restrictedRequestTypes,
 		(f.enabledOptions ^ OptionBadfilter) != r.enabledOptions,
 		f.disabledOptions != r.disabledOptions,
-		!stringArraysEquals(f.permittedDomains, r.permittedDomains),
-		!stringArraysEquals(f.restrictedDomains, r.restrictedDomains),
-		!stringArraysEquals(f.permittedClientTags, r.permittedClientTags),
-		!stringArraysEquals(f.restrictedClientTags, r.restrictedClientTags),
+		!slices.Equal(f.permittedDomains, r.permittedDomains),
+		!slices.Equal(f.restrictedDomains, r.restrictedDomains),
+		!slices.Equal(f.permittedClientTags, r.permittedClientTags),
+		!slices.Equal(f.restrictedClientTags, r.restrictedClientTags),
 		!f.permittedClients.Equal(r.permittedClients),
 		!f.restrictedClients.Equal(r.restrictedClients):
 		return false
@@ -535,8 +537,10 @@ func (f *NetworkRule) matchRequestDomain(domain string, hostnameRequest bool) (o
 	// only come from CNAME filtering.  So regardless of whether it actually
 	// matches the "denyallow" list, we consider that it does not.
 	// Original issue: https://github.com/AdguardTeam/AdGuardHome/issues/3175.
-	if hostnameRequest && filterutil.ParseIP(domain) != nil {
-		return false
+	if hostnameRequest && filterutil.IsProbablyIP(domain) {
+		if _, err := netip.ParseAddr(domain); err == nil {
+			return false
+		}
 	}
 
 	return !isDomainOrSubdomainOfAny(domain, f.denyAllowDomains)
@@ -632,27 +636,30 @@ func (f *NetworkRule) matchClientTags(sortedTags []string) bool {
 	return true
 }
 
-// matchClient returns TRUE if the rule matches with the specified client
-// name -- client name (if any)
-// ip -- client ip (if any)
-func (f *NetworkRule) matchClient(name, ip string) bool {
-	if f.restrictedClients.Len() == 0 && f.permittedClients.Len() == 0 {
-		return true // the rule doesn't contain $client modifier
+// matchClient returns true if the rule is specified for client defined by
+// host or ip.  Both host and ip can be empty.
+func (f *NetworkRule) matchClient(host string, ip netip.Addr) bool {
+	restLen := f.restrictedClients.Len()
+	permLen := f.permittedClients.Len()
+
+	if restLen == 0 && permLen == 0 {
+		// The rule has no $client modifier.
+		return true
 	}
 
-	if f.restrictedClients.containsAny(name, ip) {
-		// the client is in the restricted set
+	if f.restrictedClients.containsAny(host, ip) {
+		// The client is in the restricted set.
 		return false
 	}
 
-	if f.permittedClients.Len() != 0 {
-		// If the rule is permitted for specific client only,
-		// we should check whether our client is among
-		// permitted or not and return the result immediately
-		return f.permittedClients.containsAny(name, ip)
+	if permLen != 0 {
+		// If the rule is permitted for specific client only, check whether the
+		// client is among permitted.
+		return f.permittedClients.containsAny(host, ip)
 	}
 
-	// If we got here, permitted list is empty and the client is not among restricted
+	// If we got here, permitted list is empty and the client is not among
+	// restricted.
 	return true
 }
 

@@ -6,13 +6,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestFindSorted(t *testing.T) {
-	assert.Equal(t, -1, findSorted([]string{"b"}, "a"))
-	assert.Equal(t, 0, findSorted([]string{"a"}, "a"))
-	assert.Equal(t, 0, findSorted([]string{"a", "b"}, "a"))
-	assert.Equal(t, 3, findSorted([]string{"a", "b", "c", "d"}, "d"))
-}
-
 func TestSplitWithEscapeCharacter(t *testing.T) {
 	str := "opt1,opt2"
 	parts := splitWithEscapeCharacter(str, ',', '\\', false)

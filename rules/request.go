@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"net/netip"
 	"strings"
 
 	"github.com/AdguardTeam/urlfilter/filterutil"
@@ -60,51 +61,58 @@ func (t RequestType) Count() int {
 	return count
 }
 
-// Request represents a web request with all it's necessary properties
+// Request represents a web filtering request with all it's necessary
+// properties.
 type Request struct {
-	// URL is the request URL.
-	URL string
+	// ClientIP is the IP address to match against $client modifiers.  The
+	// default zero value won't be considered.
+	ClientIP netip.Addr
 
-	// URLLowerCase is the request URL in lower case.
-	URLLowerCase string
-
-	// Hostname is the request hostname.
-	Hostname string
-
-	// Domain is the request domain (eTLD+1).
-	Domain string
-
-	// SourceURL is the source URL.
-	SourceURL string
-
-	// SourceHostname is the source hostname.
-	SourceHostname string
-
-	// SourceDomain is the source domain (eTLD+1).
-	SourceDomain string
-
-	// ClientIP is the client IP address.
-	ClientIP string
-
-	// ClientName is the client name.
+	// ClientName is the name to match against $client modifiers.  The default
+	// empty value won't be considered.
 	ClientName string
 
-	// SortedClientTags is the sorted list of client tags ($ctag).
+	// URL is the full request URL.
+	URL string
+
+	// URLLowerCase is the full request URL in lower case.
+	URLLowerCase string
+
+	// Hostname is the hostname to filter.
+	Hostname string
+
+	// Domain is the effective top-level domain of the request with an
+	// additional label.
+	Domain string
+
+	// SourceURL is the full URL of the source.
+	SourceURL string
+
+	// SourceHostname is the hostname of the source.
+	SourceHostname string
+
+	// SourceDomain is the effective top-level domain of the source with an
+	// additional label.
+	SourceDomain string
+
+	// SortedClientTags is the list of tags to match against $ctag modifiers.
 	SortedClientTags []string
 
-	// RequestType is the type of the request.
+	// RequestType is the type of the filtering request.
 	RequestType RequestType
 
-	// DNSType is the type of the resource record (RR) of a DNS request.  See
-	// package github.com/miekg/dns for all acceptable constants.
+	// DNSType is the type of the resource record (RR) of a DNS request, for
+	// example "A" or "AAAA".  See [RRValue] for all acceptable constants and
+	// their corresponding values.
 	DNSType uint16
 
-	// ThirdParty is true if request is third-party.
+	// ThirdParty is true if the filtering request should consider $third-party
+	// modifier.
 	ThirdParty bool
 
 	// IsHostnameRequest means that the request is for a given Hostname, and not
 	// for a URL, and we don't really know what protocol it is.  This can be
-	// true for DNS requests, or for HTTP CONNECT, or SNI matching.
+	// true for DNS requests, for HTTP CONNECT, or for SNI matching.
 	IsHostnameRequest bool
 }
 

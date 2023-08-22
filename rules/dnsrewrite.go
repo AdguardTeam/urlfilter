@@ -2,6 +2,7 @@ package rules
 
 import (
 	"fmt"
+	"net/netip"
 	"strconv"
 	"strings"
 
@@ -17,36 +18,30 @@ type RCode = int
 // type.
 type RRType = uint16
 
-// RRValue is the value of a resource record.
-//
-// If the corresponding RRType is either dns.TypeA or dns.TypeAAAA, the
-// underlying type of RRValue is net.IP.
-//
-// If the RRType is dns.TypeMX, the underlying value is a non-nil *DNSMX.
-//
-// If the RRType is either dns.TypePTR the underlying type of Value is string,
-// and it is a valid FQDN.
-//
-// If the RRType is either dns.TypeTXT, the underlying type of Value is string.
-//
-// If the RRType is either dns.TypeHTTPS or dns.TypeSVCB, the underlying value
-// is a non-nil *DNSSVCB.
-//
-// If the RRType is dns.TypeSRV, the underlying value is a non-nil *DNSSRV.
-//
-// Otherwise, currently, it is nil.  New types may be added in the future.
-type RRValue = interface{}
+// RRValue is the value of a resource record.  Depending on the [RRType], it
+// will have different types:
+//   - [netip.Addr] for [dns.TypeA] and [dns.TypeAAAA];
+//   - non-nil [*DNSMX] for [dns.TypeMX];
+//   - string for [dns.TypePTR] (it's also a valid FQDN);
+//   - string for [dns.TypeTXT];
+//   - non-nil [*DNSSVCB] for [dns.TypeHTTPS] and [dns.TypeSVCB];
+//   - non-nil [*DNSSRV] for [dns.TypeSRV];
+//   - nil otherwise, but new types may be added in the future.
+type RRValue = any
 
 // DNSRewrite is a DNS rewrite ($dnsrewrite) rule.
 type DNSRewrite struct {
-	// Value is the value for the record.  See the RRValue documentation for
-	// more details.
+	// Value is the value for the record.  See [RRValue] documentation for more
+	// details.
 	Value RRValue
+
 	// NewCNAME is the new CNAME.  If set, clients must ignore other fields,
-	// resolve the CNAME, and set the new A and AAAA records accordingly.
+	// resolve the CNAME, and set the new records accordingly.
 	NewCNAME string
+
 	// RCode is the new DNS RCODE.
 	RCode RCode
+
 	// RRType is the new DNS resource record (RR) type.  It is only non-zero
 	// if RCode is dns.RCodeSuccess.
 	RRType RRType
@@ -134,7 +129,9 @@ func loadDNSRewriteShort(s string) (rewrite *DNSRewrite, err error) {
 		// Return an empty DNSRewrite, because an empty string most probably
 		// means that this is a disabling allowlist case.
 		return &DNSRewrite{}, nil
-	} else if allUppercaseASCII(s) {
+	}
+
+	if allUppercaseASCII(s) {
 		switch s {
 		case
 			"NOERROR",
@@ -149,21 +146,22 @@ func loadDNSRewriteShort(s string) (rewrite *DNSRewrite, err error) {
 		}
 	}
 
-	ip := filterutil.ParseIP(s)
-	if ip != nil {
-		if ip4 := ip.To4(); ip4 != nil {
+	if filterutil.IsProbablyIP(s) {
+		if ip, parseErr := netip.ParseAddr(s); parseErr == nil {
+			if ip.Is4() {
+				return &DNSRewrite{
+					RCode:  dns.RcodeSuccess,
+					RRType: dns.TypeA,
+					Value:  ip,
+				}, nil
+			}
+
 			return &DNSRewrite{
 				RCode:  dns.RcodeSuccess,
-				RRType: dns.TypeA,
+				RRType: dns.TypeAAAA,
 				Value:  ip,
 			}, nil
 		}
-
-		return &DNSRewrite{
-			RCode:  dns.RcodeSuccess,
-			RRType: dns.TypeAAAA,
-			Value:  ip,
-		}, nil
 	}
 
 	err = validateHost(s)
@@ -202,6 +200,10 @@ type DNSSVCB struct {
 
 // dnsRewriteRRHandler is a function that parses values for specific resource
 // record types.
+//
+// TODO(e.burkov):  Since these functions are used here only as values of
+// [dnsRewriteRRHandlers] map, which has a key of [RRType], the rr parameter
+// appears useless in most cases except for [svcbDNSRewriteRRHandler].
 type dnsRewriteRRHandler func(rcode RCode, rr RRType, valStr string) (dnsr *DNSRewrite, err error)
 
 // cnameDNSRewriteRRHandler is a DNS rewrite handler that parses full-form CNAME
@@ -392,9 +394,14 @@ func svcbDNSRewriteRRHandler(rcode RCode, rr RRType, valStr string) (dnsr *DNSRe
 // handlers.
 var dnsRewriteRRHandlers = map[RRType]dnsRewriteRRHandler{
 	dns.TypeA: func(rcode RCode, rr RRType, valStr string) (dnsr *DNSRewrite, err error) {
-		ip := filterutil.ParseIP(valStr)
-		if ip4 := ip.To4(); ip4 == nil {
-			return nil, fmt.Errorf("invalid ipv4: %q", valStr)
+		var ip netip.Addr
+		if !filterutil.IsProbablyIP(valStr) {
+			return nil, fmt.Errorf("%q is not a valid ipv4", valStr)
+		} else if ip, err = netip.ParseAddr(valStr); err != nil {
+			// Don't wrap the error since it's informative enough as is.
+			return nil, err
+		} else if !ip.Is4() {
+			return nil, fmt.Errorf("%q is not a valid ipv4", valStr)
 		}
 
 		return &DNSRewrite{
@@ -405,11 +412,14 @@ var dnsRewriteRRHandlers = map[RRType]dnsRewriteRRHandler{
 	},
 
 	dns.TypeAAAA: func(rcode RCode, rr RRType, valStr string) (dnsr *DNSRewrite, err error) {
-		ip := filterutil.ParseIP(valStr)
-		if ip == nil {
-			return nil, fmt.Errorf("invalid ipv6: %q", valStr)
-		} else if ip4 := ip.To4(); ip4 != nil {
-			return nil, fmt.Errorf("want ipv6, got ipv4: %q", valStr)
+		var ip netip.Addr
+		if !filterutil.IsProbablyIP(valStr) {
+			return nil, fmt.Errorf("%q is not a valid ipv6", valStr)
+		} else if ip, err = netip.ParseAddr(valStr); err != nil {
+			// Don't wrap the error since it's informative enough as is.
+			return nil, err
+		} else if !ip.Is6() {
+			return nil, fmt.Errorf("%q is an ipv4, not an ipv6", valStr)
 		}
 
 		return &DNSRewrite{

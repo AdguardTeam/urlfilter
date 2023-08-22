@@ -3,20 +3,8 @@ package rules
 import (
 	"strings"
 
-	"golang.org/x/exp/slices"
 	"golang.org/x/net/publicsuffix"
 )
-
-// findSorted - finds value in a sorted array
-// returns value index or -1 if nothing found
-func findSorted(sortedArray []string, val string) int {
-	i, ok := slices.BinarySearch(sortedArray, val)
-	if ok && sortedArray[i] == val {
-		return i
-	}
-
-	return -1
-}
 
 // splitWithEscapeCharacter splits string by the specified separator if it is not escaped
 func splitWithEscapeCharacter(str string, sep, escapeCharacter byte, preserveAllTokens bool) []string {
@@ -57,21 +45,6 @@ func splitWithEscapeCharacter(str string, sep, escapeCharacter byte, preserveAll
 	}
 
 	return parts
-}
-
-// stringArraysEquals checks if arrays are equal
-func stringArraysEquals(l, r []string) bool {
-	if len(l) != len(r) {
-		return false
-	}
-
-	for i := range l {
-		if l[i] != r[i] {
-			return false
-		}
-	}
-
-	return true
 }
 
 // isDomainOrSubdomainOfAny checks if "domain" is domain or subdomain or any of the "domains"
