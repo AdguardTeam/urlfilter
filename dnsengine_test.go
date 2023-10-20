@@ -7,126 +7,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/AdguardTeam/golibs/testutil"
 	"github.com/AdguardTeam/urlfilter/filterlist"
 	"github.com/AdguardTeam/urlfilter/filterutil"
 	"github.com/miekg/dns"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-const (
-	networkFilterPath = testResourcesDir + "/adguard_sdn_filter.txt"
-	hostsPath         = testResourcesDir + "/hosts"
-)
-
-func TestDNSEngine_bench(t *testing.T) {
-	debug.SetGCPercent(10)
-
-	filterRuleList, err := filterlist.NewFileRuleList(1, networkFilterPath, true)
-	if err != nil {
-		t.Fatalf("cannot read %s", networkFilterPath)
-	}
-
-	hostsRuleList, err := filterlist.NewFileRuleList(2, hostsPath, true)
-	if err != nil {
-		t.Fatalf("cannot read %s", hostsPath)
-	}
-
-	ruleLists := []filterlist.RuleList{
-		filterRuleList,
-		hostsRuleList,
-	}
-	ruleStorage, err := filterlist.NewRuleStorage(ruleLists)
-	if err != nil {
-		t.Fatalf("cannot create rule storage: %s", err)
-	}
-	defer func() { assert.Nil(t, ruleStorage.Close()) }()
-
-	testRequests := loadRequests(t)
-	assert.True(t, len(testRequests) > 0)
-	var testHostnames []string
-	for _, req := range testRequests {
-		h := filterutil.ExtractHostname(req.URL)
-		if h != "" {
-			testHostnames = append(testHostnames, h)
-		}
-	}
-
-	startHeap, startRSS := alloc(t)
-	t.Logf(
-		"Allocated before loading rules (heap/RSS, kiB): %d/%d",
-		startHeap,
-		startRSS,
-	)
-
-	startParse := time.Now()
-	dnsEngine := NewDNSEngine(ruleStorage)
-	assert.NotNil(t, dnsEngine)
-
-	t.Logf("Elapsed on parsing rules: %v", time.Since(startParse))
-	t.Logf("Rules count - %v", dnsEngine.RulesCount)
-
-	loadHeap, loadRSS := alloc(t)
-	t.Logf(
-		"Allocated after loading rules (heap/RSS, kiB): %d/%d (%d/%d diff)",
-		loadHeap,
-		loadRSS,
-		loadHeap-startHeap,
-		loadRSS-startRSS,
-	)
-
-	totalMatches := 0
-	totalElapsed := time.Duration(0)
-	minElapsedMatch := time.Hour
-	minElapsedHostname := ""
-	maxElapsedMatch := time.Duration(0)
-	maxElapsedHostname := ""
-
-	for i, reqHostname := range testHostnames {
-		if i != 0 && i%10000 == 0 {
-			t.Logf("Processed %d requests", i)
-		}
-
-		startMatch := time.Now()
-		res, found := dnsEngine.Match(reqHostname)
-		elapsedMatch := time.Since(startMatch)
-		totalElapsed += elapsedMatch
-		if elapsedMatch > maxElapsedMatch {
-			maxElapsedMatch = elapsedMatch
-			maxElapsedHostname = reqHostname
-		}
-		if elapsedMatch < minElapsedMatch {
-			minElapsedMatch = elapsedMatch
-			minElapsedHostname = reqHostname
-		}
-
-		if found {
-			if res.NetworkRule != nil {
-				if !res.NetworkRule.Whitelist {
-					totalMatches++
-				}
-			} else if res.HostRulesV4 != nil || res.HostRulesV6 != nil {
-				totalMatches++
-			}
-		}
-	}
-
-	t.Logf("Total matches: %d", totalMatches)
-	t.Logf("Total elapsed: %v", totalElapsed)
-	t.Logf("Average per request: %v", time.Duration(int64(totalElapsed)/int64(len(testHostnames))))
-	t.Logf("Max per request: %v, on %s", maxElapsedMatch, maxElapsedHostname)
-	t.Logf("Min per request: %v, on %s", minElapsedMatch, minElapsedHostname)
-	t.Logf("Storage cache length: %d", ruleStorage.GetCacheSize())
-
-	matchHeap, matchRSS := alloc(t)
-	t.Logf(
-		"Allocated after matching (heap/RSS, kiB): %d/%d (%d/%d diff)",
-		matchHeap,
-		matchRSS,
-		matchHeap-loadHeap,
-		matchRSS-loadRSS,
-	)
-}
 
 func TestDNSEnginePriority(t *testing.T) {
 	rulesText := `@@||example.org^
@@ -627,4 +514,160 @@ func assertMatchRuleText(t *testing.T, rulesText string, rules *DNSResult, ok bo
 		assert.NotNil(t, rules.NetworkRule)
 		assert.Equal(t, rulesText, rules.NetworkRule.Text())
 	}
+}
+
+const (
+	networkFilterPath = testResourcesDir + "/adguard_sdn_filter.txt"
+	hostsPath         = testResourcesDir + "/hosts"
+)
+
+func BenchmarkDNSEngine(b *testing.B) {
+	debug.SetGCPercent(10)
+
+	ruleStorage := newRuleStorage(b)
+	testutil.CleanupAndRequireSuccess(b, ruleStorage.Close)
+
+	testHostnames := loadHostnames(b)
+
+	startHeap, startRSS := alloc(b)
+	b.Logf(
+		"Allocated before loading rules (heap/RSS, kiB): %d/%d",
+		startHeap,
+		startRSS,
+	)
+
+	startParse := time.Now()
+	dnsEngine := NewDNSEngine(ruleStorage)
+	assert.NotNil(b, dnsEngine)
+
+	b.Logf("Elapsed on parsing rules: %v", time.Since(startParse))
+	b.Logf("Rules count - %v", dnsEngine.RulesCount)
+
+	loadHeap, loadRSS := alloc(b)
+	b.Logf(
+		"Allocated after loading rules (heap/RSS, kiB): %d/%d (%d/%d diff)",
+		loadHeap,
+		loadRSS,
+		loadHeap-startHeap,
+		loadRSS-startRSS,
+	)
+
+	totalMatches := 0
+	totalElapsed := time.Duration(0)
+	minElapsedMatch := time.Hour
+	minElapsedHostname := ""
+	maxElapsedMatch := time.Duration(0)
+	maxElapsedHostname := ""
+
+	for i, reqHostname := range testHostnames {
+		if i != 0 && i%10000 == 0 {
+			b.Logf("Processed %d requests", i)
+		}
+
+		startMatch := time.Now()
+		res, found := dnsEngine.Match(reqHostname)
+		elapsedMatch := time.Since(startMatch)
+		totalElapsed += elapsedMatch
+		if elapsedMatch > maxElapsedMatch {
+			maxElapsedMatch = elapsedMatch
+			maxElapsedHostname = reqHostname
+		}
+		if elapsedMatch < minElapsedMatch {
+			minElapsedMatch = elapsedMatch
+			minElapsedHostname = reqHostname
+		}
+
+		if found {
+			if res.NetworkRule != nil {
+				if !res.NetworkRule.Whitelist {
+					totalMatches++
+				}
+			} else if res.HostRulesV4 != nil || res.HostRulesV6 != nil {
+				totalMatches++
+			}
+		}
+	}
+
+	b.Logf("Total matches: %d", totalMatches)
+	b.Logf("Total elapsed: %v", totalElapsed)
+	b.Logf("Average per request: %v", time.Duration(int64(totalElapsed)/int64(len(testHostnames))))
+	b.Logf("Max per request: %v, on %s", maxElapsedMatch, maxElapsedHostname)
+	b.Logf("Min per request: %v, on %s", minElapsedMatch, minElapsedHostname)
+	b.Logf("Storage cache length: %d", ruleStorage.GetCacheSize())
+
+	matchHeap, matchRSS := alloc(b)
+	b.Logf(
+		"Allocated after matching (heap/RSS, kiB): %d/%d (%d/%d diff)",
+		matchHeap,
+		matchRSS,
+		matchHeap-loadHeap,
+		matchRSS-loadRSS,
+	)
+}
+
+// Sinks for benchmarks.
+var (
+	matchedSink bool
+	resultSink  *DNSResult
+)
+
+func BenchmarkDNSEngine_Match(b *testing.B) {
+	testHostnames := loadHostnames(b)
+
+	ruleStorage := newRuleStorage(b)
+	testutil.CleanupAndRequireSuccess(b, ruleStorage.Close)
+
+	dnsEngine := NewDNSEngine(ruleStorage)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		for _, reqHostname := range testHostnames {
+			resultSink, matchedSink = dnsEngine.Match(reqHostname)
+		}
+	}
+
+	// Most recent results, on a MBP 14 with Apple M1 Pro chip:
+	//
+	//	goos: darwin
+	//  goarch: arm64
+	//  pkg: github.com/AdguardTeam/urlfilter
+	//  BenchmarkDNSEngine_Match
+	//  BenchmarkDNSEngine_Match-8   	      34	  33710070 ns/op	 3557557 B/op	   81918 allocs/op
+}
+
+// newRuleStorage returns new properly initialized rules storage with test data.
+func newRuleStorage(t *testing.B) (ruleStorage *filterlist.RuleStorage) {
+	t.Helper()
+
+	filterRuleList, err := filterlist.NewFileRuleList(1, networkFilterPath, true)
+	require.NoError(t, err)
+
+	hostsRuleList, err := filterlist.NewFileRuleList(2, hostsPath, true)
+	require.NoError(t, err)
+
+	ruleLists := []filterlist.RuleList{
+		filterRuleList,
+		hostsRuleList,
+	}
+
+	ruleStorage, err = filterlist.NewRuleStorage(ruleLists)
+	require.NoError(t, err)
+
+	return ruleStorage
+}
+
+// loadHostnames returns a slice of test hostnames.
+func loadHostnames(t *testing.B) (hostnames []string) {
+	t.Helper()
+
+	for _, req := range loadRequests(t) {
+		h := filterutil.ExtractHostname(req.URL)
+		if h != "" {
+			hostnames = append(hostnames, h)
+		}
+	}
+
+	return hostnames
 }

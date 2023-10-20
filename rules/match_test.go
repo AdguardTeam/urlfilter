@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewMatchingResult(t *testing.T) {
@@ -165,4 +166,65 @@ func TestRemoveDNSRewriteRules(t *testing.T) {
 		assert.Equal(t, "host1", got[0].RuleText)
 		assert.Equal(t, "host3", got[1].RuleText)
 	}
+}
+
+func TestGetDNSBasicRule(t *testing.T) {
+	blockRule := newTestRule(t, "example.block")
+	allowlistRule := newTestRule(t, "@@||example.allow^")
+	importantBlockRule := newTestRule(t, "example.block$important")
+
+	testCases := []struct {
+		want  *NetworkRule
+		name  string
+		rules []*NetworkRule
+	}{{
+		want:  nil,
+		rules: []*NetworkRule{},
+		name:  "empty",
+	}, {
+		want: blockRule,
+		rules: []*NetworkRule{
+			blockRule,
+		},
+		name: "basic",
+	}, {
+		want: allowlistRule,
+		rules: []*NetworkRule{
+			blockRule,
+			allowlistRule,
+		},
+		name: "allowlist",
+	}, {
+		want: importantBlockRule,
+		rules: []*NetworkRule{
+			blockRule,
+			allowlistRule,
+			importantBlockRule,
+		},
+		name: "important",
+	}, {
+		want: blockRule,
+		rules: []*NetworkRule{
+			blockRule,
+			newTestRule(t, "@@||example.org^$stealth"),
+		},
+		name: "stealth",
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			r := GetDNSBasicRule(tc.rules)
+			assert.Equal(t, tc.want, r)
+		})
+	}
+}
+
+// newTestRule returns a network rule created from given source text.
+func newTestRule(t *testing.T, srcText string) (r *NetworkRule) {
+	t.Helper()
+
+	r, err := NewNetworkRule(srcText, 1)
+	require.NoError(t, err)
+
+	return r
 }

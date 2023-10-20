@@ -1,6 +1,9 @@
 github.com/AdguardTeam/golibs v0.4.0/go.mod h1:skKsDKIBB7kkFflLJBpfGX+G8QFTx0WKUzB6TIgtUj4=
 github.com/AdguardTeam/golibs v0.15.0 h1:yOv/fdVkJIOWKr0NlUXAE9RA0DK9GKiBbiGzq47vY7o=
 github.com/AdguardTeam/golibs v0.15.0/go.mod h1:66ZLs8P7nk/3IfKroQ1rqtieLk+5eXYXMBKXlVL7KeI=
+github.com/AdguardTeam/golibs v0.17.1/go.mod h1:DKhCIXHcUYtBhU8ibTLKh1paUL96n5zhQBlx763sj+U=
+github.com/AdguardTeam/golibs v0.17.2 h1:vg6wHMjUKscnyPGRvxS5kAt7Uw4YxcJiITZliZ476W8=
+github.com/AdguardTeam/golibs v0.17.2/go.mod h1:DKhCIXHcUYtBhU8ibTLKh1paUL96n5zhQBlx763sj+U=
 github.com/AdguardTeam/gomitmproxy v0.2.1 h1:p9gr8Er1TYvf+7ic81Ax1sZ62UNCsMTZNbm7tC59S9o=
 github.com/AdguardTeam/gomitmproxy v0.2.1/go.mod h1:Qdv0Mktnzer5zpdpi5rAwixNJzW2FN91LjKJCkVbYGU=
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=

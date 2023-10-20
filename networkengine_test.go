@@ -261,7 +261,7 @@ func newTestRuleStorage(t *testing.T, listID int, rulesText string) *filterlist.
 	return ruleStorage
 }
 
-func loadRequests(t *testing.T) []testRequest {
+func loadRequests(t testing.TB) []testRequest {
 	if _, err := os.Stat(requestsPath); errors.Is(err, os.ErrNotExist) {
 		err = unzip(requestsPath+".zip", testResourcesDir)
 		if err != nil {
@@ -365,7 +365,7 @@ func unzip(src, dest string) (err error) {
 }
 
 // alloc returns the heap and RSS memory sizes, in kibibytes.
-func alloc(t *testing.T) (heap, rss uint64) {
+func alloc(t testing.TB) (heap, rss uint64) {
 	p, err := process.NewProcess(int32(os.Getpid()))
 	require.NoError(t, err)
 

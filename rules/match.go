@@ -138,6 +138,32 @@ func NewMatchingResult(rules, sourceRules []*NetworkRule) (result *MatchingResul
 	return result
 }
 
+// GetDNSBasicRule returns a rule that should be applied to the DNS request.
+func GetDNSBasicRule(rules []*NetworkRule) (basicRule *NetworkRule) {
+	rules = removeBadfilterRules(rules)
+	rules = removeDNSRewriteRules(rules)
+
+	for _, rule := range rules {
+		switch {
+		case rule.IsOptionEnabled(OptionReplace):
+			// $replace rules have a higher priority than other basic rules
+			// (including exception rules).
+			return nil
+		case rule.IsOptionEnabled(OptionCookie) ||
+			rule.IsOptionEnabled(OptionCsp) ||
+			rule.IsOptionEnabled(OptionStealth):
+			// Skip rules with other options.
+			continue
+		default:
+			if basicRule == nil || rule.IsHigherPriority(basicRule) {
+				basicRule = rule
+			}
+		}
+	}
+
+	return basicRule
+}
+
 // GetBasicResult returns a rule that should be applied to the web request.
 //
 // Possible outcomes are:

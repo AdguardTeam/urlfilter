@@ -3,7 +3,7 @@ module github.com/AdguardTeam/urlfilter
 go 1.20
 
 require (
-	github.com/AdguardTeam/golibs v0.15.0
+	github.com/AdguardTeam/golibs v0.17.2
 	github.com/AdguardTeam/gomitmproxy v0.2.1
 	github.com/jessevdk/go-flags v1.5.0
 	github.com/miekg/dns v1.1.55

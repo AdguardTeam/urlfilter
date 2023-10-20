@@ -157,30 +157,37 @@ func NewRequest(url, sourceURL string, requestType RequestType) *Request {
 	return &r
 }
 
-// NewRequestForHostname creates a new instance of "Request" for matching a
-// hostname.  It uses "http://" as a protocol and TypeDocument as a request
+// NewRequestForHostname creates a new instance of [Request] for matching the
+// hostname.  It uses "http://" as a protocol and [TypeDocument] as a request
 // type.
 func NewRequestForHostname(hostname string) (r *Request) {
+	r = &Request{}
+	FillRequestForHostname(r, hostname)
+
+	return r
+}
+
+// FillRequestForHostname fills an instance of request r for matching the
+// hostname.  It uses "http://" as a protocol for request URL and [TypeDocument]
+// as request type.
+func FillRequestForHostname(r *Request, hostname string) {
 	// Do not use fmt.Sprintf or url.URL to achieve better performance.
 	// Hostname validation should be performed by the function caller.
 	urlStr := "http://" + hostname
 
-	r = &Request{
-		RequestType:       TypeDocument,
-		URL:               urlStr,
-		URLLowerCase:      urlStr,
-		Hostname:          hostname,
-		ThirdParty:        false,
-		IsHostnameRequest: true,
-	}
+	r.URL = urlStr
+	r.URLLowerCase = urlStr
+	r.Hostname = hostname
+
+	r.RequestType = TypeDocument
+	r.ThirdParty = false
+	r.IsHostnameRequest = true
 
 	if domain := effectiveTLDPlusOne(r.Hostname); domain != "" {
 		r.Domain = domain
 	} else {
 		r.Domain = r.Hostname
 	}
-
-	return r
 }
 
 // effectiveTLDPlusOne is a faster version of publicsuffix.EffectiveTLDPlusOne

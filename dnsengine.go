@@ -3,6 +3,7 @@ package urlfilter
 import (
 	"net/netip"
 
+	"github.com/AdguardTeam/golibs/syncutil"
 	"github.com/AdguardTeam/urlfilter/filterlist"
 	"github.com/AdguardTeam/urlfilter/filterutil"
 	"github.com/AdguardTeam/urlfilter/rules"
@@ -22,6 +23,9 @@ type DNSEngine struct {
 
 	// rulesStorage is the storage of all rules.
 	rulesStorage *filterlist.RuleStorage
+
+	// pool is the pool of [rules.Request] values.
+	pool *syncutil.Pool[rules.Request]
 
 	// RulesCount is the count of rules loaded to the engine.
 	RulesCount int
@@ -92,6 +96,9 @@ func NewDNSEngine(s *filterlist.RuleStorage) *DNSEngine {
 		rulesStorage: s,
 		lookupTable:  make(map[uint32][]int64, hostRulesCount),
 		RulesCount:   0,
+		pool: syncutil.NewPool(func() (v *rules.Request) {
+			return &rules.Request{}
+		}),
 	}
 
 	networkEngine := NewNetworkEngineSkipStorageScan(s)
@@ -126,6 +133,21 @@ func (d *DNSEngine) Match(hostname string) (res *DNSResult, matched bool) {
 	return d.MatchRequest(&DNSRequest{Hostname: hostname})
 }
 
+// getRequestFromPool returns an instance of request from the engine's pool.
+// Fills it's properties to match the given DNS request.
+func (d *DNSEngine) getRequestFromPool(dReq *DNSRequest) (req *rules.Request) {
+	req = d.pool.Get()
+
+	req.SortedClientTags = dReq.SortedClientTags
+	req.ClientIP = dReq.ClientIP
+	req.ClientName = dReq.ClientName
+	req.DNSType = dReq.DNSType
+
+	rules.FillRequestForHostname(req, dReq.Hostname)
+
+	return req
+}
+
 // MatchRequest matches the specified DNS request.  The return parameter matched
 // is true if the result has a basic network rule or some host rules.
 //
@@ -144,19 +166,15 @@ func (d *DNSEngine) MatchRequest(dReq *DNSRequest) (res *DNSResult, matched bool
 		return res, false
 	}
 
-	r := rules.NewRequestForHostname(dReq.Hostname)
-	r.SortedClientTags = dReq.SortedClientTags
-	r.ClientIP = dReq.ClientIP
-	r.ClientName = dReq.ClientName
-	r.DNSType = dReq.DNSType
+	r := d.getRequestFromPool(dReq)
+	defer d.pool.Put(r)
 
 	res.NetworkRules = d.networkEngine.MatchAll(r)
-
-	result := rules.NewMatchingResult(res.NetworkRules, nil)
-	resultRule := result.GetBasicResult()
+	resultRule := rules.GetDNSBasicRule(res.NetworkRules)
 	if resultRule != nil {
 		// Network rules always have higher priority.
 		res.NetworkRule = resultRule
+
 		return res, true
 	}
 
