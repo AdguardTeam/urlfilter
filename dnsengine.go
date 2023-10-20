@@ -138,6 +138,10 @@ func (d *DNSEngine) Match(hostname string) (res *DNSResult, matched bool) {
 func (d *DNSEngine) getRequestFromPool(dReq *DNSRequest) (req *rules.Request) {
 	req = d.pool.Get()
 
+	req.SourceDomain = ""
+	req.SourceHostname = ""
+	req.SourceURL = ""
+
 	req.SortedClientTags = dReq.SortedClientTags
 	req.ClientIP = dReq.ClientIP
 	req.ClientName = dReq.ClientName
