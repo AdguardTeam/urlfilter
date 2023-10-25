@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"fmt"
 	"net/netip"
 	"testing"
 
@@ -228,24 +229,28 @@ func TestNetworkRule_ParseModifiers(t *testing.T) {
 	}
 }
 
-func TestNetworkRule_CountModifiers(t *testing.T) {
-	for _, tc := range []struct {
-		option  NetworkRuleOption
-		wantNum int
+func TestNetworkRuleOption_Count(t *testing.T) {
+	testCases := []struct {
+		option NetworkRuleOption
+		want   int
 	}{{
-		option:  OptionImportant,
-		wantNum: 1,
+		option: OptionImportant,
+		want:   1,
 	}, {
-		option:  OptionImportant | OptionStealth,
-		wantNum: 2,
+		option: OptionImportant | OptionStealth,
+		want:   2,
 	}, {
-		option:  OptionImportant | OptionStealth | OptionRedirect | OptionUrlblock,
-		wantNum: 4,
+		option: OptionImportant | OptionStealth | OptionRedirect | OptionUrlblock,
+		want:   4,
 	}, {
-		option:  0,
-		wantNum: 0,
-	}} {
-		assert.Equal(t, tc.option.Count(), tc.wantNum)
+		option: 0,
+		want:   0,
+	}}
+
+	for _, tc := range testCases {
+		t.Run(fmt.Sprintf("flags_%v", tc.want), func(t *testing.T) {
+			assert.Equal(t, tc.option.Count(), tc.want)
+		})
 	}
 }
 

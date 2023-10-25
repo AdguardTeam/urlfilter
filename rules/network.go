@@ -2,6 +2,7 @@ package rules
 
 import (
 	"fmt"
+	"math/bits"
 	"net/netip"
 	"regexp"
 	"strings"
@@ -84,22 +85,9 @@ const (
 	OptionHostLevelRulesOnly = OptionImportant | OptionBadfilter
 )
 
-// Count returns the count of enabled options
+// Count returns the count of enabled options.
 func (o NetworkRuleOption) Count() int {
-	if o == 0 {
-		return 0
-	}
-
-	flags := uint64(o)
-	count := 0
-	var i uint
-	for i = 0; i < 64; i++ {
-		mask := uint64(1 << i)
-		if (flags & mask) == mask {
-			count++
-		}
-	}
-	return count
+	return bits.OnesCount64(uint64(o))
 }
 
 // NetworkRule is a basic filtering rule

@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -48,9 +49,29 @@ func TestNewRequest(t *testing.T) {
 	assert.Equal(t, true, r.ThirdParty)
 }
 
-func TestCountRequestType(t *testing.T) {
-	assert.Equal(t, 1, TypeDocument.Count())
-	assert.Equal(t, 2, (TypeDocument | TypeOther).Count())
+func TestRequestType_Count(t *testing.T) {
+	testCases := []struct {
+		rType RequestType
+		want  int
+	}{{
+		rType: TypeDocument,
+		want:  1,
+	}, {
+		rType: TypeDocument | TypeOther,
+		want:  2,
+	}, {
+		rType: TypeDocument | TypeOther | TypeImage | TypeFont,
+		want:  4,
+	}, {
+		rType: 0,
+		want:  0,
+	}}
+
+	for _, tc := range testCases {
+		t.Run(fmt.Sprintf("flags_%v", tc.want), func(t *testing.T) {
+			assert.Equal(t, tc.rType.Count(), tc.want)
+		})
+	}
 }
 
 func TestEffectiveTLDPlusOne(t *testing.T) {
