@@ -3,6 +3,7 @@ package urlfilter
 import (
 	"github.com/AdguardTeam/urlfilter/rules"
 	"github.com/miekg/dns"
+	"golang.org/x/exp/slices"
 )
 
 // DNSRewritesAll returns all $dnsrewrite network rules.  To get the rules with
@@ -21,57 +22,62 @@ func (res *DNSResult) DNSRewritesAll() (nrules []*rules.NetworkRule) {
 	return nrules
 }
 
-// removeNetworkRule changes nrules in-place to remove the element at index
-// i and returns the resulting slice.
-func removeNetworkRule(nrules []*rules.NetworkRule, i int) (flt []*rules.NetworkRule) {
-	// See https://github.com/golang/go/wiki/SliceTricks#delete.
-	//
-	// TODO(a.garipov): Use golang.org/x/exp/slices in Go 1.18.
-	return append(nrules[:i], nrules[i+1:]...)
-}
-
 // removeMatchingException changes nrules in-place to remove the elements that
-// match DNS rewrite exception rule exc and returns the resulting slice.
-func removeMatchingException(nrules []*rules.NetworkRule, exc *rules.NetworkRule) (flt []*rules.NetworkRule) {
+// match DNS rewrite exception rule exc and returns the resulting slice.  exc
+// must not be nil.
+func removeMatchingException(
+	nrules []*rules.NetworkRule,
+	exc *rules.NetworkRule,
+) (flt []*rules.NetworkRule) {
 	if exc.DNSRewrite == nil {
 		return nrules
 	}
 
-	excdnsr := exc.DNSRewrite
-	if *excdnsr == (rules.DNSRewrite{}) {
-		// A rule like:
-		//
-		//   $dnsrewrite=
-		//
-		// Which means disabling all DNS rewrite rules.
-		return nil
-	}
-
-	// Use the three-statement form as opposed to the range form, because we
-	// change the slice in-place.
-	for i := 0; i < len(nrules); i++ {
-		nr := nrules[i]
-		nrdnsr := nr.DNSRewrite
-		if nrdnsr.NewCNAME == excdnsr.NewCNAME {
-			nrules = removeNetworkRule(nrules, i)
-
-			continue
+	excImportant := exc.IsOptionEnabled(rules.OptionImportant)
+	if *exc.DNSRewrite == (rules.DNSRewrite{}) {
+		if excImportant {
+			// Rule with "$important,dnsrewrite" disables all DNS rewrite rules.
+			return nil
 		}
 
-		if nrdnsr.RCode == excdnsr.RCode {
-			if excdnsr.RCode != dns.RcodeSuccess {
-				nrules = removeNetworkRule(nrules, i)
-
-				continue
-			}
-
-			if nrdnsr.RRType == excdnsr.RRType && nrdnsr.Value == excdnsr.Value {
-				nrules = removeNetworkRule(nrules, i)
-			}
-		}
+		// Rule with "$dnsrewrite" disables any other except important.
+		return slices.DeleteFunc(nrules, func(nr *rules.NetworkRule) bool {
+			return !nr.IsOptionEnabled(rules.OptionImportant)
+		})
 	}
+
+	nrules = slices.DeleteFunc(nrules, func(nr *rules.NetworkRule) bool {
+		return matchException(nr, exc, excImportant)
+	})
 
 	return nrules
+}
+
+// matchException returns true if the exception disables the rule.
+func matchException(nr, exc *rules.NetworkRule, excImportant bool) (ok bool) {
+	if !excImportant && nr.IsOptionEnabled(rules.OptionImportant) {
+		// Do not match important rules unless the exc is important.
+		return false
+	}
+
+	nrdnsr := nr.DNSRewrite
+	excdnsr := exc.DNSRewrite
+
+	if excdnsr.NewCNAME != "" {
+		return nrdnsr.NewCNAME == excdnsr.NewCNAME
+	}
+
+	if nrdnsr.RCode == excdnsr.RCode {
+		if excdnsr.RCode != dns.RcodeSuccess {
+			return true
+		}
+
+		if nrdnsr.RRType == excdnsr.RRType && nrdnsr.Value == excdnsr.Value {
+			return true
+		}
+	}
+
+	return false
 }
 
 // DNSRewrites returns $dnsrewrite network rules applying exception logic.  For
@@ -101,7 +107,7 @@ func (res *DNSResult) DNSRewrites() (nrules []*rules.NetworkRule) {
 	for i := 0; i < len(nrules); i++ {
 		nr := nrules[i]
 		if nr.Whitelist {
-			nrules = removeNetworkRule(nrules, i)
+			nrules = slices.Delete(nrules, i, i+1)
 			nrules = removeMatchingException(nrules, nr)
 		}
 	}

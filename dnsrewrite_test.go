@@ -39,6 +39,12 @@ func TestDNSResult_DNSRewrites(t *testing.T) {
 @@||exc-exc-order^
 @@|exc-exc-order^$dnsrewrite=127.0.0.1
 
+|priority-rewrite-important^$important,dnsrewrite=127.0.0.1
+@@||priority-rewrite-important^$dnsrewrite
+
+|priority-rewrite-exc-important^$important,dnsrewrite=127.0.0.1
+@@||priority-rewrite-exc-important^$important,dnsrewrite
+
 |disable-cname^$dnsrewrite=127.0.0.1
 |disable-cname^$dnsrewrite=new-cname
 @@||disable-cname^$dnsrewrite=new-cname
@@ -55,6 +61,12 @@ func TestDNSResult_DNSRewrites(t *testing.T) {
 |disable-all-order^$dnsrewrite=127.0.0.1
 @@||disable-all-order^$dnsrewrite=
 |disable-all-order^$dnsrewrite=127.0.0.2
+
+|priority-disable-important^$important,dnsrewrite=127.0.0.1
+@@||priority-disable-important^$dnsrewrite=127.0.0.1
+
+|priority-disable-exc-important^$important,dnsrewrite=127.0.0.1
+@@||priority-disable-exc-important^$important,dnsrewrite=127.0.0.1
 `
 
 	ruleStorage := newTestRuleStorage(t, 1, rulesText)
@@ -147,6 +159,27 @@ func TestDNSResult_DNSRewrites(t *testing.T) {
 		require.Len(t, dnsr, 0)
 	})
 
+	t.Run("priority-rewrite-important", func(t *testing.T) {
+		res, ok := dnsEngine.Match(path.Base(t.Name()))
+		assert.False(t, ok)
+
+		dnsr := res.DNSRewrites()
+		require.Len(t, dnsr, 1)
+
+		dr := dnsr[0].DNSRewrite
+		assert.Equal(t, dns.RcodeSuccess, dr.RCode)
+		assert.Equal(t, dns.TypeA, dr.RRType)
+		assert.Equal(t, testIPv4, dr.Value)
+	})
+
+	t.Run("priority-rewrite-exc-important", func(t *testing.T) {
+		res, ok := dnsEngine.Match(path.Base(t.Name()))
+		assert.False(t, ok)
+
+		dnsr := res.DNSRewrites()
+		require.Len(t, dnsr, 0)
+	})
+
 	t.Run("disable-cname", func(t *testing.T) {
 		res, ok := dnsEngine.Match(path.Base(t.Name()))
 		assert.False(t, ok)
@@ -192,6 +225,27 @@ func TestDNSResult_DNSRewrites(t *testing.T) {
 
 		dnsr := res.DNSRewrites()
 		assert.Len(t, dnsr, 0)
+	})
+
+	t.Run("priority-disable-important", func(t *testing.T) {
+		res, ok := dnsEngine.Match(path.Base(t.Name()))
+		assert.False(t, ok)
+
+		dnsr := res.DNSRewrites()
+		require.Len(t, dnsr, 1)
+
+		dr := dnsr[0].DNSRewrite
+		assert.Equal(t, dns.RcodeSuccess, dr.RCode)
+		assert.Equal(t, dns.TypeA, dr.RRType)
+		assert.Equal(t, testIPv4, dr.Value)
+	})
+
+	t.Run("priority-disable-exc-important", func(t *testing.T) {
+		res, ok := dnsEngine.Match(path.Base(t.Name()))
+		assert.False(t, ok)
+
+		dnsr := res.DNSRewrites()
+		require.Len(t, dnsr, 0)
 	})
 }
 
