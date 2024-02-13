@@ -134,25 +134,20 @@ func (s *RuleStorage) RetrieveHostRule(idx int64) *rules.HostRule {
 }
 
 // Close closes the storage instance
-func (s *RuleStorage) Close() error {
+func (s *RuleStorage) Close() (err error) {
 	if len(s.Lists) == 0 {
 		return nil
 	}
 
 	var errs []error
-
 	for _, l := range s.Lists {
-		err := l.Close()
+		err = l.Close()
 		if err != nil {
 			errs = append(errs, err)
 		}
 	}
 
-	if len(errs) > 0 {
-		return errors.List("closing rule lists", errs...)
-	}
-
-	return nil
+	return errors.Annotate(errors.Join(errs...), "closing rule lists: %w")
 }
 
 // GetCacheSize returns the size of the in-memory rules cache

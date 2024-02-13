@@ -1,9 +1,10 @@
 package urlfilter
 
 import (
+	"slices"
+
 	"github.com/AdguardTeam/urlfilter/rules"
 	"github.com/miekg/dns"
-	"golang.org/x/exp/slices"
 )
 
 // DNSRewritesAll returns all $dnsrewrite network rules.  To get the rules with

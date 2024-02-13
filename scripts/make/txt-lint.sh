@@ -3,7 +3,7 @@
 # This comment is used to simplify checking local copies of the script.  Bump
 # this number every time a remarkable change is made to this script.
 #
-# AdGuard-Project-Version: 4
+# AdGuard-Project-Version: 5
 
 verbose="${VERBOSE:-0}"
 readonly verbose
@@ -46,7 +46,8 @@ trailing_newlines() {
 		':!*.zip'\
 		| while read -r f
 		do
-			if [ "$( tail -c -1 "$f" )" != "$nl" ]
+			final_byte="$( tail -c -1 "$f" )"
+			if [ "$final_byte" != "$nl" ]
 			then
 				printf '%s: must have a trailing newline\n' "$f"
 			fi
@@ -71,6 +72,6 @@ run_linter -e trailing_newlines
 
 run_linter -e trailing_whitespace
 
-git ls-files -- '*.conf' '*.md' '*.txt' '*.yaml' '*.yml'\
+git ls-files -- '*.conf' '*.md' '*.txt' '*.yaml' '*.yml' ':!testdata/' ':!examples/'\
 	| xargs misspell --error\
 	| sed -e 's/^/misspell: /'

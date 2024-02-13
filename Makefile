@@ -8,7 +8,7 @@
 # Makefile.  Bump this number every time a significant change is made to
 # this Makefile.
 #
-# AdGuard-Project-Version: 2
+# AdGuard-Project-Version: 4
 
 # Don't name these macros "GO" etc., because GNU Make apparently makes
 # them exported environment variables with the literal value of
@@ -23,6 +23,7 @@ VERBOSE.MACRO = $${VERBOSE:-0}
 BRANCH = $$( git rev-parse --abbrev-ref HEAD )
 GOAMD64 = v1
 GOPROXY = https://goproxy.cn|https://proxy.golang.org|direct
+GOTOOLCHAIN = go1.21.7
 RACE = 0
 REVISION = $$( git rev-parse --short HEAD )
 VERSION = 0
@@ -32,6 +33,7 @@ ENV = env\
 	GO="$(GO.MACRO)"\
 	GOAMD64='$(GOAMD64)'\
 	GOPROXY='$(GOPROXY)'\
+	GOTOOLCHAIN='$(GOTOOLCHAIN)'\
 	PATH="$${PWD}/bin:$$( "$(GO.MACRO)" env GOPATH )/bin:$${PATH}"\
 	RACE='$(RACE)'\
 	REVISION="$(REVISION)"\
@@ -56,15 +58,17 @@ go-lint:  ; $(ENV)          "$(SHELL)" ./scripts/make/go-lint.sh
 go-test:  ; $(ENV) RACE='1' "$(SHELL)" ./scripts/make/go-test.sh
 go-tools: ; $(ENV)          "$(SHELL)" ./scripts/make/go-tools.sh
 
+go-upd-tools: ; $(ENV) "$(SHELL)" ./scripts/make/go-upd-tools.sh
+
 go-check: go-tools go-lint go-test
 
 # A quick check to make sure that all operating systems relevant to the
 # development of the project can be typechecked and built successfully.
 go-os-check:
-	env GOOS='darwin'   "$(GO.MACRO)" vet ./...
-	env GOOS='freebsd'  "$(GO.MACRO)" vet ./...
-	env GOOS='openbsd'  "$(GO.MACRO)" vet ./...
-	env GOOS='linux'    "$(GO.MACRO)" vet ./...
-	env GOOS='windows'  "$(GO.MACRO)" vet ./...
+	env GOOS='darwin'  "$(GO.MACRO)" vet ./...
+	env GOOS='freebsd' "$(GO.MACRO)" vet ./...
+	env GOOS='openbsd' "$(GO.MACRO)" vet ./...
+	env GOOS='linux'   "$(GO.MACRO)" vet ./...
+	env GOOS='windows' "$(GO.MACRO)" vet ./...
 
 txt-lint: ; $(ENV) "$(SHELL)" ./scripts/make/txt-lint.sh

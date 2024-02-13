@@ -5,12 +5,12 @@ import (
 	"math/bits"
 	"net/netip"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 
 	"github.com/AdguardTeam/golibs/errors"
 	"github.com/AdguardTeam/urlfilter/filterutil"
-	"golang.org/x/exp/slices"
 )
 
 const (

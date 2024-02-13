@@ -2,10 +2,10 @@ package rules
 
 import (
 	"net/netip"
+	"slices"
 	"strings"
 
 	"github.com/AdguardTeam/urlfilter/filterutil"
-	"golang.org/x/exp/slices"
 )
 
 // clients is a set representation for $client modifier.

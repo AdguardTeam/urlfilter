@@ -2,9 +2,8 @@ package rules
 
 import (
 	"bytes"
+	"slices"
 	"strings"
-
-	"golang.org/x/exp/slices"
 )
 
 // CosmeticRuleType is the enumeration of different cosmetic rules

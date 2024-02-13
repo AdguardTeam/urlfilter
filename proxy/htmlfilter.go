@@ -38,7 +38,7 @@ func (s *Server) filterHTML(session *Session) error {
 	modifiedBody := body
 	index := findBodyInjectionIndex(body)
 	if index != -1 {
-		// TODO (!!!!): HANDLE CSP PROPERLY
+		// TODO(ameshkov): HANDLE CSP PROPERLY!
 		session.HTTPResponse.Header.Del("Content-Security-Policy")
 		session.HTTPResponse.Header.Del("Content-Security-Policy-Report-Only")
 		injection := s.buildInjectionCode(session)
