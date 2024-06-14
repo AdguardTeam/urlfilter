@@ -3,7 +3,7 @@
 # This comment is used to simplify checking local copies of the script.  Bump
 # this number every time a significant change is made to this script.
 #
-# AdGuard-Project-Version: 5
+# AdGuard-Project-Version: 7
 
 verbose="${VERBOSE:-0}"
 readonly verbose
@@ -35,7 +35,7 @@ set -f -u
 # blocklist_imports is a simple check against unwanted packages.  The following
 # packages are banned:
 #
-#   *  Packages errors and log are replaced by our own packages in the
+#   *  Package errors is replaced by our own package in the
 #      github.com/AdguardTeam/golibs module.
 #
 #   *  Package io/ioutil is soft-deprecated.
@@ -59,20 +59,18 @@ set -f -u
 # schemas, which use package reflect.  If your project needs more exceptions,
 # add and document them.
 #
-# TODO(a.garipov): Add golibs/log.
-#
 # TODO(a.garipov): Add deprecated package golang.org/x/exp/maps once all
-# projects switch to Go 1.22.
+# projects switch to Go 1.23.
 blocklist_imports() {
 	git grep\
 		-e '[[:space:]]"errors"$'\
+		-e '[[:space:]]"golang.org/x/exp/slices"$'\
+		-e '[[:space:]]"golang.org/x/net/context"$'\
 		-e '[[:space:]]"io/ioutil"$'\
 		-e '[[:space:]]"log"$'\
 		-e '[[:space:]]"reflect"$'\
 		-e '[[:space:]]"sort"$'\
 		-e '[[:space:]]"unsafe"$'\
-		-e '[[:space:]]"golang.org/x/exp/slices"$'\
-		-e '[[:space:]]"golang.org/x/net/context"$'\
 		-n\
 		-- '*.go'\
 		':!*.pb.go'\
@@ -136,7 +134,7 @@ run_linter -e gofumpt --extra -e -l .
 
 # TODO(a.garipov): golint is deprecated, find a suitable replacement.
 
-run_linter "$GO" vet ./...
+run_linter "${GO:-go}" vet ./...
 
 run_linter govulncheck ./...
 

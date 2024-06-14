@@ -31,7 +31,7 @@ set -f -u
 
 # trailing_newlines is a simple check that makes sure that all plain-text files
 # have a trailing newlines to make sure that all tools work correctly with them.
-trailing_newlines() {
+trailing_newlines() (
 	nl="$( printf "\n" )"
 	readonly nl
 
@@ -52,15 +52,20 @@ trailing_newlines() {
 				printf '%s: must have a trailing newline\n' "$f"
 			fi
 		done
-}
+)
 
 # trailing_whitespace is a simple check that makes sure that there are no
 # trailing whitespace in plain-text files.
 trailing_whitespace() {
 	# NOTE: Adjust for your project.
 	git ls-files\
-		':!./bin/*'\
-		':!./testdata/*'\
+		':!*.bmp'\
+		':!*.jpg'\
+		':!*.mmdb'\
+		':!*.png'\
+		':!*.tar.gz'\
+		':!*.webp'\
+		':!*.zip'\
 		| while read -r f
 		do
 			grep -e '[[:space:]]$' -n -- "$f"\
@@ -72,6 +77,6 @@ run_linter -e trailing_newlines
 
 run_linter -e trailing_whitespace
 
-git ls-files -- '*.conf' '*.md' '*.txt' '*.yaml' '*.yml' ':!testdata/' ':!examples/'\
+git ls-files -- '*.conf' '*.md' '*.txt' '*.yaml' '*.yml'\
 	| xargs misspell --error\
 	| sed -e 's/^/misspell: /'

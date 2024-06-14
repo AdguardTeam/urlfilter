@@ -8,6 +8,7 @@
 # bottom to make sure they take effect.
 *.db
 *.log
+*.out
 *.snap
 *.test
 *.pprof

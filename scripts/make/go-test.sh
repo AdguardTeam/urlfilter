@@ -43,7 +43,7 @@ go="${GO:-go}"
 readonly go
 
 count_flags='--count=1'
-cover_flags='--coverprofile=./coverage.txt'
+cover_flags='--coverprofile=./cover.out'
 shuffle_flags='--shuffle=on'
 timeout_flags="${TIMEOUT_FLAGS:---timeout=30s}"
 readonly count_flags cover_flags shuffle_flags timeout_flags
