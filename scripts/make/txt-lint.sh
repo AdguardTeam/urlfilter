@@ -59,6 +59,7 @@ trailing_newlines() (
 trailing_whitespace() {
 	# NOTE: Adjust for your project.
 	git ls-files\
+		':!/testdata/*'\
 		':!*.bmp'\
 		':!*.jpg'\
 		':!*.mmdb'\

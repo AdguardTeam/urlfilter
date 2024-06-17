@@ -70,7 +70,7 @@
               - |
                 set -e -f -u -x
 
-                make VERBOSE=1 go-deps go-test
+                make VERBOSE=1 go-deps go-test go-fuzz
 
 'branches':
     'create': 'for-pull-request'

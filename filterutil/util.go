@@ -2,17 +2,19 @@ package filterutil
 
 import "strings"
 
-// ExtractHostname -- quickly retrieves hostname from an URL
-func ExtractHostname(url string) string {
-	if url == "" {
-		return ""
-	}
-
+// ExtractHostname quickly retrieves hostname from the given URL.
+//
+// NOTE: ExtractHostname is an optimized, best-effort function to retrieve a
+// hostname from a URL-like string.  The result is not guaranteed to be correct
+// for some edge cases, which include non-hierarchical URLs and IPv6 hostnames.
+//
+// TODO(a.garipov): Consider moving to golibs.
+func ExtractHostname(url string) (hostname string) {
 	firstIdx := strings.Index(url, "//")
 	if firstIdx == -1 {
-		// This is a non hierarchical structured URL (e.g. stun: or turn:)
+		// This is a non-hierarchical structured URL (e.g. stun: or turn:)
 		// https://tools.ietf.org/html/rfc4395#section-2.2
-		// https://tools.ietf.org/html/draft-nandakumar-rtcweb-stun-uri-08#appendix-B
+		// https://datatracker.ietf.org/doc/html/rfc7064#appendix-B
 		firstIdx = strings.Index(url, ":")
 		if firstIdx == -1 {
 			return ""
@@ -22,17 +24,15 @@ func ExtractHostname(url string) string {
 		firstIdx = firstIdx + 2
 	}
 
-	nextIdx := 0
-	for i := firstIdx; i < len(url); i++ {
-		c := url[i]
-		if c == '/' || c == ':' || c == '?' {
-			nextIdx = i
-			break
-		}
+	if firstIdx < 0 {
+		return ""
 	}
 
-	if nextIdx == 0 {
+	nextIdx := strings.IndexAny(url[firstIdx:], "/:?")
+	if nextIdx == -1 {
 		nextIdx = len(url)
+	} else {
+		nextIdx += firstIdx
 	}
 
 	if nextIdx <= firstIdx {

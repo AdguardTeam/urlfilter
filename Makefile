@@ -54,6 +54,7 @@ test: go-test
 
 go-bench: ; $(ENV)          "$(SHELL)" ./scripts/make/go-bench.sh
 go-deps:  ; $(ENV)          "$(SHELL)" ./scripts/make/go-deps.sh
+go-fuzz:  ; $(ENV)          "$(SHELL)" ./scripts/make/go-fuzz.sh
 go-lint:  ; $(ENV)          "$(SHELL)" ./scripts/make/go-lint.sh
 go-test:  ; $(ENV) RACE='1' "$(SHELL)" ./scripts/make/go-test.sh
 go-tools: ; $(ENV)          "$(SHELL)" ./scripts/make/go-tools.sh
