@@ -32,7 +32,7 @@ type RuleStorage struct {
 	Lists []RuleList
 
 	// Mutex protects all the fields.
-	sync.Mutex
+	cacheLock sync.RWMutex
 }
 
 // NewRuleStorage creates a new instance of the RuleStorage
@@ -76,8 +76,8 @@ func (s *RuleStorage) NewRuleStorageScanner() *RuleStorageScanner {
 // RetrieveRule looks for the filtering rule in this storage
 // storageIdx is the lookup index that you can get from the rule storage scanner
 func (s *RuleStorage) RetrieveRule(storageIdx int64) (rules.Rule, error) {
-	s.Lock()
-	defer s.Unlock()
+	s.cacheLock.RLock()
+	defer s.cacheLock.RUnlock()
 
 	rule, ok := s.cache[storageIdx]
 	if ok {
@@ -93,7 +93,9 @@ func (s *RuleStorage) RetrieveRule(storageIdx int64) (rules.Rule, error) {
 
 	f, err := list.RetrieveRule(int(ruleIdx))
 	if f != nil {
+		s.cacheLock.Lock()
 		s.cache[storageIdx] = f
+		s.cacheLock.Unlock()
 	}
 
 	return f, err
