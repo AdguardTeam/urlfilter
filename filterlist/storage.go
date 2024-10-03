@@ -77,9 +77,9 @@ func (s *RuleStorage) NewRuleStorageScanner() *RuleStorageScanner {
 // storageIdx is the lookup index that you can get from the rule storage scanner
 func (s *RuleStorage) RetrieveRule(storageIdx int64) (rules.Rule, error) {
 	s.cacheLock.RLock()
-	defer s.cacheLock.RUnlock()
 
 	rule, ok := s.cache[storageIdx]
+	s.cacheLock.RUnlock()
 	if ok {
 		return rule, nil
 	}
