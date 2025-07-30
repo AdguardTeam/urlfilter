@@ -1,38 +1,47 @@
 ---
+# This comment is used to simplify checking local copies of the Bamboo spec.
+# Bump this number every time a significant change is made to this spec.
+#
+# AdGuard-Project-Version: 8
 'version': 2
 'plan':
     'project-key': 'AGH'
     'key': 'URLFLTSPECS'
     'name': 'urlfilter - Lint and Run tests'
 'variables':
-    'dockerFpm': 'alanfranz/fpm-within-docker:ubuntu-bionic'
     # When there is a patch release of Go available, set this property to an
     # exact patch version as opposed to a minor one to make sure that this exact
     # version is actually used and not whatever the docker daemon on the CI has
     # cached a few months ago.
-    'dockerGo': 'golang:1.23.2'
+    'dockerGo': 'adguard/go-builder:1.24.5--2'
     'maintainer': 'Adguard Go Team'
     'name': 'urlfilter'
+    'packageName': 'urlfilter'
 
 'stages':
-  - 'Lint':
+  - 'Go Lint':
         'manual': false
         'final': false
         'jobs':
-          - 'Lint'
+          - 'Go Lint'
+  - 'Misc Lint':
+        'manual': false
+        'final': false
+        'jobs':
+          - 'Misc Lint'
   - 'Test':
         'manual': false
         'final': false
         'jobs':
           - 'Test'
 
-'Lint':
+'Go Lint':
     'docker':
         'image': '${bamboo.dockerGo}'
         'volumes':
             '${system.GO_CACHE_DIR}': '${bamboo.cacheGo}'
             '${system.GO_PKG_CACHE_DIR}': '${bamboo.cacheGoPkg}'
-    'key': 'LINT'
+    'key': 'GOLINT'
     'other':
         'clean-working-dir': true
     'requirements':
@@ -44,9 +53,32 @@
             'interpreter': 'SHELL'
             'scripts':
               - |
+                #!/bin/sh
+
                 set -e -f -u -x
 
                 make VERBOSE=1 go-tools go-lint
+
+'Misc Lint':
+    'docker':
+        'image': '${bamboo.dockerGo}'
+    'key': 'MISCLINT'
+    'other':
+        'clean-working-dir': true
+    'requirements':
+      - 'adg-docker': true
+    'tasks':
+      - 'checkout':
+            'force-clean-build': true
+      - 'script':
+            'interpreter': 'SHELL'
+            'scripts':
+              - |
+                #!/bin/sh
+
+                set -e -f -u -x
+
+                make VERBOSE=1 go-tools md-lint sh-lint txt-lint
 
 'Test':
     'docker':
@@ -55,22 +87,27 @@
             '${system.GO_CACHE_DIR}': '${bamboo.cacheGo}'
             '${system.GO_PKG_CACHE_DIR}': '${bamboo.cacheGoPkg}'
     'key': 'TEST'
-    'other':
-        'clean-working-dir': true
-    'requirements':
-      - 'adg-docker': true
     'tasks':
       - 'checkout':
             'force-clean-build': true
       - 'script':
             'interpreter': 'SHELL'
-            # Projects that have go-bench and/or go-fuzz targets should add them
-            # here as well.
             'scripts':
               - |
+                #!/bin/sh
+
                 set -e -f -u -x
 
-                make VERBOSE=1 go-deps go-test go-fuzz
+                make VERBOSE=1 \
+                    go-deps \
+                    go-test \
+                    go-fuzz \
+                    go-bench \
+                    ;
+    'final-tasks':
+      - 'clean'
+    'requirements':
+      - 'adg-docker': true
 
 'branches':
     'create': 'for-pull-request'
@@ -79,16 +116,20 @@
         'after-inactive-days': 5
     'link-to-jira': true
 
-# Run only the "Lint" and "Test" stages in any branch save for "main".  For
-# projects that use "master", use that here too.
+# Run only the linting and testing stages in any branch save for "master".
 'branch-overrides':
-  - '^((?!main).)*$':
+  - '^((?!master).)*$':
         'stages':
-          - 'Lint':
+          - 'Go Lint':
                 'manual': false
                 'final': false
                 'jobs':
-                  - 'Lint'
+                  - 'Go Lint'
+          - 'Misc Lint':
+                'manual': false
+                'final': false
+                'jobs':
+                  - 'Misc Lint'
           - 'Test':
                 'manual': false
                 'final': false

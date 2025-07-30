@@ -94,16 +94,14 @@ func BenchmarkExtractHostname(b *testing.B) {
 		assert.Equal(b, exampleHost, got)
 	})
 
-	// Most recent results, on a MBP 14 with Apple M1 Pro chip:
+	// Most recent results:
 	//
 	// goos: darwin
 	// goarch: arm64
 	// pkg: github.com/AdguardTeam/urlfilter/filterutil
-	// BenchmarkExtractHostname
-	// BenchmarkExtractHostname/no_std
-	// BenchmarkExtractHostname/no_std-8         	42377496	        27.90 ns/op	       0 B/op	       0 allocs/op
-	// BenchmarkExtractHostname/std
-	// BenchmarkExtractHostname/std-8            	 6521311	       183.8 ns/op	     144 B/op	       1 allocs/op
+	// cpu: Apple M1 Pro
+	// BenchmarkExtractHostname/no_std-8               26470028               113.5 ns/op             0 B/op          0 allocs/op
+	// BenchmarkExtractHostname/std-8                   2272830               458.8 ns/op           144 B/op          1 allocs/op
 }
 
 // extractHostnameStd retrieves hostname from the given URL using standard

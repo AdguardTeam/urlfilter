@@ -78,9 +78,11 @@ func BenchmarkIsProbablyIP(b *testing.B) {
 		}
 	})
 
+	// Most recent results:
+	//
 	// goos: darwin
-	// goarch: amd64
+	// goarch: arm64
 	// pkg: github.com/AdguardTeam/urlfilter/filterutil
-	// cpu: Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz
-	// BenchmarkIsProbablyIP/random-12		6803722		174.9 ns/op		0 B/op		0 allocs/op
+	// cpu: Apple M1 Pro
+	// BenchmarkIsProbablyIP/random-8                  19352161                56.97 ns/op            0 B/op          0 allocs/op
 }

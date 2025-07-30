@@ -1,3 +1,8 @@
+# This comment is used to simplify checking local copies of the file.  Bump
+# this number every time a significant change is made to this file.
+#
+# AdGuard-Project-Version: 2
+
 # Please, DO NOT put your text editors' temporary files here.  The more are
 # added, the harder it gets to maintain and manage projects' gitignores.  Put
 # them into your global gitignore file instead.
@@ -9,13 +14,9 @@
 *.db
 *.log
 *.out
-*.snap
 *.test
-*.pprof
-*.json
-*~
 /bin/
-/cmd/data
 /cmd/adguard
-coverage.txt
+/test-reports/
+/coverage.txt
 /testdata/

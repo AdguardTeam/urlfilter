@@ -1,0 +1,54 @@
+'name': 'test urlfilter'
+
+'on': 'push'
+
+'jobs':
+  'tests':
+    'runs-on': '${{ matrix.os }}'
+    'strategy':
+      'matrix':
+        'os':
+        - 'macos-latest'
+        - 'ubuntu-latest'
+    'steps':
+    - 'uses': 'actions/checkout@master'
+    - 'uses': 'actions/setup-go@v3'
+      'with':
+        'go-version': '1.24.x'
+    - 'name': 'tests'
+      'run': 'make test'
+    - 'name': 'coverage'
+      'uses': 'codecov/codecov-action@v1'
+      'if':
+        success() && matrix.os == 'ubuntu-latest'
+      'with':
+        'token': '${{ secrets.CODECOV_TOKEN }}'
+        'file': './coverage.txt'
+
+  'notify':
+    'needs':
+    - 'tests'
+    # Secrets are not passed to workflows that are triggered by a pull request
+    # from a fork.
+    #
+    # Use always() to signal to the runner that this job must run even if the
+    # previous ones failed.
+    'if':
+      ${{ always() &&
+        (
+          github.event_name == 'push' ||
+          github.event.pull_request.head.repo.full_name == github.repository
+        )
+      }}
+    'runs-on': 'ubuntu-latest'
+    'steps':
+    - 'name': 'Conclusion'
+      'uses': 'technote-space/workflow-conclusion-action@v1'
+    - 'name': 'Send Slack notification'
+      'uses': '8398a7/action-slack@v3'
+      'with':
+        'status': '${{ env.WORKFLOW_CONCLUSION }}'
+        'fields': 'workflow, repo, message, commit, author, eventName, ref'
+      'env':
+        'GITHUB_TOKEN': '${{ secrets.GITHUB_TOKEN }}'
+        'SLACK_WEBHOOK_URL': '${{ secrets.SLACK_WEBHOOK_URL }}'

@@ -57,7 +57,7 @@ func TestContentScriptTmpl(t *testing.T) {
 		t.Fatalf("could not execute template: %s", err)
 	}
 
-	log.Printf(data.String())
+	log.Print(data.String())
 
 	// TODO: Run a nodejs script that will validate the data
 }

@@ -629,13 +629,13 @@ func BenchmarkDNSEngine_Match(b *testing.B) {
 		}
 	}
 
-	// Most recent results, on a MBP 14 with Apple M1 Pro chip:
+	// Most recent results:
 	//
-	//	goos: darwin
-	//  goarch: arm64
-	//  pkg: github.com/AdguardTeam/urlfilter
-	//  BenchmarkDNSEngine_Match
-	//  BenchmarkDNSEngine_Match-8   	      34	  33710070 ns/op	 3557557 B/op	   81918 allocs/op
+	// goos: darwin
+	// goarch: arm64
+	// pkg: github.com/AdguardTeam/urlfilter
+	// cpu: Apple M1 Pro
+	// BenchmarkDNSEngine_Match-8            30          53901601 ns/op         3767994 B/op      82188 allocs/op
 }
 
 // newRuleStorage returns new properly initialized rules storage with test data.

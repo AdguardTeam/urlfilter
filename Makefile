@@ -24,7 +24,7 @@ BRANCH = $${BRANCH:-$$(git rev-parse --abbrev-ref HEAD)}
 GOAMD64 = v1
 GOPROXY = https://proxy.golang.org|direct
 GOTELEMETRY = off
-GOTOOLCHAIN = go1.23.2
+GOTOOLCHAIN = go1.24.5
 RACE = 0
 REVISION = $${REVISION:-$$(git rev-parse --short HEAD)}
 VERSION = 0
@@ -56,12 +56,11 @@ check: go-deps go-tools go-lint test
 
 init: ; git config core.hooksPath ./scripts/hooks
 
-ci: go-deps go-test go-bench
-
 test: go-test
 
 go-bench:     ; $(ENV)          "$(SHELL)" ./scripts/make/go-bench.sh
 go-deps:      ; $(ENV)          "$(SHELL)" ./scripts/make/go-deps.sh
+go-env:       ; $(ENV)          "$(GO.MACRO)" env
 go-fuzz:      ; $(ENV)          "$(SHELL)" ./scripts/make/go-fuzz.sh
 go-lint:      ; $(ENV)          "$(SHELL)" ./scripts/make/go-lint.sh
 go-test:      ; $(ENV) RACE='1' "$(SHELL)" ./scripts/make/go-test.sh
@@ -80,3 +79,6 @@ go-os-check:
 	$(ENV) GOOS='windows' "$(GO.MACRO)" vet ./...
 
 txt-lint: ; $(ENV) "$(SHELL)" ./scripts/make/txt-lint.sh
+
+md-lint:  ; $(ENV_MISC) "$(SHELL)" ./scripts/make/md-lint.sh
+sh-lint:  ; $(ENV_MISC) "$(SHELL)" ./scripts/make/sh-lint.sh
