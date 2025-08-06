@@ -1,100 +1,105 @@
-package urlfilter
+package urlfilter_test
 
 import (
-	"encoding/json"
 	"testing"
 
+	"github.com/AdguardTeam/golibs/testutil"
+	"github.com/AdguardTeam/urlfilter"
 	"github.com/AdguardTeam/urlfilter/filterlist"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestElementHidingSimple(t *testing.T) {
-	engine := buildCosmeticEngine(t)
+func TestCosmeticEngine_Match_elementHiding(t *testing.T) {
+	t.Parallel()
 
-	// Simple matching
+	engine := newTestCosmeticEngine(t)
+
 	result := engine.Match("example.org", true, true, true)
-	assert.NotNil(t, result)
+	require.NotNil(t, result)
 
-	assert.Contains(t, result.ElementHiding.Generic, "banner_generic")
-	assert.Equal(t, 1, len(result.ElementHiding.Generic))
-	assert.NotContains(t, result.ElementHiding.Generic, "banner_generic_disabled")
-	assert.Equal(t, 1, len(result.ElementHiding.Specific))
-	assert.Contains(t, result.ElementHiding.Specific, "banner_specific")
-	assert.Nil(t, result.ElementHiding.GenericExtCSS)
-	assert.Nil(t, result.ElementHiding.SpecificExtCSS)
-
-	jsonString, err := json.MarshalIndent(result, "", "\t")
-	if err != nil {
-		t.Fatalf("cannot marshal: %s", err)
-	}
-
-	t.Logf("%s", jsonString)
+	assert.Equal(t, urlfilter.StylesResult{
+		Generic:        []string{"banner_generic"},
+		Specific:       []string{"banner_specific"},
+		GenericExtCSS:  nil,
+		SpecificExtCSS: nil,
+	}, result.ElementHiding)
 }
 
-func TestElementHidingNoDisabled(t *testing.T) {
-	engine := buildCosmeticEngine(t)
+func TestCosmeticEngine_Match_elementHidingNoDisabled(t *testing.T) {
+	t.Parallel()
 
-	// Simple matching
+	engine := newTestCosmeticEngine(t)
+
 	result := engine.Match("example.com", true, true, true)
-	assert.NotNil(t, result)
+	require.NotNil(t, result)
 
-	assert.Equal(t, 2, len(result.ElementHiding.Generic))
-	assert.Contains(t, result.ElementHiding.Generic, "banner_generic")
-	assert.Contains(t, result.ElementHiding.Generic, "banner_generic_disabled")
-	assert.Nil(t, result.ElementHiding.Specific)
-	assert.Nil(t, result.ElementHiding.GenericExtCSS)
-	assert.Nil(t, result.ElementHiding.SpecificExtCSS)
-
-	jsonString, err := json.MarshalIndent(result, "", "\t")
-	if err != nil {
-		t.Fatalf("cannot marshal: %s", err)
-	}
-
-	t.Logf("%s", jsonString)
+	assert.Equal(t, urlfilter.StylesResult{
+		Generic:        []string{"banner_generic", "banner_generic_disabled"},
+		Specific:       nil,
+		GenericExtCSS:  nil,
+		SpecificExtCSS: nil,
+	}, result.ElementHiding)
 }
 
-func TestElementHidingNoGeneric(t *testing.T) {
-	engine := buildCosmeticEngine(t)
+func TestCosmeticEngine_Match_elementHidingNoGeneric(t *testing.T) {
+	t.Parallel()
 
-	// Simple matching
+	engine := newTestCosmeticEngine(t)
+
 	result := engine.Match("example.org", true, true, false)
-	assert.NotNil(t, result)
+	require.NotNil(t, result)
 
-	assert.Nil(t, result.ElementHiding.Generic)
-	assert.Equal(t, 1, len(result.ElementHiding.Specific))
-	assert.Contains(t, result.ElementHiding.Specific, "banner_specific")
-	assert.Nil(t, result.ElementHiding.GenericExtCSS)
-	assert.Nil(t, result.ElementHiding.SpecificExtCSS)
-
-	jsonString, err := json.MarshalIndent(result, "", "\t")
-	if err != nil {
-		t.Fatalf("cannot marshal: %s", err)
-	}
-
-	t.Logf("%s", jsonString)
+	assert.Equal(t, urlfilter.StylesResult{
+		Generic:        nil,
+		Specific:       []string{"banner_specific"},
+		GenericExtCSS:  nil,
+		SpecificExtCSS: nil,
+	}, result.ElementHiding)
 }
 
-func TestElementHidingNoCSS(t *testing.T) {
-	engine := buildCosmeticEngine(t)
+func TestCosmeticEngine_Match_elementHidingNoCSS(t *testing.T) {
+	t.Parallel()
 
-	// Simple matching
+	engine := newTestCosmeticEngine(t)
+
 	result := engine.Match("example.org", false, true, true)
-	assert.NotNil(t, result)
+	require.NotNil(t, result)
 
-	assert.Nil(t, result.ElementHiding.Specific)
-	assert.Nil(t, result.ElementHiding.Generic)
-	assert.Nil(t, result.ElementHiding.GenericExtCSS)
-	assert.Nil(t, result.ElementHiding.SpecificExtCSS)
-
-	jsonString, err := json.MarshalIndent(result, "", "\t")
-	if err != nil {
-		t.Fatalf("cannot marshal: %s", err)
-	}
-
-	t.Logf("%s", jsonString)
+	assert.Equal(t, urlfilter.StylesResult{
+		Generic:        nil,
+		Specific:       nil,
+		GenericExtCSS:  nil,
+		SpecificExtCSS: nil,
+	}, result.ElementHiding)
 }
 
-func buildCosmeticEngine(t *testing.T) *CosmeticEngine {
+func FuzzCosmeticEngine_Match(f *testing.F) {
+	for _, seed := range []string{
+		"",
+		" ",
+		"\n",
+		"1",
+		"127.0.0.1",
+		"example.test",
+	} {
+		f.Add(seed)
+	}
+
+	engine := newTestCosmeticEngine(f)
+
+	f.Fuzz(func(t *testing.T, host string) {
+		assert.NotPanics(t, func() {
+			_ = engine.Match(host, true, true, true)
+		})
+	})
+}
+
+// newTestCosmeticEngine is a helper function to build a cosmetic engine for
+// testing.  It adds rule storage close method to tb's cleanup.
+func newTestCosmeticEngine(tb testing.TB) (eng *urlfilter.CosmeticEngine) {
+	tb.Helper()
+
 	rulesText := `##banner_generic
 ##banner_generic_disabled
 example.org##banner_specific
@@ -109,9 +114,9 @@ example.org#@#banner_generic_disabled`
 	}
 
 	ruleStorage, err := filterlist.NewRuleStorage(lists)
-	if err != nil {
-		t.Fatalf("failed to create a rule storage: %s", err)
-	}
+	require.NoError(tb, err)
 
-	return NewCosmeticEngine(ruleStorage)
+	testutil.CleanupAndRequireSuccess(tb, ruleStorage.Close)
+
+	return urlfilter.NewCosmeticEngine(ruleStorage)
 }

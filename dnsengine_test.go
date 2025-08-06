@@ -2,6 +2,7 @@ package urlfilter
 
 import (
 	"net/netip"
+	"os"
 	"runtime/debug"
 	"strings"
 	"testing"
@@ -606,12 +607,6 @@ func BenchmarkDNSEngine(b *testing.B) {
 	)
 }
 
-// Sinks for benchmarks.
-var (
-	matchedSink bool
-	resultSink  *DNSResult
-)
-
 func BenchmarkDNSEngine_Match(b *testing.B) {
 	testHostnames := loadHostnames(b)
 
@@ -620,14 +615,18 @@ func BenchmarkDNSEngine_Match(b *testing.B) {
 
 	dnsEngine := NewDNSEngine(ruleStorage)
 
-	b.ReportAllocs()
-	b.ResetTimer()
+	var r *DNSResult
+	var match bool
 
-	for i := 0; i < b.N; i++ {
+	b.ReportAllocs()
+	for b.Loop() {
 		for _, reqHostname := range testHostnames {
-			resultSink, matchedSink = dnsEngine.Match(reqHostname)
+			r, match = dnsEngine.Match(reqHostname)
 		}
 	}
+
+	assert.NotNil(b, r)
+	assert.True(b, match)
 
 	// Most recent results:
 	//
@@ -635,26 +634,79 @@ func BenchmarkDNSEngine_Match(b *testing.B) {
 	// goarch: arm64
 	// pkg: github.com/AdguardTeam/urlfilter
 	// cpu: Apple M1 Pro
-	// BenchmarkDNSEngine_Match-8            30          53901601 ns/op         3767994 B/op      82188 allocs/op
+	// BenchmarkDNSEngine_Match-8   	      30	  39543044 ns/op	 3603043 B/op	   82078 allocs/op
+}
+
+func FuzzDNSEngine_Match(f *testing.F) {
+	for _, seed := range []string{
+		"",
+		" ",
+		"\n",
+		"1",
+		"127.0.0.1",
+		"example.test",
+	} {
+		f.Add(seed)
+	}
+
+	rulesText := `||example.test^
+||example2.test/*
+0.0.0.0 v4.com
+127.0.0.1 v4.com
+:: v6.com
+::1 v4and6.com
+`
+
+	lists := []filterlist.RuleList{
+		&filterlist.StringRuleList{
+			ID:             1,
+			RulesText:      rulesText,
+			IgnoreCosmetic: false,
+		},
+	}
+
+	ruleStorage, err := filterlist.NewRuleStorage(lists)
+	require.NoError(f, err)
+
+	testutil.CleanupAndRequireSuccess(f, ruleStorage.Close)
+
+	dnsEngine := NewDNSEngine(ruleStorage)
+
+	f.Fuzz(func(t *testing.T, hostname string) {
+		assert.NotPanics(t, func() {
+			_, _ = dnsEngine.Match(hostname)
+		}, hostname)
+	})
+}
+
+// ruleListFromPath returns a rule list loaded from a file.
+func ruleListFromPath(tb testing.TB, path string, id int) (l *filterlist.StringRuleList) {
+	tb.Helper()
+
+	rulesText, err := os.ReadFile(path)
+	require.NoError(tb, err)
+
+	return &filterlist.StringRuleList{
+		ID:             id,
+		RulesText:      string(rulesText),
+		IgnoreCosmetic: true,
+	}
 }
 
 // newRuleStorage returns new properly initialized rules storage with test data.
-func newRuleStorage(t *testing.B) (ruleStorage *filterlist.RuleStorage) {
-	t.Helper()
+func newRuleStorage(tb testing.TB) (ruleStorage *filterlist.RuleStorage) {
+	tb.Helper()
 
-	filterRuleList, err := filterlist.NewFileRuleList(1, networkFilterPath, true)
-	require.NoError(t, err)
-
-	hostsRuleList, err := filterlist.NewFileRuleList(2, hostsPath, true)
-	require.NoError(t, err)
+	filterRuleList := ruleListFromPath(tb, networkFilterPath, 1)
+	hostsRuleList := ruleListFromPath(tb, hostsPath, 2)
 
 	ruleLists := []filterlist.RuleList{
 		filterRuleList,
 		hostsRuleList,
 	}
 
-	ruleStorage, err = filterlist.NewRuleStorage(ruleLists)
-	require.NoError(t, err)
+	ruleStorage, err := filterlist.NewRuleStorage(ruleLists)
+	require.NoError(tb, err)
 
 	return ruleStorage
 }

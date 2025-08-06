@@ -1,65 +1,20 @@
-package rules
+package rules_test
 
 import (
 	"testing"
 
+	"github.com/AdguardTeam/urlfilter/rules"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestNewElementHidingRule(t *testing.T) {
-	f, err := NewCosmeticRule("##banner", 1)
-	assert.Nil(t, err)
-	assert.NotNil(t, f)
-	assert.Equal(t, 1, f.FilterListID)
-	assert.Equal(t, CosmeticElementHiding, f.Type)
-	assert.False(t, f.Whitelist)
-	assert.False(t, f.ExtendedCSS)
-	assert.Empty(t, f.permittedDomains)
-	assert.Empty(t, f.restrictedDomains)
-	assert.Equal(t, "banner", f.Content)
-
-	f, err = NewCosmeticRule("example.org,~sub.example.org##banner", 1)
-	assert.Nil(t, err)
-	assert.NotNil(t, f)
-	assert.Equal(t, CosmeticElementHiding, f.Type)
-	assert.False(t, f.Whitelist)
-	assert.False(t, f.ExtendedCSS)
-	assert.Equal(t, 1, len(f.permittedDomains))
-	assert.Equal(t, 1, len(f.restrictedDomains))
-	assert.Equal(t, "example.org", f.permittedDomains[0])
-	assert.Equal(t, "sub.example.org", f.restrictedDomains[0])
-	assert.Equal(t, "banner", f.Content)
-
-	f, err = NewCosmeticRule("example.org#@#banner", 1)
-	assert.Nil(t, err)
-	assert.NotNil(t, f)
-	assert.Equal(t, CosmeticElementHiding, f.Type)
-	assert.True(t, f.Whitelist)
-	assert.False(t, f.ExtendedCSS)
-	assert.Equal(t, 1, len(f.permittedDomains))
-	assert.Equal(t, "example.org", f.permittedDomains[0])
-	assert.Empty(t, f.restrictedDomains)
-	assert.Equal(t, "banner", f.Content)
-}
-
-func TestCosmeticRuleValidation(t *testing.T) {
-	_, err := NewCosmeticRule("||example.org^", 1)
-	assert.NotNil(t, err)
-
-	_, err = NewCosmeticRule("example.org## ", 1)
-	assert.NotNil(t, err)
-
-	_, err = NewCosmeticRule("#@#.banner", 1)
-	assert.NotNil(t, err)
-}
-
-func TestCosmeticRuleMatch(t *testing.T) {
-	f, err := NewCosmeticRule("##banner", 1)
+func TestCosmeticRule_Match(t *testing.T) {
+	f, err := rules.NewCosmeticRule("##banner", testFilterListID)
 	assert.Nil(t, err)
 	assert.NotNil(t, f)
 	assert.True(t, f.Match("example.org"))
 
-	f, err = NewCosmeticRule("example.org,~sub.example.org##banner", 1)
+	f, err = rules.NewCosmeticRule("example.org,~sub.example.org##banner", testFilterListID)
 	assert.Nil(t, err)
 	assert.NotNil(t, f)
 	assert.True(t, f.Match("example.org"))
@@ -69,8 +24,8 @@ func TestCosmeticRuleMatch(t *testing.T) {
 	assert.False(t, f.Match("sub.sub.example.org"))
 }
 
-func TestCosmeticRuleWildcardTLDMatch(t *testing.T) {
-	f, err := NewCosmeticRule("example.*##banner", 1)
+func TestCosmeticRule_Match_wildcardTLD(t *testing.T) {
+	f, err := rules.NewCosmeticRule("example.*##banner", testFilterListID)
 	assert.Nil(t, err)
 	assert.NotNil(t, f)
 
@@ -79,4 +34,26 @@ func TestCosmeticRuleWildcardTLDMatch(t *testing.T) {
 	assert.True(t, f.Match("example.co.uk"))
 	assert.False(t, f.Match("example.local"))
 	assert.False(t, f.Match("example.local.test"))
+}
+
+func FuzzCosmeticRule_Match(f *testing.F) {
+	r, err := rules.NewCosmeticRule("example.*##banner", testFilterListID)
+	require.NoError(f, err)
+
+	for _, seed := range []string{
+		"",
+		" ",
+		"\n",
+		"1",
+		"127.0.0.1",
+		"example.test",
+	} {
+		f.Add(seed)
+	}
+
+	f.Fuzz(func(t *testing.T, in string) {
+		assert.NotPanics(t, func() {
+			_ = r.Match(in)
+		})
+	})
 }

@@ -135,7 +135,7 @@ func TestBenchNetworkEngine(t *testing.T) {
 	)
 
 	startParse := time.Now()
-	engine := buildNetworkEngine(t)
+	engine := newTestNetworkEngine(t)
 	assert.NotNil(t, engine)
 	testutil.CleanupAndRequireSuccess(t, engine.ruleStorage.Close)
 
@@ -193,6 +193,42 @@ func TestBenchNetworkEngine(t *testing.T) {
 	)
 }
 
+func FuzzNetworkEngine_Match(f *testing.F) {
+	for _, seed := range []string{
+		"",
+		" ",
+		"\n",
+		"1",
+		"127.0.0.1",
+		"example.test",
+	} {
+		f.Add(seed)
+	}
+
+	rulesText := "||example.test^"
+
+	lists := []filterlist.RuleList{
+		&filterlist.StringRuleList{
+			ID:             1,
+			RulesText:      rulesText,
+			IgnoreCosmetic: true,
+		},
+	}
+
+	ruleStorage, err := filterlist.NewRuleStorage(lists)
+	require.NoError(f, err)
+
+	testutil.CleanupAndRequireSuccess(f, ruleStorage.Close)
+
+	engine := NewNetworkEngine(ruleStorage)
+
+	f.Fuzz(func(t *testing.T, host string) {
+		assert.NotPanics(t, func() {
+			_, _ = engine.Match(rules.NewRequestForHostname(host))
+		})
+	})
+}
+
 // assumeRequestType converts string value from requests.json to RequestType
 // This maps puppeteer types to WebRequest types
 func testGetRequestType(t string) rules.RequestType {
@@ -225,11 +261,14 @@ func isSupportedURL(url string) bool {
 		strings.HasPrefix(url, "ws"))
 }
 
-func buildNetworkEngine(t *testing.T) *NetworkEngine {
+// newTestNetworkEngine returns a new NetworkEngine initialized with the rules
+// from filterPath.
+func newTestNetworkEngine(tb testing.TB) (engine *NetworkEngine) {
+	tb.Helper()
+
 	filterBytes, err := os.ReadFile(filterPath)
-	if err != nil {
-		t.Fatalf("cannot read %s", filterPath)
-	}
+	require.NoError(tb, err)
+
 	lists := []filterlist.RuleList{
 		&filterlist.StringRuleList{
 			ID:             1,
@@ -239,13 +278,9 @@ func buildNetworkEngine(t *testing.T) *NetworkEngine {
 	}
 
 	ruleStorage, err := filterlist.NewRuleStorage(lists)
-	if err != nil {
-		t.Fatalf("cannot initialize rule storage: %s", err)
-	}
-	engine := NewNetworkEngine(ruleStorage)
-	log.Printf("Loaded %d rules from %s", engine.RulesCount, filterPath)
+	require.NoError(tb, err)
 
-	return engine
+	return NewNetworkEngine(ruleStorage)
 }
 
 func newTestRuleStorage(t *testing.T, listID int, rulesText string) *filterlist.RuleStorage {

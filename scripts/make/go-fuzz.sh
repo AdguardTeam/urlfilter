@@ -49,6 +49,102 @@ readonly go count_flags shuffle_flags timeout_flags fuzztime_flags
 	"$x_flags" \
 	"$v_flags" \
 	"$fuzztime_flags" \
+	--fuzz='FuzzCosmeticEngine_Match' \
+	. \
+	;
+
+"$go" test \
+	"$count_flags" \
+	"$shuffle_flags" \
+	"$race_flags" \
+	"$timeout_flags" \
+	"$x_flags" \
+	"$v_flags" \
+	"$fuzztime_flags" \
+	--fuzz='FuzzDNSEngine_Match' \
+	. \
+	;
+
+"$go" test \
+	"$count_flags" \
+	"$shuffle_flags" \
+	"$race_flags" \
+	"$timeout_flags" \
+	"$x_flags" \
+	"$v_flags" \
+	"$fuzztime_flags" \
+	--fuzz='FuzzNewEngine' \
+	. \
+	;
+
+"$go" test \
+	"$count_flags" \
+	"$shuffle_flags" \
+	"$race_flags" \
+	"$timeout_flags" \
+	"$x_flags" \
+	"$v_flags" \
+	"$fuzztime_flags" \
+	--fuzz='FuzzNetworkEngine_Match' \
+	. \
+	;
+
+"$go" test \
+	"$count_flags" \
+	"$shuffle_flags" \
+	"$race_flags" \
+	"$timeout_flags" \
+	"$x_flags" \
+	"$v_flags" \
+	"$fuzztime_flags" \
 	--fuzz='FuzzExtractHostname' \
 	./filterutil/ \
+	;
+
+"$go" test \
+	"$count_flags" \
+	"$shuffle_flags" \
+	"$race_flags" \
+	"$timeout_flags" \
+	"$x_flags" \
+	"$v_flags" \
+	"$fuzztime_flags" \
+	--fuzz='FuzzNewRule' \
+	./rules/ \
+	;
+
+"$go" test \
+	"$count_flags" \
+	"$shuffle_flags" \
+	"$race_flags" \
+	"$timeout_flags" \
+	"$x_flags" \
+	"$v_flags" \
+	"$fuzztime_flags" \
+	--fuzz='FuzzCosmeticRule_Match' \
+	./rules/ \
+	;
+
+"$go" test \
+	"$count_flags" \
+	"$shuffle_flags" \
+	"$race_flags" \
+	"$timeout_flags" \
+	"$x_flags" \
+	"$v_flags" \
+	"$fuzztime_flags" \
+	--fuzz='FuzzHostRule_Match' \
+	./rules/ \
+	;
+
+"$go" test \
+	"$count_flags" \
+	"$shuffle_flags" \
+	"$race_flags" \
+	"$timeout_flags" \
+	"$x_flags" \
+	"$v_flags" \
+	"$fuzztime_flags" \
+	--fuzz='FuzzNetworkRule_Match' \
+	./rules/ \
 	;

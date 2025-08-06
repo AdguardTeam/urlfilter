@@ -55,9 +55,6 @@ func randIPv6(tb testing.TB, r *rand.Rand) (addr netip.Addr) {
 	return netip.AddrFrom16(data)
 }
 
-// boolSink is a sink for bool returning values in benchmarks.
-var boolSink bool
-
 func BenchmarkIsProbablyIP(b *testing.B) {
 	const n = 128
 
@@ -65,17 +62,19 @@ func BenchmarkIsProbablyIP(b *testing.B) {
 	r := rand.New(rand.NewSource(n))
 
 	addrStrs := make([]string, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		addrStrs[i] = randIPv6(b, r).String()
 	}
 
 	b.Run("random", func(b *testing.B) {
-		b.ResetTimer()
-		b.ReportAllocs()
+		var ok bool
 
-		for i := 0; i < b.N; i++ {
-			boolSink = IsProbablyIP(addrStrs[i%n])
+		b.ReportAllocs()
+		for i := 0; b.Loop(); i++ {
+			ok = IsProbablyIP(addrStrs[i%n])
 		}
+
+		assert.True(b, ok)
 	})
 
 	// Most recent results:
@@ -84,5 +83,5 @@ func BenchmarkIsProbablyIP(b *testing.B) {
 	// goarch: arm64
 	// pkg: github.com/AdguardTeam/urlfilter/filterutil
 	// cpu: Apple M1 Pro
-	// BenchmarkIsProbablyIP/random-8                  19352161                56.97 ns/op            0 B/op          0 allocs/op
+	// BenchmarkIsProbablyIP/random-8         	11645703	        88.50 ns/op	       0 B/op	       0 allocs/op
 }

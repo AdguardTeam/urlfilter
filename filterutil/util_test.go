@@ -71,11 +71,10 @@ func BenchmarkExtractHostname(b *testing.B) {
 	// Compare custom implementation of hostname extraction against a solution
 	// using the standard library.
 	b.Run("no_std", func(b *testing.B) {
-		b.ReportAllocs()
-
 		var got string
 
-		for i := 0; i < b.N; i++ {
+		b.ReportAllocs()
+		for b.Loop() {
 			got = filterutil.ExtractHostname(exampleURL)
 		}
 
@@ -83,11 +82,10 @@ func BenchmarkExtractHostname(b *testing.B) {
 	})
 
 	b.Run("std", func(b *testing.B) {
-		b.ReportAllocs()
-
 		var got string
 
-		for i := 0; i < b.N; i++ {
+		b.ReportAllocs()
+		for b.Loop() {
 			got = extractHostnameStd(exampleURL)
 		}
 
@@ -100,8 +98,8 @@ func BenchmarkExtractHostname(b *testing.B) {
 	// goarch: arm64
 	// pkg: github.com/AdguardTeam/urlfilter/filterutil
 	// cpu: Apple M1 Pro
-	// BenchmarkExtractHostname/no_std-8               26470028               113.5 ns/op             0 B/op          0 allocs/op
-	// BenchmarkExtractHostname/std-8                   2272830               458.8 ns/op           144 B/op          1 allocs/op
+	// BenchmarkExtractHostname/no_std-8         	37493067	        26.72 ns/op	       0 B/op	       0 allocs/op
+	// BenchmarkExtractHostname/std-8            	 6846234	       176.0 ns/op	     144 B/op	       1 allocs/op
 }
 
 // extractHostnameStd retrieves hostname from the given URL using standard
