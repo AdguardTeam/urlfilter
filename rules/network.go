@@ -10,7 +10,7 @@ import (
 	"sync"
 
 	"github.com/AdguardTeam/golibs/errors"
-	"github.com/AdguardTeam/urlfilter/filterutil"
+	"github.com/AdguardTeam/golibs/netutil"
 )
 
 const (
@@ -525,10 +525,8 @@ func (f *NetworkRule) matchRequestDomain(domain string, hostnameRequest bool) (o
 	// only come from CNAME filtering.  So regardless of whether it actually
 	// matches the "denyallow" list, we consider that it does not.
 	// Original issue: https://github.com/AdguardTeam/AdGuardHome/issues/3175.
-	if hostnameRequest && filterutil.IsProbablyIP(domain) {
-		if _, err := netip.ParseAddr(domain); err == nil {
-			return false
-		}
+	if hostnameRequest && netutil.IsValidIPString(domain) {
+		return false
 	}
 
 	return !isDomainOrSubdomainOfAny(domain, f.denyAllowDomains)

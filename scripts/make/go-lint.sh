@@ -154,25 +154,25 @@ run_linter govulncheck ./...
 
 # TODO(e.burkov): Enable for all.
 run_linter gocyclo --over 42 ./rules/
-run_linter gocyclo --over 31 ./filterutil/
+run_linter gocyclo --over 31 ./internal/ufnet/
 run_linter gocyclo --over 18 ./proxy/
 run_linter gocyclo --over 10 \
-	-ignore "rules/|filterutil/|proxy/|_test" \
+	-ignore "_test|internal/ufnet/|proxy/|rules/" \
 	./ \
 	;
 
 # TODO(e.burkov): Enable for all.
-run_linter gocognit --over 56 ./filterutil/
+run_linter gocognit --over 56 ./internal/ufnet/
 run_linter gocognit --over 35 ./rules/
 run_linter gocognit --over 10 \
 	./cmd/ \
-	./examples/ \
-	./filterlist/ \
-	./lookup/ \
 	./dnsengine.go \
 	./dnsrewrite.go \
 	./doc.go \
 	./engine.go \
+	./examples/ \
+	./filterlist/ \
+	./internal/lookup/ \
 	./networkengine.go \
 	;
 

@@ -98,7 +98,7 @@ readonly go count_flags shuffle_flags timeout_flags fuzztime_flags
 	"$v_flags" \
 	"$fuzztime_flags" \
 	--fuzz='FuzzExtractHostname' \
-	./filterutil/ \
+	./internal/ufnet/ \
 	;
 
 "$go" test \

@@ -5,7 +5,7 @@ import (
 	"net/netip"
 	"strings"
 
-	"github.com/AdguardTeam/urlfilter/filterutil"
+	"github.com/AdguardTeam/urlfilter/internal/ufnet"
 	"golang.org/x/net/publicsuffix"
 )
 
@@ -118,10 +118,10 @@ func NewRequest(url, sourceURL string, requestType RequestType) *Request {
 
 		URL:          url,
 		URLLowerCase: strings.ToLower(url),
-		Hostname:     filterutil.ExtractHostname(url),
+		Hostname:     ufnet.ExtractHostname(url),
 
 		SourceURL:      sourceURL,
-		SourceHostname: filterutil.ExtractHostname(sourceURL),
+		SourceHostname: ufnet.ExtractHostname(sourceURL),
 	}
 
 	domain := effectiveTLDPlusOne(r.Hostname)

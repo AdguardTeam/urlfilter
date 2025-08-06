@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/AdguardTeam/golibs/errors"
-	"github.com/AdguardTeam/urlfilter/filterutil"
+	"github.com/AdguardTeam/urlfilter/internal/ufnet"
 	"github.com/miekg/dns"
 )
 
@@ -98,7 +98,7 @@ func loadDomains(domains, sep string) (permittedDomains, restrictedDomains []str
 			d = d[1:]
 		}
 
-		if !filterutil.IsDomainName(d) && !strings.HasSuffix(d, ".*") {
+		if !ufnet.IsDomainName(d) && !strings.HasSuffix(d, ".*") {
 			err = fmt.Errorf("invalid domain specified: %s", domains)
 			return
 		}

@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/AdguardTeam/golibs/errors"
-	"github.com/AdguardTeam/urlfilter/filterutil"
+	"github.com/AdguardTeam/golibs/netutil"
 	"github.com/miekg/dns"
 )
 
@@ -146,22 +146,21 @@ func loadDNSRewriteShort(s string) (rewrite *DNSRewrite, err error) {
 		}
 	}
 
-	if filterutil.IsProbablyIP(s) {
-		if ip, parseErr := netip.ParseAddr(s); parseErr == nil {
-			if ip.Is4() {
-				return &DNSRewrite{
-					RCode:  dns.RcodeSuccess,
-					RRType: dns.TypeA,
-					Value:  ip,
-				}, nil
-			}
-
+	if netutil.IsValidIPString(s) {
+		ip := netip.MustParseAddr(s)
+		if ip.Is4() {
 			return &DNSRewrite{
 				RCode:  dns.RcodeSuccess,
-				RRType: dns.TypeAAAA,
+				RRType: dns.TypeA,
 				Value:  ip,
 			}, nil
 		}
+
+		return &DNSRewrite{
+			RCode:  dns.RcodeSuccess,
+			RRType: dns.TypeAAAA,
+			Value:  ip,
+		}, nil
 	}
 
 	err = validateHost(s)
@@ -395,7 +394,7 @@ func svcbDNSRewriteRRHandler(rcode RCode, rr RRType, valStr string) (dnsr *DNSRe
 var dnsRewriteRRHandlers = map[RRType]dnsRewriteRRHandler{
 	dns.TypeA: func(rcode RCode, rr RRType, valStr string) (dnsr *DNSRewrite, err error) {
 		var ip netip.Addr
-		if !filterutil.IsProbablyIP(valStr) {
+		if !netutil.IsValidIPString(valStr) {
 			return nil, fmt.Errorf("%q is not a valid ipv4", valStr)
 		} else if ip, err = netip.ParseAddr(valStr); err != nil {
 			// Don't wrap the error since it's informative enough as is.
@@ -413,7 +412,7 @@ var dnsRewriteRRHandlers = map[RRType]dnsRewriteRRHandler{
 
 	dns.TypeAAAA: func(rcode RCode, rr RRType, valStr string) (dnsr *DNSRewrite, err error) {
 		var ip netip.Addr
-		if !filterutil.IsProbablyIP(valStr) {
+		if !netutil.IsValidIPString(valStr) {
 			return nil, fmt.Errorf("%q is not a valid ipv6", valStr)
 		} else if ip, err = netip.ParseAddr(valStr); err != nil {
 			// Don't wrap the error since it's informative enough as is.

@@ -1,4 +1,5 @@
-package filterutil
+// Package ufnet contains utilities for domain and hostname parsing/validation.
+package ufnet
 
 import "strings"
 
@@ -9,6 +10,8 @@ import "strings"
 // for some edge cases, which include non-hierarchical URLs and IPv6 hostnames.
 //
 // TODO(a.garipov): Consider moving to golibs.
+//
+// TODO(s.chzhen):  Consider using url.URL.
 func ExtractHostname(url string) (hostname string) {
 	firstIdx := strings.Index(url, "//")
 	if firstIdx == -1 {
@@ -19,6 +22,7 @@ func ExtractHostname(url string) (hostname string) {
 		if firstIdx == -1 {
 			return ""
 		}
+
 		firstIdx = firstIdx - 1
 	} else {
 		firstIdx = firstIdx + 2
@@ -56,8 +60,10 @@ func ExtractHostname(url string) (hostname string) {
 // . TLD is >=2 characters
 // . TLD is [a-zA-Z]+ or "xn--[a-zA-Z0-9]+"
 //
+// TODO(s.chzhen):  Consider using netutil.IsValidHostname.
+//
 //nolint:gocyclo
-func IsDomainName(name string) bool {
+func IsDomainName(name string) (ok bool) {
 	if len(name) > 253 {
 		return false
 	}
@@ -77,6 +83,7 @@ func IsDomainName(name string) bool {
 			if !((c >= 'a' && c <= 'z') ||
 				(c >= 'A' && c <= 'Z')) {
 				charOnly = false
+
 				if !(c >= '0' && c <= '9') {
 					return false
 				}
@@ -91,10 +98,12 @@ func IsDomainName(name string) bool {
 				if prevChar == '-' {
 					return false
 				}
+
 				nLevel++
 				st = 0
 				charOnly = true
 				xn = 0
+
 				continue
 			}
 
@@ -107,6 +116,7 @@ func IsDomainName(name string) bool {
 				charOnly = false
 				if !((c >= '0' && c <= '9') ||
 					c == '-') {
+
 					return false
 				}
 			}
@@ -131,6 +141,7 @@ func IsDomainName(name string) bool {
 	if st != 2 ||
 		nLabel == 1 ||
 		(!charOnly && xn < len("xn--wwww")) {
+
 		return false
 	}
 

@@ -1,10 +1,10 @@
-package filterutil_test
+package ufnet_test
 
 import (
 	"net/url"
 	"testing"
 
-	"github.com/AdguardTeam/urlfilter/filterutil"
+	"github.com/AdguardTeam/urlfilter/internal/ufnet"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -54,7 +54,7 @@ func TestExtractHostname(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := filterutil.ExtractHostname(tc.in)
+			got := ufnet.ExtractHostname(tc.in)
 			require.Equal(t, tc.want, got)
 
 			assert.Equal(t, extractHostnameStd(tc.in), got)
@@ -75,7 +75,7 @@ func BenchmarkExtractHostname(b *testing.B) {
 
 		b.ReportAllocs()
 		for b.Loop() {
-			got = filterutil.ExtractHostname(exampleURL)
+			got = ufnet.ExtractHostname(exampleURL)
 		}
 
 		assert.Equal(b, exampleHost, got)
@@ -94,12 +94,12 @@ func BenchmarkExtractHostname(b *testing.B) {
 
 	// Most recent results:
 	//
-	// goos: darwin
-	// goarch: arm64
-	// pkg: github.com/AdguardTeam/urlfilter/filterutil
-	// cpu: Apple M1 Pro
-	// BenchmarkExtractHostname/no_std-8         	37493067	        26.72 ns/op	       0 B/op	       0 allocs/op
-	// BenchmarkExtractHostname/std-8            	 6846234	       176.0 ns/op	     144 B/op	       1 allocs/op
+	// goos: linux
+	// goarch: amd64
+	// pkg: github.com/AdguardTeam/urlfilter/internal/ufnet
+	// cpu: Intel(R) Core(TM) i7-10510U CPU @ 1.80GHz
+	// BenchmarkExtractHostname/no_std-8         	56034104	        21.12 ns/op	       0 B/op	       0 allocs/op
+	// BenchmarkExtractHostname/std-8            	 6690783	       177.8 ns/op	     144 B/op	       1 allocs/op
 }
 
 // extractHostnameStd retrieves hostname from the given URL using standard
@@ -140,37 +140,37 @@ func FuzzExtractHostname(f *testing.F) {
 	}
 
 	f.Fuzz(func(_ *testing.T, input string) {
-		_ = filterutil.ExtractHostname(input)
+		_ = ufnet.ExtractHostname(input)
 	})
 }
 
 func TestIsDomainName(t *testing.T) {
-	assert.True(t, filterutil.IsDomainName("1.cc"))
-	assert.True(t, filterutil.IsDomainName("1.2.cc"))
-	assert.True(t, filterutil.IsDomainName("a.b.cc"))
-	assert.True(t, filterutil.IsDomainName("abc.abc.abc"))
-	assert.True(t, filterutil.IsDomainName("a-bc.ab--c.abc"))
-	assert.True(t, filterutil.IsDomainName("abc.xn--p1ai"))
-	assert.True(t, filterutil.IsDomainName("xn--p1ai.xn--p1ai"))
-	assert.True(t, filterutil.IsDomainName("cc"))
-	assert.True(t, filterutil.IsDomainName("xn--p1ai"))
+	assert.True(t, ufnet.IsDomainName("1.cc"))
+	assert.True(t, ufnet.IsDomainName("1.2.cc"))
+	assert.True(t, ufnet.IsDomainName("a.b.cc"))
+	assert.True(t, ufnet.IsDomainName("abc.abc.abc"))
+	assert.True(t, ufnet.IsDomainName("a-bc.ab--c.abc"))
+	assert.True(t, ufnet.IsDomainName("abc.xn--p1ai"))
+	assert.True(t, ufnet.IsDomainName("xn--p1ai.xn--p1ai"))
+	assert.True(t, ufnet.IsDomainName("cc"))
+	assert.True(t, ufnet.IsDomainName("xn--p1ai"))
 
-	assert.False(t, filterutil.IsDomainName("#cc"))
-	assert.False(t, filterutil.IsDomainName("a.cc#"))
-	assert.False(t, filterutil.IsDomainName("abc.xn--"))
-	assert.False(t, filterutil.IsDomainName("abc.xn--asd"))
+	assert.False(t, ufnet.IsDomainName("#cc"))
+	assert.False(t, ufnet.IsDomainName("a.cc#"))
+	assert.False(t, ufnet.IsDomainName("abc.xn--"))
+	assert.False(t, ufnet.IsDomainName("abc.xn--asd"))
 
-	assert.False(t, filterutil.IsDomainName(".a.cc"))
-	assert.False(t, filterutil.IsDomainName("a.cc."))
+	assert.False(t, ufnet.IsDomainName(".a.cc"))
+	assert.False(t, ufnet.IsDomainName("a.cc."))
 
-	assert.False(t, filterutil.IsDomainName("-a.cc"))
-	assert.False(t, filterutil.IsDomainName("a-.cc"))
+	assert.False(t, ufnet.IsDomainName("-a.cc"))
+	assert.False(t, ufnet.IsDomainName("a-.cc"))
 
-	assert.False(t, filterutil.IsDomainName("a.1cc"))
-	assert.False(t, filterutil.IsDomainName("a.cc1"))
-	assert.False(t, filterutil.IsDomainName("a.c"))
+	assert.False(t, ufnet.IsDomainName("a.1cc"))
+	assert.False(t, ufnet.IsDomainName("a.cc1"))
+	assert.False(t, ufnet.IsDomainName("a.c"))
 
 	const longLabel = "123456789012345678901234567890123456789012345678901234567890123"
-	assert.True(t, filterutil.IsDomainName(longLabel+".cc"))
-	assert.False(t, filterutil.IsDomainName(longLabel+"4.cc"))
+	assert.True(t, ufnet.IsDomainName(longLabel+".cc"))
+	assert.False(t, ufnet.IsDomainName(longLabel+"4.cc"))
 }

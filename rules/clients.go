@@ -5,7 +5,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/AdguardTeam/urlfilter/filterutil"
+	"github.com/AdguardTeam/golibs/netutil"
 )
 
 // clients is a set representation for $client modifier.
@@ -56,13 +56,11 @@ func (c *clients) finalize() {
 // add adds a new client to the set.  c must be not be nil, and must be sorted
 // with [finalize] after all additions.
 func (c *clients) add(client string) {
-	if filterutil.IsProbablyIP(client) {
-		ip, err := netip.ParseAddr(client)
-		if err == nil {
-			c.nets = append(c.nets, netip.PrefixFrom(ip, ip.BitLen()))
+	if netutil.IsValidIPString(client) {
+		ip := netip.MustParseAddr(client)
+		c.nets = append(c.nets, netip.PrefixFrom(ip, ip.BitLen()))
 
-			return
-		}
+		return
 	} else if strings.Contains(client, "/") {
 		subnet, err := netip.ParsePrefix(client)
 		if err == nil {

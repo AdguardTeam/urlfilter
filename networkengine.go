@@ -2,7 +2,7 @@ package urlfilter
 
 import (
 	"github.com/AdguardTeam/urlfilter/filterlist"
-	"github.com/AdguardTeam/urlfilter/lookup"
+	"github.com/AdguardTeam/urlfilter/internal/lookup"
 	"github.com/AdguardTeam/urlfilter/rules"
 )
 

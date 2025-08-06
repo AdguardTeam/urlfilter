@@ -5,7 +5,7 @@ import (
 
 	"github.com/AdguardTeam/golibs/syncutil"
 	"github.com/AdguardTeam/urlfilter/filterlist"
-	"github.com/AdguardTeam/urlfilter/filterutil"
+	"github.com/AdguardTeam/urlfilter/internal/fasthash"
 	"github.com/AdguardTeam/urlfilter/rules"
 )
 
@@ -205,7 +205,7 @@ func (d *DNSEngine) MatchRequest(dReq *DNSRequest) (res *DNSResult, matched bool
 
 // matchLookupTable looks for matching rules in the d.lookupTable
 func (d *DNSEngine) matchLookupTable(hostname string) ([]rules.Rule, bool) {
-	hash := filterutil.FastHash(hostname)
+	hash := fasthash.String(hostname)
 	rulesIndexes, ok := d.lookupTable[hash]
 	if !ok {
 		return nil, false
@@ -225,7 +225,7 @@ func (d *DNSEngine) matchLookupTable(hostname string) ([]rules.Rule, bool) {
 // addRule adds rule to the index
 func (d *DNSEngine) addRule(hostRule *rules.HostRule, storageIdx int64) {
 	for _, hostname := range hostRule.Hostnames {
-		hash := filterutil.FastHash(hostname)
+		hash := fasthash.String(hostname)
 		rulesIndexes := d.lookupTable[hash]
 		d.lookupTable[hash] = append(rulesIndexes, storageIdx)
 	}

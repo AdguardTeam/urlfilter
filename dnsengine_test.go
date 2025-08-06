@@ -10,7 +10,7 @@ import (
 
 	"github.com/AdguardTeam/golibs/testutil"
 	"github.com/AdguardTeam/urlfilter/filterlist"
-	"github.com/AdguardTeam/urlfilter/filterutil"
+	"github.com/AdguardTeam/urlfilter/internal/ufnet"
 	"github.com/miekg/dns"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -716,7 +716,7 @@ func loadHostnames(t *testing.B) (hostnames []string) {
 	t.Helper()
 
 	for _, req := range loadRequests(t) {
-		h := filterutil.ExtractHostname(req.URL)
+		h := ufnet.ExtractHostname(req.URL)
 		if h != "" {
 			hostnames = append(hostnames, h)
 		}

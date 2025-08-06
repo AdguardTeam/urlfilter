@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	"github.com/AdguardTeam/urlfilter/filterlist"
-	"github.com/AdguardTeam/urlfilter/filterutil"
+	"github.com/AdguardTeam/urlfilter/internal/fasthash"
 	"github.com/AdguardTeam/urlfilter/rules"
 )
 
@@ -38,7 +38,7 @@ func (d *DomainsTable) TryAdd(f *rules.NetworkRule, storageIdx int64) (ok bool) 
 	}
 
 	for _, domain := range permittedDomains {
-		hash := filterutil.FastHash(domain)
+		hash := fasthash.String(domain)
 
 		// Add the rule to the lookup table
 		rulesIndexes := d.domainsLookupTable[hash]
@@ -57,7 +57,7 @@ func (d *DomainsTable) MatchAll(r *rules.Request) (result []*rules.NetworkRule) 
 
 	domains := getSubdomains(r.SourceHostname)
 	for _, domain := range domains {
-		hash := filterutil.FastHash(domain)
+		hash := fasthash.String(domain)
 		matchingRules, ok := d.domainsLookupTable[hash]
 		if !ok {
 			continue

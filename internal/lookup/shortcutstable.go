@@ -5,11 +5,14 @@ import (
 	"strings"
 
 	"github.com/AdguardTeam/urlfilter/filterlist"
-	"github.com/AdguardTeam/urlfilter/filterutil"
+	"github.com/AdguardTeam/urlfilter/internal/fasthash"
 	"github.com/AdguardTeam/urlfilter/rules"
 )
 
 const (
+	// shortcutLength is the fixed length used to form URL "shortcuts".
+	//
+	// NOTE:  Do not change this without updating [ShortcutsTable.MatchAll].
 	shortcutLength = 5
 )
 
@@ -61,7 +64,7 @@ func (s *ShortcutsTable) TryAdd(f *rules.NetworkRule, storageIdx int64) (ok bool
 	var shortcutHash uint32
 	minCount := math.MaxInt32
 	for _, shortcutToCheck := range shortcuts {
-		hash := filterutil.FastHash(shortcutToCheck)
+		hash := fasthash.String(shortcutToCheck)
 		count, found := s.shortcutsHistogram[hash]
 		if !found {
 			count = 0
@@ -85,11 +88,27 @@ func (s *ShortcutsTable) TryAdd(f *rules.NetworkRule, storageIdx int64) (ok bool
 
 // MatchAll implements the LookupTable interface for *ShortcutsTable.
 func (s *ShortcutsTable) MatchAll(r *rules.Request) (result []*rules.NetworkRule) {
-	for i := 0; i <= len(r.URLLowerCase)-shortcutLength; i++ {
+	reqURL := r.URLLowerCase
+	urlLen := len(reqURL)
+	if urlLen < shortcutLength {
+		return nil
+	}
+
+	for end := 4; end < urlLen; end++ {
+		start := end - 4
+
+		// Manually unroll [fasthash.String] to help the compiler eliminate
+		// bounds checks.
+		hash := uint32(5381)
+		hash = (hash * 33) ^ uint32(reqURL[start])
+		hash = (hash * 33) ^ uint32(reqURL[start+1])
+		hash = (hash * 33) ^ uint32(reqURL[start+2])
+		hash = (hash * 33) ^ uint32(reqURL[start+3])
+		hash = (hash * 33) ^ uint32(reqURL[start+4])
+
 		// The shortcutsLookupTable contains the shortcuts of rules of
 		// fixed length and rules itself.  Go through all the substrings
 		// of passed URL having such length to find matching rules.
-		hash := filterutil.FastHashBetween(r.URLLowerCase, i, i+shortcutLength)
 		matchingRules, ok := s.shortcutsLookupTable[hash]
 		if !ok {
 			continue

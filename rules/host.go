@@ -4,7 +4,7 @@ import (
 	"net/netip"
 	"strings"
 
-	"github.com/AdguardTeam/urlfilter/filterutil"
+	"github.com/AdguardTeam/urlfilter/internal/ufnet"
 )
 
 // HostRule is a structure for simple host-level rules (i.e. /etc/hosts syntax).
@@ -74,7 +74,7 @@ func NewHostRule(ruleText string, filterListID int) (h *HostRule, err error) {
 
 	first := splitNextByWhitespace(&ruleText)
 	if len(ruleText) == 0 {
-		if !filterutil.IsDomainName(first) {
+		if !ufnet.IsDomainName(first) {
 			return nil, &RuleSyntaxError{msg: "invalid syntax", ruleText: ruleText}
 		}
 
