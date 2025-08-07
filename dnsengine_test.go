@@ -3,6 +3,7 @@ package urlfilter
 import (
 	"net/netip"
 	"os"
+	"runtime"
 	"runtime/debug"
 	"strings"
 	"testing"
@@ -523,6 +524,8 @@ const (
 	hostsPath         = testResourcesDir + "/hosts"
 )
 
+// TODO(a.garipov):  Consider removing and replacing with tests similar to
+// [BenchmarkDNSEngine_heapAlloc].
 func BenchmarkDNSEngine(b *testing.B) {
 	debug.SetGCPercent(10)
 
@@ -605,6 +608,58 @@ func BenchmarkDNSEngine(b *testing.B) {
 		matchHeap-loadHeap,
 		matchRSS-loadRSS,
 	)
+}
+
+// BenchmarkDNSEngine_heapAlloc is a benchmark used to measure changes in the
+// heap-allocated memory during typical operation of a DNS engine.  It reports
+// the following additional metrics:
+//   - initial_heap_bytes: the size of allocated heap objects before doing
+//     anything.
+//   - heap_after_loading_bytes: the size of allocated heap objects after
+//     compiling rule lists.
+//   - heap_after_matching_bytes: the size of allocated heap objects after
+//     matching a few requests with the engine.
+func BenchmarkDNSEngine_heapAlloc(b *testing.B) {
+	ruleStorage := newRuleStorage(b)
+	testutil.CleanupAndRequireSuccess(b, ruleStorage.Close)
+
+	testHostnames := loadHostnames(b)
+
+	b.ReportAllocs()
+	for b.Loop() {
+		runtime.GC()
+
+		b.ReportMetric(heapAlloc(b), "initial_heap_bytes")
+
+		dnsEngine := NewDNSEngine(ruleStorage)
+
+		b.ReportMetric(heapAlloc(b), "heap_after_loading_bytes")
+
+		for _, reqHostname := range testHostnames {
+			_, _ = dnsEngine.Match(reqHostname)
+		}
+
+		b.ReportMetric(heapAlloc(b), "heap_after_matching_bytes")
+	}
+
+	// Most recent results:
+	//	goos: linux
+	//	goarch: amd64
+	//	pkg: github.com/AdguardTeam/urlfilter
+	//	cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
+	//	BenchmarkDNSEngine_heapAlloc
+	//	BenchmarkDNSEngine_heapAlloc-16    	      49	 242786443 ns/op	  21317672 heap_after_loading_bytes	  24698744 heap_after_matching_bytes	  11290072 initial_heap_bytes	69773342 B/op	 1028856 allocs/op
+}
+
+// heapAlloc is a helper that returns the current heap-allocated bytes as
+// counted by the runtime.
+func heapAlloc(tb testing.TB) (heap float64) {
+	tb.Helper()
+
+	m := &runtime.MemStats{}
+	runtime.ReadMemStats(m)
+
+	return float64(m.HeapAlloc)
 }
 
 func BenchmarkDNSEngine_Match(b *testing.B) {
