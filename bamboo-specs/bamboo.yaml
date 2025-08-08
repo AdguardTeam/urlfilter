@@ -5,8 +5,8 @@
 # AdGuard-Project-Version: 8
 'version': 2
 'plan':
-    'project-key': 'AGH'
-    'key': 'URLFLTSPECS'
+    'project-key': 'GO'
+    'key': 'URLFILTER'
     'name': 'urlfilter - Lint and Run tests'
 'variables':
     # When there is a patch release of Go available, set this property to an

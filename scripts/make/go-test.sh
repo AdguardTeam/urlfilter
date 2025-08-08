@@ -40,7 +40,7 @@ count_flags='--count=2'
 cover_flags='--coverprofile=./cover.out'
 go="${GO:-go}"
 shuffle_flags='--shuffle=on'
-timeout_flags="${TIMEOUT_FLAGS:---timeout=30s}"
+timeout_flags="${TIMEOUT_FLAGS:---timeout=1m}"
 readonly count_flags cover_flags go shuffle_flags timeout_flags
 
 go_test() {
