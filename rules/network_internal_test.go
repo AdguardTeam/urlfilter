@@ -1,8 +1,10 @@
 package rules
 
 import (
+	"net/url"
 	"testing"
 
+	"github.com/AdguardTeam/golibs/netutil/urlutil"
 	"github.com/AdguardTeam/golibs/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -204,7 +206,10 @@ func TestNetworkRule_clientTagRules(t *testing.T) {
 	assert.NotNil(t, f)
 	assert.Equal(t, []string{"pc"}, f.permittedClientTags)
 
-	r := NewRequestForHostname("example.org")
+	r := NewRequestForURL(&url.URL{
+		Scheme: urlutil.SchemeHTTP,
+		Host:   "example.org",
+	})
 	r.SortedClientTags = []string{"pc"}
 	assert.True(t, f.Match(r))
 

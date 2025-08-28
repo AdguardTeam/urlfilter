@@ -3,16 +3,11 @@ package rules
 import (
 	"math/bits"
 	"net/netip"
+	"net/url"
 	"strings"
 
-	"github.com/AdguardTeam/urlfilter/internal/ufnet"
 	"golang.org/x/net/publicsuffix"
 )
-
-// maxURLLength limits the URL length by 4 KiB. It appears that there
-// can be URLs longer than a megabyte, and it makes no sense to go
-// through the whole URL.
-const maxURLLength = 4 * 1024
 
 // RequestType is the request types enumeration
 type RequestType uint32
@@ -56,15 +51,15 @@ type Request struct {
 	// default zero value won't be considered.
 	ClientIP netip.Addr
 
+	// SourceURL is the full URL of the source.
+	SourceURL *url.URL
+
+	// URL is the full request URL.
+	URL *url.URL
+
 	// ClientName is the name to match against $client modifiers.  The default
 	// empty value won't be considered.
 	ClientName string
-
-	// URL is the full request URL.
-	URL string
-
-	// URLLowerCase is the full request URL in lower case.
-	URLLowerCase string
 
 	// Hostname is the hostname to filter.
 	Hostname string
@@ -72,9 +67,6 @@ type Request struct {
 	// Domain is the effective top-level domain of the request with an
 	// additional label.
 	Domain string
-
-	// SourceURL is the full URL of the source.
-	SourceURL string
 
 	// SourceHostname is the hostname of the source.
 	SourceHostname string
@@ -105,23 +97,16 @@ type Request struct {
 }
 
 // NewRequest creates a new instance of "Request" and populates it's fields
-func NewRequest(url, sourceURL string, requestType RequestType) *Request {
-	if len(url) > maxURLLength {
-		url = url[:maxURLLength]
-	}
-	if len(sourceURL) > maxURLLength {
-		sourceURL = sourceURL[:maxURLLength]
-	}
-
+func NewRequest(u, sourceURL *url.URL, requestType RequestType) *Request {
 	r := Request{
+		SourceURL:   sourceURL,
+		URL:         u,
+		Hostname:    u.Hostname(),
 		RequestType: requestType,
+	}
 
-		URL:          url,
-		URLLowerCase: strings.ToLower(url),
-		Hostname:     ufnet.ExtractHostname(url),
-
-		SourceURL:      sourceURL,
-		SourceHostname: ufnet.ExtractHostname(sourceURL),
+	if sourceURL != nil {
+		r.SourceHostname = sourceURL.Hostname()
 	}
 
 	domain := effectiveTLDPlusOne(r.Hostname)
@@ -145,29 +130,20 @@ func NewRequest(url, sourceURL string, requestType RequestType) *Request {
 	return &r
 }
 
-// NewRequestForHostname creates a new instance of [Request] for matching the
-// hostname.  It uses "http://" as a protocol and [TypeDocument] as a request
-// type.
-func NewRequestForHostname(hostname string) (r *Request) {
+// NewRequestForURL creates a new instance of [Request] for matching the URL's
+// hostname.  It uses [TypeDocument] as a request type.
+func NewRequestForURL(u *url.URL) (r *Request) {
 	r = &Request{}
-	FillRequestForHostname(r, hostname)
+	FillRequestForURL(r, u)
 
 	return r
 }
 
-// FillRequestForHostname fills the given instance of request r for matching the
-// hostname.  It uses "http://" as a protocol for request URL and [TypeDocument]
-// as request type.
-func FillRequestForHostname(r *Request, hostname string) {
-	// Do not use fmt.Sprintf or url.URL to achieve better performance.
-	// Hostname validation should be performed by the function caller.
-	urlStr := "http://" + hostname
-
-	// TODO(d.kolyshev): Make r.URL to be [url.URL], then [url.AppendBinary]
-	// on usages.
-	r.URL = urlStr
-	r.URLLowerCase = urlStr
-	r.Hostname = hostname
+// FillRequestForURL fills the given instance of request r for matching the
+// given URL.  It uses [TypeDocument] as request type.
+func FillRequestForURL(r *Request, u *url.URL) {
+	r.URL = u
+	r.Hostname = u.Hostname()
 
 	r.RequestType = TypeDocument
 	r.ThirdParty = false

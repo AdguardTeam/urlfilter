@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/AdguardTeam/golibs/errors"
 	"github.com/AdguardTeam/golibs/log"
+	"github.com/AdguardTeam/golibs/netutil/urlutil"
 	"github.com/AdguardTeam/golibs/testutil"
 	"github.com/AdguardTeam/urlfilter/filterlist"
 	"github.com/AdguardTeam/urlfilter/rules"
@@ -31,16 +33,24 @@ const (
 
 type testRequest struct {
 	Line        string
-	URL         string `json:"url"`
-	FrameURL    string `json:"frameUrl"`
-	RequestType string `json:"cpt"`
+	URL         *urlutil.URL `json:"url"`
+	FrameURL    *urlutil.URL `json:"frameUrl"`
+	RequestType string       `json:"cpt"`
 	LineNumber  int
 }
 
+// testURL is a URL used for testing.
+var testURL = &url.URL{
+	Scheme: urlutil.SchemeHTTP,
+	Host:   "example.org",
+}
+
 func TestEmptyNetworkEngine(t *testing.T) {
+	t.Parallel()
+
 	ruleStorage := newTestRuleStorage(t, 1, "")
 	engine := NewNetworkEngine(ruleStorage)
-	r := rules.NewRequest("http://example.org/", "", rules.TypeOther)
+	r := rules.NewRequest(testURL, nil, rules.TypeOther)
 	rule, ok := engine.Match(r)
 	assert.False(t, ok)
 	assert.Nil(t, rule)
@@ -53,7 +63,7 @@ func TestMatchWhitelistRule(t *testing.T) {
 	ruleStorage := newTestRuleStorage(t, -1, rulesText)
 	engine := NewNetworkEngine(ruleStorage)
 
-	r := rules.NewRequest("http://example.org/", "", rules.TypeScript)
+	r := rules.NewRequest(testURL, nil, rules.TypeScript)
 	rule, ok := engine.Match(r)
 	assert.True(t, ok)
 	assert.NotNil(t, rule)
@@ -68,19 +78,25 @@ func TestMatchImportantRule(t *testing.T) {
 	ruleStorage := newTestRuleStorage(t, -1, rulesText)
 	engine := NewNetworkEngine(ruleStorage)
 
-	r := rules.NewRequest("http://example.org/", "", rules.TypeOther)
+	r := rules.NewRequest(testURL, nil, rules.TypeOther)
 	rule, ok := engine.Match(r)
 	assert.True(t, ok)
 	assert.NotNil(t, rule)
 	assert.Equal(t, r2, rule.String())
 
-	r = rules.NewRequest("http://test1.example.org/", "", rules.TypeOther)
+	r = rules.NewRequest(&url.URL{
+		Scheme: urlutil.SchemeHTTP,
+		Host:   "test1.example.org",
+	}, nil, rules.TypeOther)
 	rule, ok = engine.Match(r)
 	assert.True(t, ok)
 	assert.NotNil(t, rule)
 	assert.Equal(t, r2, rule.String())
 
-	r = rules.NewRequest("http://test2.example.org/", "", rules.TypeOther)
+	r = rules.NewRequest(&url.URL{
+		Scheme: urlutil.SchemeHTTP,
+		Host:   "test2.example.org",
+	}, nil, rules.TypeOther)
 	rule, ok = engine.Match(r)
 	assert.True(t, ok)
 	assert.NotNil(t, rule)
@@ -92,10 +108,10 @@ func TestMatchSourceRule(t *testing.T) {
 	ruleStorage := newTestRuleStorage(t, -1, ruleText)
 	engine := NewNetworkEngine(ruleStorage)
 
-	url := "https://ci.phncdn.com/videos/201809/25/184777011/original/(m=ecuKGgaaaa)(mh=VSmV9NL_iouBcWJJ)4.jpg"
-	sourceURL := "https://www.pornhub.com/view_video.php?viewkey=ph5be89d11de4b0"
+	reqURL, _ := url.Parse("https://ci.phncdn.com/videos/201809/25/184777011/original/(m=ecuKGgaaaa)(mh=VSmV9NL_iouBcWJJ)4.jpg")
+	sourceURL, _ := url.Parse("https://www.pornhub.com/view_video.php?viewkey=ph5be89d11de4b0")
 
-	r := rules.NewRequest(url, sourceURL, rules.TypeImage)
+	r := rules.NewRequest(reqURL, sourceURL, rules.TypeImage)
 	rule, ok := engine.Match(r)
 	assert.True(t, ok)
 	assert.NotNil(t, rule)
@@ -107,10 +123,10 @@ func TestMatchSimplePattern(t *testing.T) {
 	ruleStorage := newTestRuleStorage(t, -1, ruleText)
 	engine := NewNetworkEngine(ruleStorage)
 
-	url := "https://ap.lijit.com/rtb/bid?src=prebid_prebid_1.35.0"
-	sourceURL := "https://www.drudgereport.com/"
+	reqURL, _ := url.Parse("https://ap.lijit.com/rtb/bid?src=prebid_prebid_1.35.0")
+	sourceURL, _ := url.Parse("https://www.drudgereport.com/")
 
-	r := rules.NewRequest(url, sourceURL, rules.TypeXmlhttprequest)
+	r := rules.NewRequest(reqURL, sourceURL, rules.TypeXmlhttprequest)
 	rule, ok := engine.Match(r)
 	assert.True(t, ok)
 	assert.NotNil(t, rule)
@@ -125,7 +141,7 @@ func TestBenchNetworkEngine(t *testing.T) {
 	assert.True(t, len(testRequests) > 0)
 	var requests []*rules.Request
 	for _, req := range testRequests {
-		r := rules.NewRequest(req.URL, req.FrameURL, testGetRequestType(req.RequestType))
+		r := rules.NewRequest(&req.URL.URL, &req.FrameURL.URL, testGetRequestType(req.RequestType))
 		requests = append(requests, r)
 	}
 
@@ -226,7 +242,11 @@ func FuzzNetworkEngine_Match(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, host string) {
 		assert.NotPanics(t, func() {
-			_, _ = engine.Match(rules.NewRequestForHostname(host))
+			req := rules.NewRequestForURL(&url.URL{
+				Scheme: urlutil.SchemeHTTP,
+				Host:   host,
+			})
+			_, _ = engine.Match(req)
 		})
 	})
 }
@@ -321,7 +341,7 @@ func loadRequests(t testing.TB) []testRequest {
 		if line != "" {
 			var req testRequest
 			err = json.Unmarshal([]byte(line), &req)
-			if err == nil && isSupportedURL(req.URL) && isSupportedURL(req.FrameURL) {
+			if err == nil && isSupportedURL(req.URL.String()) && isSupportedURL(req.FrameURL.String()) {
 				req.Line = line
 				req.LineNumber = lineNumber
 				requests = append(requests, req)

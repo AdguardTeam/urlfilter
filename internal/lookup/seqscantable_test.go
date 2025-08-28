@@ -1,6 +1,7 @@
 package lookup_test
 
 import (
+	"net/url"
 	"testing"
 
 	"github.com/AdguardTeam/urlfilter/internal/lookup"
@@ -32,16 +33,16 @@ func TestSeqScanTable_AppendMatching(t *testing.T) {
 	loadTable(t, tbl, s)
 
 	testCases := []struct {
+		url          *url.URL
 		name         string
-		urlStr       string
 		wantRuleText string
 	}{{
+		url:          testURLNoMatch,
 		name:         "no_match",
-		urlStr:       testURLStrNoMatch,
 		wantRuleText: "",
 	}, {
+		url:          testURLWithDomain,
 		name:         "match",
-		urlStr:       testURLStrWithDomain,
 		wantRuleText: testRule,
 	}}
 
@@ -49,7 +50,7 @@ func TestSeqScanTable_AppendMatching(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			r := rules.NewRequest(tc.urlStr, tc.urlStr, rules.TypeOther)
+			r := rules.NewRequest(tc.url, tc.url, rules.TypeOther)
 			assertMatch(t, tbl, r, tc.wantRuleText)
 		})
 	}
@@ -60,7 +61,7 @@ func BenchmarkSeqScanTable_AppendMatching(b *testing.B) {
 	tbl := &lookup.SeqScanTable{}
 	loadTable(b, tbl, s)
 
-	r := rules.NewRequest(testURLStrWithDomain, testURLStrWithDomain, rules.TypeOther)
+	r := rules.NewRequest(testURLWithDomain, testURLWithDomain, rules.TypeOther)
 
 	gotRules := make([]*rules.NetworkRule, 0, 1)
 
@@ -84,7 +85,7 @@ func BenchmarkSeqScanTable_AppendMatching_baseFilter(b *testing.B) {
 	tbl := &lookup.SeqScanTable{}
 	loadTable(b, tbl, s)
 
-	r := rules.NewRequest(testURLStrBaseFilterDomain, testURLStrBaseFilterDomain, rules.TypeOther)
+	r := rules.NewRequest(testURLBaseFilterDomain, testURLBaseFilterDomain, rules.TypeOther)
 
 	gotRules := make([]*rules.NetworkRule, 0, 1)
 

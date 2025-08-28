@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"bytes"
 	"fmt"
 	"math/bits"
 	"net/netip"
@@ -465,7 +466,9 @@ func (f *NetworkRule) matchPattern(r *Request) bool {
 		return f.regex.MatchString(r.Hostname)
 	}
 
-	return f.regex.MatchString(r.URL)
+	b, _ := r.URL.MarshalBinary()
+
+	return f.regex.Match(b)
 }
 
 // shouldMatchHostname checks if we should match hostnames and not the URL
@@ -503,8 +506,12 @@ func (f *NetworkRule) shouldMatchHostname(r *Request) bool {
 }
 
 // matchShortcut simply checks if shortcut is a substring of the URL
-func (f *NetworkRule) matchShortcut(r *Request) bool {
-	return strings.Contains(r.URLLowerCase, f.Shortcut)
+func (f *NetworkRule) matchShortcut(r *Request) (ok bool) {
+	b, _ := r.URL.MarshalBinary()
+
+	// TODO(d.kolyshev): Is it possible to save lowercased URL?
+	// TODO(d.kolyshev): !! Make f.Shortcut []byte.
+	return bytes.Contains(bytes.ToLower(b), []byte(f.Shortcut))
 }
 
 // matchRequestDomain checks if the filtering rule is allowed to match this

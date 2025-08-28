@@ -721,7 +721,7 @@ func loadHostnames(t *testing.B) (hostnames []string) {
 	t.Helper()
 
 	for _, req := range loadRequests(t) {
-		h := ufnet.ExtractHostname(req.URL)
+		h := ufnet.ExtractHostname(req.URL.String())
 		if h != "" {
 			hostnames = append(hostnames, h)
 		}

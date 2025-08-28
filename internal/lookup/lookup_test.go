@@ -1,10 +1,12 @@
 package lookup_test
 
 import (
+	"net/url"
 	"os"
 	"testing"
 
 	"github.com/AdguardTeam/golibs/errors"
+	"github.com/AdguardTeam/golibs/netutil/urlutil"
 	"github.com/AdguardTeam/urlfilter/filterlist"
 	"github.com/AdguardTeam/urlfilter/internal/lookup"
 	"github.com/AdguardTeam/urlfilter/rules"
@@ -43,12 +45,27 @@ const (
 		testRuleTextWithDomain
 )
 
-// Common URL strings for tests.
-const (
-	testURLStrNoDomain      = "https://" + testDomainNoMod + "/"
-	testURLStrNoMatch       = "https://no-match.example/"
-	testURLStrWithDomain    = "https://" + testDomain + "/"
-	testURLStrWithSubdomain = "https://" + testDomainSub + "/"
+// Common URLs for tests.
+var (
+	testURLNoDomain = &url.URL{
+		Scheme: urlutil.SchemeHTTPS,
+		Host:   testDomainNoMod,
+	}
+
+	testURLNoMatch = &url.URL{
+		Scheme: urlutil.SchemeHTTPS,
+		Host:   "no-match.example",
+	}
+
+	testURLWithDomain = &url.URL{
+		Scheme: urlutil.SchemeHTTPS,
+		Host:   testDomain,
+	}
+
+	testURLWithSubdomain = &url.URL{
+		Scheme: urlutil.SchemeHTTPS,
+		Host:   testDomainSub,
+	}
 )
 
 // Common constants from the AdGuard Base Filter for tests.
@@ -57,9 +74,16 @@ const (
 const (
 	testRuleBaseFilterDomain = "@@||googleads.g.doubleclick.net/ads/preferences/" +
 		"$domain=googleads.g.doubleclick.net"
-
-	testURLStrBaseFilterDomain = "https://googleads.g.doubleclick.net/ads/preferences/"
 )
+
+// Common URLs from the AdGuard Base Filter for tests.
+//
+// Keep in sync with ../../testdata/adguard_base_filter.txt.
+var testURLBaseFilterDomain = &url.URL{
+	Scheme: urlutil.SchemeHTTPS,
+	Host:   "googleads.g.doubleclick.net",
+	Path:   "ads/preferences",
+}
 
 // baseFilterData is the data from AdGuard Base Filter.
 var baseFilterData = errors.Must(os.ReadFile("../../testdata/adguard_base_filter.txt"))

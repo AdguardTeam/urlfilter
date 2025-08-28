@@ -1,6 +1,7 @@
 package lookup
 
 import (
+	"bytes"
 	"math"
 	"slices"
 	"strings"
@@ -103,13 +104,16 @@ func (s *ShortcutsTable) AppendMatching(
 ) (res []*rules.NetworkRule) {
 	res = matching
 
-	l := len(r.URLLowerCase)
+	u, _ := r.URL.MarshalBinary()
+	urlLowerCased := bytes.ToLower(u)
+
+	l := len(urlLowerCased)
 	if l < shortcutLength {
 		return res
 	}
 
 	for i := range l - shortcutLength {
-		sc := shortcut(r.URLLowerCase[i : i+shortcutLength])
+		sc := shortcut(urlLowerCased[i : i+shortcutLength])
 		scInfo := s.shortcuts[sc]
 		if scInfo == nil {
 			continue

@@ -2,9 +2,11 @@ package rules
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 	"testing"
 
+	"github.com/AdguardTeam/golibs/netutil/urlutil"
 	"github.com/AdguardTeam/golibs/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -56,7 +58,10 @@ func TestValidateHost(t *testing.T) {
 
 func TestNetworkRule_Match_dnsRewrite(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		req := NewRequestForHostname("example.org")
+		req := NewRequestForURL(&url.URL{
+			Scheme: urlutil.SchemeHTTP,
+			Host:   "example.org",
+		})
 
 		testCases := []struct {
 			name string
@@ -131,7 +136,10 @@ func TestNetworkRule_Match_dnsRewrite(t *testing.T) {
 		r, err := NewNetworkRule("||1.2.3.4.in-addr.arpa^$dnsrewrite=noerror;ptr;example.net", -1)
 		require.NoError(t, err)
 
-		req := NewRequestForHostname("1.2.3.4.in-addr.arpa")
+		req := NewRequestForURL(&url.URL{
+			Scheme: urlutil.SchemeHTTP,
+			Host:   "1.2.3.4.in-addr.arpa",
+		})
 		assert.True(t, r.Match(req))
 	})
 

@@ -1,6 +1,7 @@
 package lookup_test
 
 import (
+	"net/url"
 	"testing"
 
 	"github.com/AdguardTeam/urlfilter/internal/lookup"
@@ -45,29 +46,29 @@ func TestDomainsTable_AppendMatching(t *testing.T) {
 	loadTable(t, tbl, s)
 
 	testCases := []struct {
+		url          *url.URL
+		srcURL       *url.URL
 		name         string
-		urlStr       string
-		srcURLStr    string
 		wantRuleText string
 	}{{
+		url:          testURLNoDomain,
+		srcURL:       testURLNoDomain,
 		name:         "no_match",
-		urlStr:       testURLStrNoDomain,
-		srcURLStr:    testURLStrNoDomain,
 		wantRuleText: "",
 	}, {
+		url:          testURLWithSubdomain,
+		srcURL:       nil,
 		name:         "no_src",
-		urlStr:       testURLStrWithSubdomain,
-		srcURLStr:    "",
 		wantRuleText: "",
 	}, {
+		url:          testURLWithSubdomain,
+		srcURL:       testURLWithDomain,
 		name:         "match_domain",
-		urlStr:       testURLStrWithSubdomain,
-		srcURLStr:    testURLStrWithDomain,
 		wantRuleText: testRuleWithDomain,
 	}, {
+		url:          testURLWithSubdomain,
+		srcURL:       testURLWithSubdomain,
 		name:         "match_subdomain",
-		urlStr:       testURLStrWithSubdomain,
-		srcURLStr:    testURLStrWithSubdomain,
 		wantRuleText: testRuleWithDomain,
 	}}
 
@@ -75,7 +76,7 @@ func TestDomainsTable_AppendMatching(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			r := rules.NewRequest(tc.urlStr, tc.srcURLStr, rules.TypeOther)
+			r := rules.NewRequest(tc.url, tc.srcURL, rules.TypeOther)
 			assertMatch(t, tbl, r, tc.wantRuleText)
 		})
 	}
@@ -86,7 +87,7 @@ func BenchmarkDomainsTable_AppendMatching(b *testing.B) {
 	tbl := lookup.NewDomainsTable(s)
 	loadTable(b, tbl, s)
 
-	r := rules.NewRequest(testURLStrWithSubdomain, testURLStrWithDomain, rules.TypeOther)
+	r := rules.NewRequest(testURLWithSubdomain, testURLWithDomain, rules.TypeOther)
 
 	gotRules := make([]*rules.NetworkRule, 0, 1)
 
@@ -110,7 +111,7 @@ func BenchmarkDomainsTable_AppendMatching_baseFilter(b *testing.B) {
 	tbl := lookup.NewDomainsTable(s)
 	loadTable(b, tbl, s)
 
-	r := rules.NewRequest(testURLStrBaseFilterDomain, testURLStrBaseFilterDomain, rules.TypeOther)
+	r := rules.NewRequest(testURLBaseFilterDomain, testURLBaseFilterDomain, rules.TypeOther)
 
 	gotRules := make([]*rules.NetworkRule, 0, 1)
 

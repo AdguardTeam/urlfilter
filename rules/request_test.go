@@ -3,41 +3,66 @@ package rules_test
 import (
 	"fmt"
 	"net/netip"
+	"net/url"
 	"testing"
 
+	"github.com/AdguardTeam/golibs/netutil/urlutil"
 	"github.com/AdguardTeam/urlfilter/rules"
 	"github.com/stretchr/testify/assert"
 )
 
-// Common hostnames and URL strings for tests.
+// Common hostnames for tests.
 const (
 	testHostname = "test.example"
-	testURLStr   = "http://" + testHostname
 
 	testSubHostname = "sub.test.example"
-	testSubURLStr   = "http://" + testSubHostname
 
 	testLongTLDHostname = "example.org.uk"
-	testLongTLDURLStr   = "http://" + testLongTLDHostname
+
+	testOtherHostname = "other.example"
+)
+
+// Common URLs for tests.
+var (
+	testURL = &url.URL{
+		Scheme: urlutil.SchemeHTTP,
+		Host:   testHostname,
+	}
+
+	testSubURL = &url.URL{
+		Scheme: urlutil.SchemeHTTP,
+		Host:   testSubHostname,
+	}
+
+	testLongTLDURL = &url.URL{
+		Scheme: urlutil.SchemeHTTP,
+		Host:   testLongTLDHostname,
+	}
+
+	testOtherURL = &url.URL{
+		Scheme: urlutil.SchemeHTTPS,
+		Host:   testOtherHostname,
+	}
 )
 
 func TestNewRequest(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
+		sourceURL *url.URL
+		url       *url.URL
 		want      *rules.Request
 		name      string
-		sourceURL string
-		url       string
 	}{{
+		sourceURL: nil,
+		url:       testURL,
 		want: &rules.Request{
 			ClientIP:          netip.Addr{},
 			ClientName:        "",
-			URL:               testURLStr,
-			URLLowerCase:      testURLStr,
+			URL:               testURL,
 			Hostname:          testHostname,
 			Domain:            testHostname,
-			SourceURL:         "",
+			SourceURL:         nil,
 			SourceHostname:    "",
 			SourceDomain:      "",
 			SortedClientTags:  nil,
@@ -46,18 +71,17 @@ func TestNewRequest(t *testing.T) {
 			ThirdParty:        false,
 			IsHostnameRequest: false,
 		},
-		name:      "no_source",
-		sourceURL: "",
-		url:       testURLStr,
+		name: "no_source",
 	}, {
+		sourceURL: testSubURL,
+		url:       testURL,
 		want: &rules.Request{
 			ClientIP:          netip.Addr{},
 			ClientName:        "",
-			URL:               testURLStr,
-			URLLowerCase:      testURLStr,
+			URL:               testURL,
 			Hostname:          testHostname,
 			Domain:            testHostname,
-			SourceURL:         testSubURLStr,
+			SourceURL:         testSubURL,
 			SourceHostname:    testSubHostname,
 			SourceDomain:      testHostname,
 			SortedClientTags:  nil,
@@ -66,18 +90,17 @@ func TestNewRequest(t *testing.T) {
 			ThirdParty:        false,
 			IsHostnameRequest: false,
 		},
-		name:      "source",
-		sourceURL: testSubURLStr,
-		url:       testURLStr,
+		name: "source",
 	}, {
+		sourceURL: nil,
+		url:       testLongTLDURL,
 		want: &rules.Request{
 			ClientIP:          netip.Addr{},
 			ClientName:        "",
-			URL:               testLongTLDURLStr,
-			URLLowerCase:      testLongTLDURLStr,
+			URL:               testLongTLDURL,
 			Hostname:          testLongTLDHostname,
 			Domain:            testLongTLDHostname,
-			SourceURL:         "",
+			SourceURL:         nil,
 			SourceHostname:    "",
 			SourceDomain:      "",
 			SortedClientTags:  nil,
@@ -86,18 +109,17 @@ func TestNewRequest(t *testing.T) {
 			ThirdParty:        false,
 			IsHostnameRequest: false,
 		},
-		name:      "long_tld",
-		sourceURL: "",
-		url:       testLongTLDURLStr,
+		name: "long_tld",
 	}, {
+		sourceURL: testLongTLDURL,
+		url:       testURL,
 		want: &rules.Request{
 			ClientIP:          netip.Addr{},
 			ClientName:        "",
-			URL:               testURLStr,
-			URLLowerCase:      testURLStr,
+			URL:               testURL,
 			Hostname:          testHostname,
 			Domain:            testHostname,
-			SourceURL:         testLongTLDURLStr,
+			SourceURL:         testLongTLDURL,
 			SourceHostname:    testLongTLDHostname,
 			SourceDomain:      testLongTLDHostname,
 			SortedClientTags:  nil,
@@ -106,9 +128,7 @@ func TestNewRequest(t *testing.T) {
 			ThirdParty:        true,
 			IsHostnameRequest: false,
 		},
-		name:      "third_party",
-		sourceURL: testLongTLDURLStr,
-		url:       testURLStr,
+		name: "third_party",
 	}}
 
 	for _, tc := range testCases {
@@ -150,20 +170,19 @@ func TestRequestType_Count(t *testing.T) {
 	}
 }
 
-func TestFillRequestForHostname(t *testing.T) {
+func TestFillRequestForURL(t *testing.T) {
 	t.Parallel()
 
-	req := rules.NewRequest("http://other.example/", "", rules.TypeOther)
+	req := rules.NewRequest(testURL, nil, rules.TypeOther)
 
-	rules.FillRequestForHostname(req, testHostname)
+	rules.FillRequestForURL(req, testURL)
 	assert.Equal(t, &rules.Request{
 		ClientIP:          netip.Addr{},
 		ClientName:        "",
-		URL:               testURLStr,
-		URLLowerCase:      testURLStr,
+		URL:               testURL,
 		Hostname:          testHostname,
 		Domain:            testHostname,
-		SourceURL:         "",
+		SourceURL:         nil,
 		SourceHostname:    "",
 		SourceDomain:      "",
 		SortedClientTags:  nil,
@@ -174,22 +193,21 @@ func TestFillRequestForHostname(t *testing.T) {
 	}, req)
 }
 
-func BenchmarkFillRequestForHostname(b *testing.B) {
+func BenchmarkFillRequestForURL(b *testing.B) {
 	req := &rules.Request{}
 
 	b.ReportAllocs()
 	for b.Loop() {
-		rules.FillRequestForHostname(req, testHostname)
+		rules.FillRequestForURL(req, testURL)
 	}
 
 	assert.Equal(b, &rules.Request{
 		ClientIP:          netip.Addr{},
 		ClientName:        "",
-		URL:               testURLStr,
-		URLLowerCase:      testURLStr,
+		URL:               testURL,
 		Hostname:          testHostname,
 		Domain:            testHostname,
-		SourceURL:         "",
+		SourceURL:         nil,
 		SourceHostname:    "",
 		SourceDomain:      "",
 		SortedClientTags:  nil,
@@ -205,5 +223,5 @@ func BenchmarkFillRequestForHostname(b *testing.B) {
 	//	goarch: arm64
 	//	pkg: github.com/AdguardTeam/urlfilter/rules
 	//	cpu: Apple M1 Pro
-	//	BenchmarkFillRequestForHostname-8   	10298487	       109.2 ns/op	      24 B/op	       1 allocs/op
+	//	BenchmarkFillRequestForURL-8   	16819832	        71.05 ns/op	       0 B/op	       0 allocs/op
 }

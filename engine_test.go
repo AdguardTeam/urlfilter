@@ -1,8 +1,10 @@
 package urlfilter_test
 
 import (
+	"net/url"
 	"testing"
 
+	"github.com/AdguardTeam/golibs/netutil/urlutil"
 	"github.com/AdguardTeam/golibs/testutil"
 	"github.com/AdguardTeam/urlfilter"
 	"github.com/AdguardTeam/urlfilter/filterlist"
@@ -19,7 +21,10 @@ func TestEngine_MatchRequest(t *testing.T) {
 	rulesText := `||example.org^$third-party`
 	engine := newTestEngine(t, rulesText)
 
-	request := rules.NewRequest("https://example.org", "", rules.TypeDocument)
+	request := rules.NewRequest(&url.URL{
+		Scheme: urlutil.SchemeHTTPS,
+		Host:   "example.org",
+	}, nil, rules.TypeDocument)
 	result := engine.MatchRequest(request)
 
 	assert.Nil(t, result.BasicRule)
