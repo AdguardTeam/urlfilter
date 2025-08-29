@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/AdguardTeam/golibs/netutil/urlutil"
+	"github.com/AdguardTeam/golibs/testutil"
 	"github.com/AdguardTeam/urlfilter/rules"
 	"github.com/miekg/dns"
 	"github.com/stretchr/testify/assert"
@@ -15,6 +16,8 @@ import (
 )
 
 func TestNetworkRule_options(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		name        string
 		option      rules.NetworkRuleOption
@@ -115,6 +118,8 @@ func TestNetworkRule_options(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
 			var ruleText string
 			if (tc.option & rules.OptionWhitelistOnly) != 0 {
 				ruleText = "@@"
@@ -127,14 +132,18 @@ func TestNetworkRule_options(t *testing.T) {
 
 			if tc.wantEnabled {
 				assert.True(t, f.IsOptionEnabled(tc.option))
+				assert.False(t, f.IsOptionDisabled(tc.option))
 			} else {
 				assert.True(t, f.IsOptionDisabled(tc.option))
+				assert.False(t, f.IsOptionEnabled(tc.option))
 			}
 		})
 	}
 }
 
 func TestNetworkRuleOption_Count(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		option rules.NetworkRuleOption
 		want   int
@@ -157,17 +166,22 @@ func TestNetworkRuleOption_Count(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(fmt.Sprintf("flags_%v", tc.want), func(t *testing.T) {
+			t.Parallel()
+
 			assert.Equal(t, tc.option.Count(), tc.want)
 		})
 	}
 }
 
 func TestNetworkRule_disabledOptions(t *testing.T) {
-	ruleText := "@@||example.org$document,~extension"
+	t.Parallel()
+
+	const ruleText = "@@||example.org$document,~extension"
 
 	f, err := rules.NewNetworkRule(ruleText, 0)
 	require.NoError(t, err)
-	assert.NotNil(t, f)
+	require.NotNil(t, f)
+
 	assert.False(t, f.IsOptionEnabled(rules.OptionExtension))
 	assert.False(t, f.IsOptionDisabled(rules.OptionExtension))
 }
@@ -186,7 +200,7 @@ func TestNetworkRule_Match_simpleBasicRules(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, f.Match(r))
 
-	// Subdomains / domains
+	// Subdomains / domains.
 	f, err = rules.NewNetworkRule("||github.com^", 0)
 	r = rules.NewRequestForURL(&url.URL{
 		Scheme: urlutil.SchemeHTTP,
@@ -202,13 +216,13 @@ func TestNetworkRule_Match_simpleBasicRules(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, f.Match(r))
 
-	// Simple regex rule
+	// Simple regex rule.
 	f, err = rules.NewNetworkRule("/test\\.example/", 0)
 	r = rules.NewRequest(testURL, nil, rules.TypeOther)
 	require.NoError(t, err)
 	assert.True(t, f.Match(r))
 
-	// Simple pattern rule
+	// Simple pattern rule.
 	f, err = rules.NewNetworkRule("_prebid_", 0)
 	r = rules.NewRequest(&url.URL{
 		Scheme:   urlutil.SchemeHTTPS,
@@ -219,22 +233,26 @@ func TestNetworkRule_Match_simpleBasicRules(t *testing.T) {
 		Scheme: urlutil.SchemeHTTPS,
 		Host:   "www.drudgereport.com",
 	}, rules.TypeXmlhttprequest)
-
 	require.NoError(t, err)
 	assert.True(t, f.Match(r))
 }
 
 func TestNetworkRule_invalidModifiers(t *testing.T) {
-	_, err := rules.NewNetworkRule("||example.org^$unknown", 0)
-	assert.NotNil(t, err)
+	t.Parallel()
 
-	// Whitelist-only modifier
-	_, err = rules.NewNetworkRule("||example.org^$elemhide", 0)
-	assert.NotNil(t, err)
+	f, err := rules.NewNetworkRule("||example.org^$unknown", 0)
+	assert.Error(t, err)
+	assert.Nil(t, f)
 
-	// Blacklist-only modifier
-	_, err = rules.NewNetworkRule("@@||example.org^$popup", 0)
-	assert.NotNil(t, err)
+	// Whitelist-only modifier.
+	f, err = rules.NewNetworkRule("||example.org^$elemhide", 0)
+	assert.Error(t, err)
+	assert.Nil(t, f)
+
+	// Blacklist-only modifier.
+	f, err = rules.NewNetworkRule("@@||example.org^$popup", 0)
+	assert.Error(t, err)
+	assert.Nil(t, f)
 }
 
 func TestNetworkRule_Match_case(t *testing.T) {
@@ -350,7 +368,7 @@ func TestNetworkRule_Match_domainRestrictions(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, f.Match(r))
 
-	// One permitted, subdomain restricted
+	// One permitted, subdomain restricted.
 	f, err = rules.NewNetworkRule("||test.example^$domain=test.example|~sub.test.example", 0)
 	r = rules.NewRequest(testURL, nil, rules.TypeScript)
 	require.NoError(t, err)
@@ -364,7 +382,7 @@ func TestNetworkRule_Match_domainRestrictions(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, f.Match(r))
 
-	// One restricted
+	// One restricted.
 	f, err = rules.NewNetworkRule("||test.example^$domain=~test.example", 0)
 	r = rules.NewRequest(testURL, nil, rules.TypeScript)
 	require.NoError(t, err)
@@ -378,7 +396,7 @@ func TestNetworkRule_Match_domainRestrictions(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, f.Match(r))
 
-	// Wide restricted
+	// Wide restricted.
 	f, err = rules.NewNetworkRule("$domain=test.example", 0)
 	r = rules.NewRequest(testOtherURL, testURL, rules.TypeScript)
 	require.NoError(t, err)
@@ -389,78 +407,99 @@ func TestNetworkRule_Match_denyallow(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
+		want               assert.BoolAssertionFunc
 		requestURL         *url.URL
 		sourceURL          *url.URL
 		testName           string
 		ruleText           string
+		wantErrMsg         string
 		requestForHostname bool
-		fail               bool
-		match              bool
 	}{{
-		testName: "denyallow_invalid_inversion",
-		ruleText: "*^$denyallow=~test.example",
-		fail:     true,
+		want:               assert.False,
+		requestURL:         nil,
+		sourceURL:          nil,
+		testName:           "denyallow_invalid_inversion",
+		ruleText:           "*^$denyallow=~test.example",
+		wantErrMsg:         "invalid $denyallow value: ~test.example",
+		requestForHostname: false,
 	}, {
-		testName: "denyallow_invalid_empty",
-		ruleText: "*^$denyallow",
-		fail:     true,
+		want:               assert.False,
+		requestURL:         nil,
+		sourceURL:          nil,
+		testName:           "denyallow_invalid_empty",
+		ruleText:           "*^$denyallow",
+		wantErrMsg:         "no domains specified",
+		requestForHostname: false,
 	}, {
-		testName:   "denyallow_unblock_tld",
-		ruleText:   "*^$denyallow=example",
-		requestURL: testURL,
-		fail:       false,
-		match:      false,
+		want:               assert.False,
+		requestURL:         testURL,
+		sourceURL:          nil,
+		testName:           "denyallow_unblock_tld",
+		ruleText:           "*^$denyallow=example",
+		wantErrMsg:         "",
+		requestForHostname: false,
 	}, {
-		testName:   "denyallow_found",
-		ruleText:   "*^$denyallow=test.example",
-		requestURL: testURL,
-		fail:       false,
-		match:      false,
+		want:               assert.False,
+		requestURL:         testURL,
+		sourceURL:          nil,
+		testName:           "denyallow_found",
+		ruleText:           "*^$denyallow=test.example",
+		wantErrMsg:         "",
+		requestForHostname: false,
 	}, {
-		testName:   "denyallow_found_subdomain",
-		ruleText:   "*^$denyallow=test.example",
-		requestURL: testSubURL,
-		fail:       false,
-		match:      false,
+		want:               assert.False,
+		requestURL:         testSubURL,
+		sourceURL:          nil,
+		testName:           "denyallow_found_subdomain",
+		ruleText:           "*^$denyallow=test.example",
+		wantErrMsg:         "",
+		requestForHostname: false,
 	}, {
-		testName:   "denyallow_not_found",
-		ruleText:   "*^$denyallow=test.example",
-		requestURL: testOtherURL,
-		fail:       false,
-		match:      true,
+		want:               assert.True,
+		requestURL:         testOtherURL,
+		sourceURL:          nil,
+		testName:           "denyallow_not_found",
+		ruleText:           "*^$denyallow=test.example",
+		wantErrMsg:         "",
+		requestForHostname: false,
 	}, {
-		testName:   "denyallow_found_multiple_domains",
-		ruleText:   "*^$denyallow=test.example|example.net",
-		requestURL: testURL,
-		fail:       false,
-		match:      false,
+		want:               assert.False,
+		requestURL:         testURL,
+		sourceURL:          nil,
+		testName:           "denyallow_found_multiple_domains",
+		ruleText:           "*^$denyallow=test.example|example.net",
+		wantErrMsg:         "",
+		requestForHostname: false,
 	}, {
-		testName:   "denyallow_and_domain_blocking",
-		ruleText:   "*^$domain=test.example,denyallow=essentialdomain.net",
-		requestURL: testOtherURL,
-		sourceURL:  testURL,
-		fail:       false,
-		match:      true,
+		want:               assert.True,
+		requestURL:         testOtherURL,
+		sourceURL:          testURL,
+		testName:           "denyallow_and_domain_blocking",
+		ruleText:           "*^$domain=test.example,denyallow=essentialdomain.net",
+		wantErrMsg:         "",
+		requestForHostname: false,
 	}, {
-		testName: "denyallow_and_domain_not_blocking",
-		ruleText: "*^$domain=test.example,denyallow=essentialdomain.net",
+		want: assert.False,
 		requestURL: &url.URL{
 			Scheme: urlutil.SchemeHTTPS,
 			Host:   "essentialdomain.net",
 		},
-		sourceURL: testURL,
-		fail:      false,
-		match:     false,
+		sourceURL:          testURL,
+		testName:           "denyallow_and_domain_not_blocking",
+		ruleText:           "*^$domain=test.example,denyallow=essentialdomain.net",
+		wantErrMsg:         "",
+		requestForHostname: false,
 	}, {
-		testName: "denyallow_does_not_match_ips",
-		ruleText: "*$denyallow=com",
+		want: assert.False,
 		requestURL: &url.URL{
 			Scheme: urlutil.SchemeHTTPS,
 			Host:   "192.168.1.1",
 		},
+		sourceURL:          nil,
+		testName:           "denyallow_does_not_match_ips",
+		ruleText:           "*$denyallow=com",
+		wantErrMsg:         "",
 		requestForHostname: true,
-		fail:               false,
-		match:              false,
 	}}
 
 	for _, tc := range testCases {
@@ -468,16 +507,15 @@ func TestNetworkRule_Match_denyallow(t *testing.T) {
 			t.Parallel()
 
 			f, err := rules.NewNetworkRule(tc.ruleText, 0)
-			if tc.fail {
-				require.Error(t, err)
-
+			testutil.AssertErrorMsg(t, tc.wantErrMsg, err)
+			if tc.wantErrMsg != "" {
 				return
 			}
-			require.NoError(t, err)
 
 			r := rules.NewRequest(tc.requestURL, tc.sourceURL, rules.TypeScript)
 			r.IsHostnameRequest = tc.requestForHostname
-			require.Equal(t, tc.match, f.Match(r))
+
+			tc.want(t, f.Match(r))
 		})
 	}
 }
@@ -549,6 +587,8 @@ func TestNetworkRule_Match_wildcardTLDRestrictions(t *testing.T) {
 }
 
 func TestNetworkRule_invalidDomainRestrictions(t *testing.T) {
+	t.Parallel()
+
 	_, err := rules.NewNetworkRule("||example.org^$domain=", 0)
 	assert.NotNil(t, err)
 
@@ -557,6 +597,8 @@ func TestNetworkRule_invalidDomainRestrictions(t *testing.T) {
 }
 
 func TestNetworkRule_Match_client(t *testing.T) {
+	t.Parallel()
+
 	f, err := rules.NewNetworkRule("||test.example^$client=127.0.0.1", 0)
 	require.NoError(t, err)
 	assert.NotNil(t, f)
@@ -622,6 +664,8 @@ func TestNetworkRule_Match_client(t *testing.T) {
 }
 
 func TestNetworkRule_IsHigherPriority(t *testing.T) {
+	t.Parallel()
+
 	// whitelist+$important --> every other
 	compareRulesPriority(t, "@@||example.org$important", "@@||example.org$important", false)
 	compareRulesPriority(t, "@@||example.org$important", "||example.org$important", true)
@@ -656,6 +700,8 @@ func TestNetworkRule_IsHigherPriority(t *testing.T) {
 }
 
 func TestNetworkRule_Match_source(t *testing.T) {
+	t.Parallel()
+
 	u, err := url.Parse("https://ci.phncdn.com/videos/201809/25/184777011/original/(m=ecuKGgaaaa)(mh=VSmV9NL_iouBcWJJ)4.jpg")
 	require.NoError(t, err)
 
@@ -664,46 +710,47 @@ func TestNetworkRule_Match_source(t *testing.T) {
 
 	r := rules.NewRequest(u, sourceURL, rules.TypeImage)
 	ruleText := "|https://$image,media,script,third-party,domain=~feedback.pornhub.com|pornhub.com|redtube.com|redtube.com.br|tube8.com|tube8.es|tube8.fr|youporn.com|youporngay.com"
+
 	f, err := rules.NewNetworkRule(ruleText, 0)
-	if err != nil {
-		t.Fatalf("failed to create rule: %s", err)
-	}
+	require.NoError(t, err)
 
 	assert.True(t, f.Match(r))
 }
 
 func TestNetworkRule_invalidRule(t *testing.T) {
+	t.Parallel()
+
 	r, err := rules.NewNetworkRule("*$third-party", -1)
 	assert.Nil(t, r)
-	assert.Equal(t, rules.ErrTooWideRule, err)
+	assert.ErrorIs(t, err, rules.ErrTooWideRule)
 
 	r, err = rules.NewNetworkRule("$third-party", -1)
 	assert.Nil(t, r)
-	assert.Equal(t, rules.ErrTooWideRule, err)
+	assert.ErrorIs(t, err, rules.ErrTooWideRule)
 
 	r, err = rules.NewNetworkRule("ad$third-party", -1)
 	assert.Nil(t, r)
-	assert.Equal(t, rules.ErrTooWideRule, err)
+	assert.ErrorIs(t, err, rules.ErrTooWideRule)
 
-	// This one is valid because it has domain restriction
+	// This one is valid because it has domain restriction.
 	r, err = rules.NewNetworkRule("$domain=ya.ru", -1)
-	assert.NotNil(t, r)
 	require.NoError(t, err)
+	assert.NotNil(t, r)
 
-	// This one is valid because it has $ctag restriction
+	// This one is valid because it has $ctag restriction.
 	r, err = rules.NewNetworkRule("$ctag=pc", -1)
-	assert.NotNil(t, r)
 	require.NoError(t, err)
+	assert.NotNil(t, r)
 
-	// This one is valid because it has $client restriction
+	// This one is valid because it has $client restriction.
 	r, err = rules.NewNetworkRule("$client=127.0.0.1", -1)
+	require.NoError(t, err)
 	assert.NotNil(t, r)
-	require.NoError(t, err)
 
-	// This one is valid because it has $client restriction
+	// This one is valid because it has $client restriction.
 	r, err = rules.NewNetworkRule("/$client=127.0.0.1", -1)
-	require.NotNil(t, r)
 	require.NoError(t, err)
+	require.NotNil(t, r)
 
 	req := rules.NewRequest(testURL, nil, rules.TypeOther)
 	req.ClientIP = netip.MustParseAddr("127.0.0.1")
@@ -711,33 +758,52 @@ func TestNetworkRule_invalidRule(t *testing.T) {
 }
 
 func TestNetworkRule_IsHostLevelNetworkRule(t *testing.T) {
-	r, err := rules.NewNetworkRule("||example.org^$important", -1)
-	require.NoError(t, err)
-	assert.True(t, r.IsHostLevelNetworkRule())
+	t.Parallel()
 
-	r, err = rules.NewNetworkRule("||example.org^$important,badfilter", -1)
-	require.NoError(t, err)
-	assert.True(t, r.IsHostLevelNetworkRule())
+	testCases := []struct {
+		want     assert.BoolAssertionFunc
+		name     string
+		ruleText string
+	}{{
+		want:     assert.True,
+		name:     "important",
+		ruleText: "||example.org^$important",
+	}, {
+		want:     assert.True,
+		name:     "important_badfilter",
+		ruleText: "||example.org^$important,badfilter",
+	}, {
+		want:     assert.True,
+		name:     "badfilter",
+		ruleText: "||example.org^$badfilter",
+	}, {
+		want:     assert.True,
+		name:     "no_options",
+		ruleText: "||example.org",
+	}, {
+		want:     assert.False,
+		name:     "no_thirdparty",
+		ruleText: "||example.org^$~third-party",
+	}, {
+		want:     assert.False,
+		name:     "thirdparty",
+		ruleText: "||example.org^$third-party",
+	}, {
+		want:     assert.False,
+		name:     "domain",
+		ruleText: "||example.org^$domain=example.com",
+	}}
 
-	r, err = rules.NewNetworkRule("||example.org^$badfilter", -1)
-	require.NoError(t, err)
-	assert.True(t, r.IsHostLevelNetworkRule())
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-	r, err = rules.NewNetworkRule("||example.org^", -1)
-	require.NoError(t, err)
-	assert.True(t, r.IsHostLevelNetworkRule())
+			r, err := rules.NewNetworkRule(tc.ruleText, -1)
+			require.NoError(t, err)
 
-	r, err = rules.NewNetworkRule("||example.org^$~third-party", -1)
-	require.NoError(t, err)
-	assert.False(t, r.IsHostLevelNetworkRule())
-
-	r, err = rules.NewNetworkRule("||example.org^$third-party", -1)
-	require.NoError(t, err)
-	assert.False(t, r.IsHostLevelNetworkRule())
-
-	r, err = rules.NewNetworkRule("||example.org^$domain=example.com", -1)
-	require.NoError(t, err)
-	assert.False(t, r.IsHostLevelNetworkRule())
+			tc.want(t, r.IsHostLevelNetworkRule())
+		})
+	}
 }
 
 func TestNetworkRule_Match_ip(t *testing.T) {
@@ -802,6 +868,8 @@ func compareRulesPriority(tb testing.TB, left, right string, expected bool) {
 }
 
 func TestNetworkRule_Match_dnsType(t *testing.T) {
+	t.Parallel()
+
 	req := rules.NewRequestForURL(testURL)
 	req.DNSType = dns.TypeAAAA
 
@@ -819,16 +887,16 @@ func TestNetworkRule_Match_dnsType(t *testing.T) {
 
 	t.Run("parse_errors", func(t *testing.T) {
 		_, err = rules.NewNetworkRule("||test.example^$dnstype=", -1)
-		assert.NotNil(t, err)
+		assert.Error(t, err)
 
 		_, err = rules.NewNetworkRule("||test.example^$dnstype=TXT|", -1)
-		assert.NotNil(t, err)
+		assert.Error(t, err)
 
 		_, err = rules.NewNetworkRule("||test.example^$dnstype=NONE", -1)
-		assert.NotNil(t, err)
+		assert.Error(t, err)
 
 		_, err = rules.NewNetworkRule("||test.example^$dnstype=INVALIDTYPE", -1)
-		assert.NotNil(t, err)
+		assert.Error(t, err)
 	})
 }
 
