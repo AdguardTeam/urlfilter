@@ -183,6 +183,7 @@ func TestBenchNetworkEngine(t *testing.T) {
 	t.Logf("Average per request: %v", time.Duration(int64(totalElapsed)/int64(len(requests))))
 	t.Logf("Max per request: %v", maxElapsedMatch)
 	t.Logf("Min per request: %v", minElapsedMatch)
+	//lint:ignore SA1019 TODO(a.garipov): Remove the method
 	t.Logf("Storage cache length: %d", engine.ruleStorage.GetCacheSize())
 
 	matchHeap, matchRSS := alloc(t)

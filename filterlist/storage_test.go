@@ -144,5 +144,5 @@ func BenchmarkStorage_RetrieveRule(b *testing.B) {
 	//	goarch: amd64
 	//	pkg: github.com/AdguardTeam/urlfilter/filterlist
 	//	cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
-	//	BenchmarkStorage_RetrieveRule-16       	44905778	        26.14 ns/op	       0 B/op	       0 allocs/op
+	//	BenchmarkStorage_RetrieveRule-16       	83909101	        15.09 ns/op	       0 B/op	       0 allocs/op
 }

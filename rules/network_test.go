@@ -763,7 +763,7 @@ func BenchmarkNetworkRule_Match(b *testing.B) {
 	//	goarch: amd64
 	//	pkg: github.com/AdguardTeam/urlfilter/rules
 	//	cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
-	//	BenchmarkNetworkRule_Match-16    	 1814828	       662.0 ns/op	       0 B/op	       0 allocs/op
+	//	BenchmarkNetworkRule_Match-16    	 1859527	       646.3 ns/op	       0 B/op	       0 allocs/op
 }
 
 func FuzzNetworkRule_Match(f *testing.F) {

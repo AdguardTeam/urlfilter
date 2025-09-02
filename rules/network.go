@@ -144,13 +144,22 @@ type NetworkRule struct {
 	// See https://github.com/AdguardTeam/AdGuardHome/issues/1081#issuecomment-575142737.
 	restrictedClientTags []string
 
-	// Mutex protects the fields.
-	sync.Mutex
-
 	// enabledOptions are the flags with all enabled rule options.
 	enabledOptions NetworkRuleOption
 	// disabledOptions are the flags with all disabled rule options.
 	disabledOptions NetworkRuleOption
+
+	// FilterListID is a filter list identifier.
+	//
+	// TODO(a.garipov):  Unexport.
+	FilterListID int
+
+	// initOnce makes sure that init is only called once.
+	//
+	// NOTE: The use of non-pointer version is intentional, as it lowers the
+	// amount of allocations.  Also do not use sync.OnceFunc, since it allocates
+	// even more.
+	initOnce sync.Once
 
 	// permittedRequestTypes are the flags with all permitted request types. 0
 	// means ALL.
@@ -159,14 +168,17 @@ type NetworkRule struct {
 	// means NONE.
 	restrictedRequestTypes RequestType
 
-	// FilterListID is a filter list identifier.
-	FilterListID int
-
 	// Whitelist is true if this is an exception rule.
+	//
+	// TODO(a.garipov):  Unexport.
 	Whitelist bool
-	// invalid marks that the rule is invalid.  Match will always return false
-	// in this case.
-	invalid bool
+
+	// isInvalid marks the rule as invalid.  Pattern matching always returns
+	// false in this case.
+	isInvalid bool
+
+	// matchesAll shows if the rule matches everything.
+	matchesAll bool
 }
 
 // NewNetworkRule parses the rule text and returns a filter rule
@@ -318,11 +330,11 @@ func (f *NetworkRule) IsHigherPriority(r *NetworkRule) bool {
 	important := f.IsOptionEnabled(OptionImportant)
 	rImportant := r.IsOptionEnabled(OptionImportant)
 
-	if (f.Whitelist && important) && !(r.Whitelist && rImportant) {
+	if (f.Whitelist && important) && (!r.Whitelist || !rImportant) {
 		return true
 	}
 
-	if (r.Whitelist && rImportant) && !(f.Whitelist && important) {
+	if (r.Whitelist && rImportant) && (!f.Whitelist || !important) {
 		return false
 	}
 
@@ -421,43 +433,34 @@ func (f *NetworkRule) isDocumentWhitelistRule() bool {
 		f.IsOptionEnabled(OptionGenericblock))
 }
 
-func (f *NetworkRule) preparePattern() (res int) {
-	f.Lock()
-	defer f.Unlock()
-
-	switch {
-	case f.regex != nil:
-		return 1
-	case f.invalid:
-		return -1
-	default:
-		// Go on.
-	}
-
+// preparePattern converts the pattern to a regexp and parses it.  It should be
+// called before matching the rule by pattern.  It sets either isInvalid,
+// matchesAll, or regex.
+func (f *NetworkRule) preparePattern() {
 	pattern := patternToRegexp(f.pattern)
 	if pattern == RegexAnyCharacter {
-		return 0
+		f.matchesAll = true
 	}
 
 	if !f.IsOptionEnabled(OptionMatchCase) {
 		pattern = "(?i)" + pattern
 	}
 
+	// TODO(a.garipov):  Consider ways to log the error.  Perhaps, a logger from
+	// a context?
 	var err error
-	if f.regex, err = regexp.Compile(pattern); err != nil {
-		f.invalid = true
-
-		return -1
-	}
-
-	return 1
+	f.regex, err = regexp.Compile(pattern)
+	f.isInvalid = err != nil
 }
 
-// matchPattern uses the regex pattern to match the request URL
-func (f *NetworkRule) matchPattern(r *Request) bool {
-	if res := f.preparePattern(); res == -1 {
+// matchPattern uses the regex pattern to match the request URL.  r must not be
+// nil.
+func (f *NetworkRule) matchPattern(r *Request) (matched bool) {
+	f.initOnce.Do(f.preparePattern)
+
+	if f.isInvalid {
 		return false
-	} else if res == 0 {
+	} else if f.matchesAll {
 		return true
 	}
 
@@ -489,10 +492,10 @@ func (f *NetworkRule) shouldMatchHostname(r *Request) bool {
 	if len(f.pattern) > 3 && f.pattern[0] == '/' && f.pattern[len(f.pattern)-1] == '.' {
 		for i := 1; i < len(f.pattern)-1; i++ {
 			ch := f.pattern[i]
-			if !((ch >= 'a' && ch <= 'z') ||
-				(ch >= 'A' && ch <= 'Z') ||
-				(ch >= '0' && ch <= '9') ||
-				ch == '.' || ch == '-') {
+			if (ch < 'a' || ch > 'z') &&
+				(ch < 'A' || ch > 'Z') &&
+				(ch < '0' || ch > '9') &&
+				ch != '.' && ch != '-' {
 				return true
 			}
 		}
@@ -566,20 +569,12 @@ func (f *NetworkRule) matchDNSType(rtype uint16) (allowed bool) {
 		return true
 	}
 
-	for _, t := range f.restrictedDNSTypes {
-		if rtype == t {
-			return false
-		}
+	if slices.Contains(f.restrictedDNSTypes, rtype) {
+		return false
 	}
 
 	if len(f.permittedDNSTypes) > 0 {
-		for _, t := range f.permittedDNSTypes {
-			if rtype == t {
-				return true
-			}
-		}
-
-		return false
+		return slices.Contains(f.permittedDNSTypes, rtype)
 	}
 
 	return true
