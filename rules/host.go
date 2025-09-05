@@ -2,14 +2,17 @@ package rules
 
 import (
 	"net/netip"
+	"slices"
 	"strings"
 
 	"github.com/AdguardTeam/urlfilter/internal/ufnet"
 )
 
-// HostRule is a structure for simple host-level rules (i.e. /etc/hosts syntax).
-// http://man7.org/linux/man-pages/man5/hosts.5.html
-// It also supports "just domain" syntax. In this case, the IP will be set to 0.0.0.0.
+// HostRule is a structure for simple host-level rules, i.e. /etc/hosts syntax.
+//
+// See http://man7.org/linux/man-pages/man5/hosts.5.html.
+// It also supports "just domain" syntax; in that case, the IP will be set to
+// 0.0.0.0.
 type HostRule struct {
 	// IP is the address of the rule.
 	IP netip.Addr
@@ -24,49 +27,49 @@ type HostRule struct {
 	FilterListID int
 }
 
-// Split string by whitespace (' ' or '\t') and return the first element
-func splitNextByWhitespace(ps *string) string {
-	s := *ps
+// splitNextByWhitespace splits string by whitespace (' ' or '\t') and returns
+// the first element.
+func splitNextByWhitespace(sPtr *string) (r string) {
+	s := *sPtr
 
 	i := 0
-	// trim space
+	// Trim space.
 	for ; i < len(s); i++ {
-		if !(s[i] == ' ' || s[i] == '\t') {
+		if s[i] != ' ' && s[i] != '\t' {
 			break
 		}
 	}
 
 	begin := i
-	// find space or tab
+	// Find space or tab.
 	for ; i < len(s); i++ {
 		if s[i] == ' ' || s[i] == '\t' {
 			break
 		}
 	}
 
-	r := s[begin:i]
+	r = s[begin:i]
 
-	// trim space
+	// Trim space.
 	for ; i < len(s); i++ {
-		if !(s[i] == ' ' || s[i] == '\t') {
+		if s[i] != ' ' && s[i] != '\t' {
 			break
 		}
 	}
-	*ps = s[i:]
+
+	*sPtr = s[i:]
 
 	return r
 }
 
-// NewHostRule parses the rule and creates a new HostRule instance
-// The format is:
-// IP_address canonical_hostname [aliases...]
+// NewHostRule parses the rule and creates a new *HostRule.
 func NewHostRule(ruleText string, filterListID int) (h *HostRule, err error) {
 	h = &HostRule{
 		RuleText:     ruleText,
 		FilterListID: filterListID,
 	}
 
-	// Strip comment
+	// Strip comments.
 	commentIndex := strings.IndexByte(ruleText, '#')
 	if commentIndex > 0 {
 		ruleText = ruleText[0 : commentIndex-1]
@@ -75,16 +78,21 @@ func NewHostRule(ruleText string, filterListID int) (h *HostRule, err error) {
 	first := splitNextByWhitespace(&ruleText)
 	if len(ruleText) == 0 {
 		if !ufnet.IsDomainName(first) {
-			return nil, &RuleSyntaxError{msg: "invalid syntax", ruleText: ruleText}
+			return nil, &RuleSyntaxError{
+				msg:      "invalid syntax",
+				ruleText: ruleText,
+			}
 		}
 
 		h.Hostnames = append(h.Hostnames, first)
 		h.IP = netip.IPv4Unspecified()
-
 	} else {
 		h.IP, err = netip.ParseAddr(first)
 		if err != nil {
-			return nil, &RuleSyntaxError{msg: err.Error(), ruleText: ruleText}
+			return nil, &RuleSyntaxError{
+				msg:      err.Error(),
+				ruleText: ruleText,
+			}
 		}
 
 		for len(ruleText) != 0 {
@@ -96,33 +104,25 @@ func NewHostRule(ruleText string, filterListID int) (h *HostRule, err error) {
 	return h, nil
 }
 
-// Text returns the original rule text
-// Implements the `Rule` interface
-func (f *HostRule) Text() string {
+// type check
+var _ Rule = (*HostRule)(nil)
+
+// Text implements the [Rule] interface for *HostRule.
+func (f *HostRule) Text() (s string) {
 	return f.RuleText
 }
 
-// GetFilterListID returns ID of the filter list this rule belongs to
-func (f *HostRule) GetFilterListID() int {
+// GetFilterListID implements the [Rule] interface for *HostRule.
+func (f *HostRule) GetFilterListID() (id int) {
 	return f.FilterListID
 }
 
 // String returns original rule text
-func (f *HostRule) String() string {
+func (f *HostRule) String() (s string) {
 	return f.RuleText
 }
 
-// Match checks if this filtering rule matches the specified hostname
-func (f *HostRule) Match(hostname string) bool {
-	if len(f.Hostnames) == 1 && hostname == f.Hostnames[0] {
-		return true
-	}
-
-	for _, h := range f.Hostnames {
-		if h == hostname {
-			return true
-		}
-	}
-
-	return false
+// Match returns true if this filtering rule matches the specified hostname.
+func (f *HostRule) Match(hostname string) (ok bool) {
+	return slices.Contains(f.Hostnames, hostname)
 }

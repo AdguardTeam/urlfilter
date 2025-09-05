@@ -8,6 +8,7 @@ import (
 // CosmeticEngine combines all the cosmetic rules and allows to quickly
 // find all rules matching this or that hostname
 type CosmeticEngine struct {
+	// TODO(a.garipov):  See if this can be replaced with an array.
 	lookupTables map[rules.CosmeticRuleType]*cosmeticLookupTable
 }
 

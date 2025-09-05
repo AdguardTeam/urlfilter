@@ -17,8 +17,8 @@ type clients struct {
 	nets []netip.Prefix
 }
 
-// Len returns the number of specified identifiers.
-func (c *clients) Len() int {
+// len returns the number of specified identifiers.  If c is nil, l is 0.
+func (c *clients) len() (l int) {
 	if c == nil {
 		return 0
 	}
@@ -26,8 +26,9 @@ func (c *clients) Len() int {
 	return len(c.hosts) + len(c.nets)
 }
 
-// Equal returns true if c and other contain the same identifiers.
-func (c *clients) Equal(other *clients) (ok bool) {
+// equal returns true if c and other contain the same identifiers in the same
+// order.  c and other may be nil.
+func (c *clients) equal(other *clients) (ok bool) {
 	switch {
 	case c == nil:
 		return other == nil
@@ -73,19 +74,20 @@ func (c *clients) add(client string) {
 	c.hosts = append(c.hosts, client)
 }
 
-// newClients creates a new clients set from a list of clients.
+// newClients creates a new clients set from a slice of clients.
 func newClients(clientStrs ...string) (c *clients) {
 	c = &clients{}
 	for _, s := range clientStrs {
 		c.add(s)
 	}
+
 	c.finalize()
 
 	return c
 }
 
 // containsAny returns true if clients contain either host or the IP address
-// ipStr is within one of the clients' subnets.
+// ipStr is within one of the clients' subnets.  If c is nil, ok is false.
 func (c *clients) containsAny(host string, ip netip.Addr) (ok bool) {
 	if c == nil {
 		return false
@@ -112,6 +114,8 @@ func (c *clients) containsAny(host string, ip netip.Addr) (ok bool) {
 
 // comparePrefix is a comparison function for sorting slices of [netip.Prefix].
 // It prefers IPv4 over IPv6, and shorter prefixes over longer ones.
+//
+// TODO(a.garipov):  Consider removing in Go 1.26.
 func comparePrefix(a, b netip.Prefix) (res int) {
 	addrA, addrB := a.Addr(), b.Addr()
 

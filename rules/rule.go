@@ -85,12 +85,13 @@ func isComment(line string) bool {
 // sep is the separator character. for network rules it is '|', for cosmetic it is ','.
 func loadDomains(domains, sep string) (permittedDomains, restrictedDomains []string, err error) {
 	if domains == "" {
-		err = errors.Error("no domains specified")
-		return
+		// TODO(a.garipov):  Here and in the whole package, use the standard
+		// error values.
+		return nil, nil, errors.Error("no domains specified")
 	}
 
 	list := strings.Split(domains, sep)
-	for i := 0; i < len(list); i++ {
+	for i := range list {
 		d := list[i]
 		restricted := false
 		if strings.HasPrefix(d, "~") {
@@ -100,7 +101,8 @@ func loadDomains(domains, sep string) (permittedDomains, restrictedDomains []str
 
 		if !ufnet.IsDomainName(d) && !strings.HasSuffix(d, ".*") {
 			err = fmt.Errorf("invalid domain specified: %s", domains)
-			return
+
+			return permittedDomains, restrictedDomains, err
 		}
 
 		if restricted {
@@ -110,7 +112,7 @@ func loadDomains(domains, sep string) (permittedDomains, restrictedDomains []str
 		}
 	}
 
-	return
+	return permittedDomains, restrictedDomains, nil
 }
 
 // strToRRType converts s to a DNS resource record (RR) type.  s may be in any
@@ -165,12 +167,11 @@ func loadDNSTypes(types string) (permittedTypes, restrictedTypes []RRType, err e
 // isValidCTag - returns TRUE if ctag value format is correct: a-z0-9_
 func isValidCTag(s string) bool {
 	for _, ch := range s {
-		if !((ch >= 'a' && ch <= 'z') ||
-			(ch >= '0' && ch <= '9') ||
-			ch == '_') {
+		if (ch < 'a' || ch > 'z') && (ch < '0' || ch > '9') && ch != '_' {
 			return false
 		}
 	}
+
 	return true
 }
 
@@ -180,12 +181,11 @@ func isValidCTag(s string) bool {
 // returns sorted arrays with permitted and restricted $ctag
 func loadCTags(value, sep string) (permittedCTags, restrictedCTags []string, err error) {
 	if value == "" {
-		err = errors.Error("value is empty")
-		return
+		return nil, nil, errors.Error("value is empty")
 	}
 
 	list := strings.Split(value, sep)
-	for i := 0; i < len(list); i++ {
+	for i := range list {
 		d := list[i]
 		restricted := false
 		if strings.HasPrefix(d, "~") {
@@ -194,8 +194,7 @@ func loadCTags(value, sep string) (permittedCTags, restrictedCTags []string, err
 		}
 
 		if !isValidCTag(d) {
-			err = fmt.Errorf("invalid ctag specified: %s", value)
-			return
+			return permittedCTags, restrictedCTags, fmt.Errorf("invalid ctag specified: %s", value)
 		}
 
 		if restricted {
@@ -209,7 +208,7 @@ func loadCTags(value, sep string) (permittedCTags, restrictedCTags []string, err
 	slices.Sort(permittedCTags)
 	slices.Sort(restrictedCTags)
 
-	return
+	return permittedCTags, restrictedCTags, nil
 }
 
 // The $client modifier allows specifying clients this rule will be working for.
@@ -244,8 +243,7 @@ func loadCTags(value, sep string) (permittedCTags, restrictedCTags []string, err
 // Returns sorted arrays of permitted and restricted clients
 func loadClients(value string, sep byte) (permittedClients, restrictedClients *clients, err error) {
 	if value == "" {
-		err = errors.Error("value is empty")
-		return
+		return nil, nil, errors.Error("value is empty")
 	}
 
 	// First of all, split by the specified separator
@@ -280,8 +278,7 @@ func loadClients(value string, sep byte) (permittedClients, restrictedClients *c
 		}
 
 		if client == "" {
-			err = fmt.Errorf("invalid $client value %s", value)
-			return
+			return nil, nil, fmt.Errorf("invalid $client value %s", value)
 		}
 
 		if restricted {
@@ -300,5 +297,5 @@ func loadClients(value string, sep byte) (permittedClients, restrictedClients *c
 	permittedClients.finalize()
 	restrictedClients.finalize()
 
-	return
+	return permittedClients, restrictedClients, nil
 }

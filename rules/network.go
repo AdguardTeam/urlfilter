@@ -215,8 +215,8 @@ func NewNetworkRule(ruleText string, filterListID int) (r *NetworkRule, err erro
 		len(pattern) < 3 {
 		if len(r.permittedDomains) == 0 &&
 			len(r.restrictedDomains) == 0 &&
-			r.permittedClients.Len() == 0 &&
-			r.restrictedClients.Len() == 0 &&
+			r.permittedClients.len() == 0 &&
+			r.restrictedClients.len() == 0 &&
 			len(r.permittedClientTags) == 0 &&
 			len(r.restrictedClientTags) == 0 &&
 			len(r.permittedDNSTypes) == 0 &&
@@ -380,7 +380,7 @@ func (f *NetworkRule) IsHigherPriority(r *NetworkRule) bool {
 	if len(f.permittedClientTags) != 0 || len(f.restrictedClientTags) != 0 {
 		count++
 	}
-	if f.permittedClients.Len() != 0 || f.restrictedClients.Len() != 0 {
+	if f.permittedClients.len() != 0 || f.restrictedClients.len() != 0 {
 		count++
 	}
 	if len(f.denyAllowDomains) != 0 {
@@ -416,8 +416,8 @@ func (f *NetworkRule) negatesBadfilter(r *NetworkRule) bool {
 		!slices.Equal(f.restrictedDomains, r.restrictedDomains),
 		!slices.Equal(f.permittedClientTags, r.permittedClientTags),
 		!slices.Equal(f.restrictedClientTags, r.restrictedClientTags),
-		!f.permittedClients.Equal(r.permittedClients),
-		!f.restrictedClients.Equal(r.restrictedClients):
+		!f.permittedClients.equal(r.permittedClients),
+		!f.restrictedClients.equal(r.restrictedClients):
 		return false
 	}
 
@@ -620,8 +620,8 @@ func (f *NetworkRule) matchClientTags(sortedTags []string) bool {
 // matchClient returns true if the rule is specified for client defined by
 // host or ip.  Both host and ip can be empty.
 func (f *NetworkRule) matchClient(host string, ip netip.Addr) bool {
-	restLen := f.restrictedClients.Len()
-	permLen := f.permittedClients.Len()
+	restLen := f.restrictedClients.len()
+	permLen := f.permittedClients.len()
 
 	if restLen == 0 && permLen == 0 {
 		// The rule has no $client modifier.

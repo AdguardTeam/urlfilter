@@ -1,4 +1,4 @@
-package rules
+package rules_test
 
 import (
 	"fmt"
@@ -6,57 +6,14 @@ import (
 	"testing"
 
 	"github.com/AdguardTeam/golibs/testutil"
+	"github.com/AdguardTeam/urlfilter/rules"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestValidateHost(t *testing.T) {
-	testCases := []struct {
-		name string
-		in   string
-		want string
-	}{{
-		name: "success",
-		in:   "example.com",
-		want: "",
-	}, {
-		name: "success_punycode",
-		// Aka "имена.бг".
-		in:   "xn--80ajiqg.xn--90ae",
-		want: "",
-	}, {
-		name: "empty",
-		in:   "",
-		want: "invalid hostname length: 0",
-	}, {
-		name: "too_long",
-		in:   "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-		want: "invalid hostname length: 64",
-	}, {
-		name: "empty_part",
-		in:   "example..com",
-		want: "empty hostname part at index 1",
-	}, {
-		name: "bad_part_first",
-		in:   "www.-example.com",
-		want: "invalid hostname part at index 1: invalid char '-' at index 0",
-	}, {
-		name: "bad_part_inner",
-		in:   "www:example.com",
-		want: "invalid hostname part at index 0: invalid char ':' at index 3",
-	}}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			err := validateHost(tc.in)
-			testutil.AssertErrorMsg(t, tc.want, err)
-		})
-	}
-}
-
 func TestNetworkRule_Match_dnsRewrite(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		req := NewRequestForHostname("example.org")
+		req := rules.NewRequestForHostname("example.org")
 
 		testCases := []struct {
 			name string
@@ -99,7 +56,8 @@ func TestNetworkRule_Match_dnsRewrite(t *testing.T) {
 			in:   "||example.org^$dnsrewrite=noerror;svcb;30 . alpn=h3",
 		}, {
 			name: "svcb_dohpath",
-			in:   "||example.org^$dnsrewrite=noerror;svcb;30 example.net alpn=h3 dohpath=/dns-query{?dns}",
+			in: "||example.org^$dnsrewrite=noerror;svcb;30 example.net alpn=h3 " +
+				"dohpath=/dns-query{?dns}",
 		}, {
 			name: "https",
 			in:   "||example.org^$dnsrewrite=noerror;https;30 example.net",
@@ -119,7 +77,7 @@ func TestNetworkRule_Match_dnsRewrite(t *testing.T) {
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
-				r, err := NewNetworkRule(tc.in, -1)
+				r, err := rules.NewNetworkRule(tc.in, -1)
 				require.NoError(t, err)
 
 				assert.True(t, r.Match(req))
@@ -128,10 +86,11 @@ func TestNetworkRule_Match_dnsRewrite(t *testing.T) {
 	})
 
 	t.Run("success_reverse", func(t *testing.T) {
-		r, err := NewNetworkRule("||1.2.3.4.in-addr.arpa^$dnsrewrite=noerror;ptr;example.net", -1)
+		s := "||1.2.3.4.in-addr.arpa^$dnsrewrite=noerror;ptr;example.net"
+		r, err := rules.NewNetworkRule(s, -1)
 		require.NoError(t, err)
 
-		req := NewRequestForHostname("1.2.3.4.in-addr.arpa")
+		req := rules.NewRequestForHostname("1.2.3.4.in-addr.arpa")
 		assert.True(t, r.Match(req))
 	})
 
@@ -175,8 +134,9 @@ func TestNetworkRule_Match_dnsRewrite(t *testing.T) {
 		}, {
 			name: "cname_bad_host",
 			in:   "||example.org^$dnsrewrite=noerror;cname;!!badstuff",
-			wantErrMsg: `invalid cname host: invalid hostname part at index 0: ` +
-				`invalid char '!' at index 0`,
+			wantErrMsg: `invalid cname host: bad hostname "!!badstuff": ` +
+				`bad top-level domain name label "!!badstuff": ` +
+				`bad top-level domain name label rune '!'`,
 		}, {
 			name: "mx_bad_types",
 			in:   "||example.org^$dnsrewrite=noerror;mx;bad stuff",
@@ -189,13 +149,15 @@ func TestNetworkRule_Match_dnsRewrite(t *testing.T) {
 		}, {
 			name: "mx_bad_host",
 			in:   "||example.org^$dnsrewrite=noerror;mx;10 !!badstuff",
-			wantErrMsg: `invalid mx exchange: invalid hostname part at index 0: ` +
-				`invalid char '!' at index 0`,
+			wantErrMsg: `invalid mx exchange: bad hostname "!!badstuff": ` +
+				`bad top-level domain name label "!!badstuff": ` +
+				`bad top-level domain name label rune '!'`,
 		}, {
 			name: "ptr_bad_host",
 			in:   "||example.org^$dnsrewrite=noerror;ptr;bad stuff",
-			wantErrMsg: `invalid ptr host: invalid hostname part at index 0: ` +
-				`invalid char ' ' at index 3`,
+			wantErrMsg: `invalid ptr host: bad hostname "bad stuff": ` +
+				`bad top-level domain name label "bad stuff": ` +
+				`bad top-level domain name label rune ' '`,
 		}, {
 			name: "https_bad_prio",
 			in:   "||example.org^$dnsrewrite=noerror;https;bad stuff",
@@ -217,14 +179,16 @@ func TestNetworkRule_Match_dnsRewrite(t *testing.T) {
 		}, {
 			name: "svcb_bad_host",
 			in:   "||example.org^$dnsrewrite=noerror;svcb;42 !!badstuff alpn=h3",
-			wantErrMsg: `invalid svcb target: invalid hostname part at index 0: ` +
-				`invalid char '!' at index 0`,
+			wantErrMsg: `invalid svcb target: bad hostname "!!badstuff": ` +
+				`bad top-level domain name label "!!badstuff": ` +
+				`bad top-level domain name label rune '!'`,
 		}, {
 			// See https://github.com/AdguardTeam/AdGuardHome/issues/2492.
 			name: "adguard_home_issue_2492",
 			in:   "||example.org^$dnsrewrite=A:NOERROR:127.0.0.1",
 			wantErrMsg: `invalid shorthand hostname "A:NOERROR:127.0.0.1": ` +
-				`invalid hostname part at index 0: invalid char ':' at index 1`,
+				`bad hostname "A:NOERROR:127.0.0.1": bad hostname label "A:NOERROR:127": ` +
+				`bad hostname label rune ':'`,
 		}, {
 			name:       "srv_bad_num",
 			in:         "||example.org^$dnsrewrite=noerror;srv;bad stuff",
@@ -247,13 +211,14 @@ func TestNetworkRule_Match_dnsRewrite(t *testing.T) {
 		}, {
 			name: "srv_bad_host",
 			in:   "||example.org^$dnsrewrite=noerror;srv;30 60 8080 !!badstuff",
-			wantErrMsg: `invalid srv target: invalid hostname part at index 0: ` +
-				`invalid char '!' at index 0`,
+			wantErrMsg: `invalid srv target: bad hostname "!!badstuff": ` +
+				`bad top-level domain name label "!!badstuff": ` +
+				`bad top-level domain name label rune '!'`,
 		}}
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
-				_, err := NewNetworkRule(tc.in, -1)
+				_, err := rules.NewNetworkRule(tc.in, -1)
 				testutil.AssertErrorMsg(t, tc.wantErrMsg, err)
 			})
 		}
@@ -321,7 +286,7 @@ func TestNetworkRule_Match_dnsRewrite(t *testing.T) {
 		}} {
 			t.Run("short_keyword_"+strings.ToLower(tc.rcode), func(t *testing.T) {
 				rule := fmt.Sprintf("||example.org^$dnsrewrite=%s", tc.rcode)
-				_, err := NewNetworkRule(rule, -1)
+				_, err := rules.NewNetworkRule(rule, -1)
 				testutil.AssertErrorMsg(t, tc.wantErrMsg, err)
 			})
 		}
