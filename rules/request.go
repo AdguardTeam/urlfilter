@@ -96,7 +96,11 @@ type Request struct {
 	IsHostnameRequest bool
 }
 
-// NewRequest creates a new instance of "Request" and populates it's fields
+// NewRequest creates a new instance of "Request" and populates it's fields.
+//
+// TODO(d.kolyshev):  Limit the URL length by 4 KiB. It appears that there
+// can be URLs longer than a megabyte, and it makes no sense to go through
+// the whole URL.
 func NewRequest(u, sourceURL *url.URL, requestType RequestType) *Request {
 	r := Request{
 		SourceURL:   sourceURL,
