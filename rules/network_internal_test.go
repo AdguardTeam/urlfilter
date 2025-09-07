@@ -11,6 +11,8 @@ import (
 )
 
 func TestParseRuleText(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		wantWhitelist assert.BoolAssertionFunc
 		name          string
@@ -93,6 +95,8 @@ func TestParseRuleText(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
 			pattern, options, whitelist, err := parseRuleText(tc.in)
 			require.NoError(t, err)
 
@@ -112,8 +116,8 @@ func TestParseRuleText(t *testing.T) {
 // is set correctly.
 func checkRequestType(t *testing.T, name string, requestType RequestType, permitted bool) {
 	f, err := NewNetworkRule("||example.org^$"+name, 0)
-	assert.Nil(t, err)
-	assert.NotNil(t, f)
+	require.Nil(t, err)
+	require.NotNil(t, f)
 
 	if permitted {
 		assert.Equal(t, f.permittedRequestTypes, requestType)
@@ -123,6 +127,8 @@ func checkRequestType(t *testing.T, name string, requestType RequestType, permit
 }
 
 func TestNetworkRule_requestTypeModifiers(t *testing.T) {
+	t.Parallel()
+
 	checkRequestType(t, "script", TypeScript, true)
 	checkRequestType(t, "~script", TypeScript, false)
 
@@ -161,6 +167,8 @@ func TestNetworkRule_requestTypeModifiers(t *testing.T) {
 }
 
 func TestFindShortcut(t *testing.T) {
+	t.Parallel()
+
 	shortcut := findShortcut("||example.org^")
 	assert.Equal(t, "example.org", shortcut)
 
@@ -184,26 +192,31 @@ func TestFindShortcut(t *testing.T) {
 }
 
 func TestLoadCTags(t *testing.T) {
+	t.Parallel()
+
 	perm, rest, err := loadCTags("phone|pc|~printer", "|")
-	assert.Nil(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, []string{"pc", "phone"}, perm)
 	assert.Equal(t, []string{"printer"}, rest)
 
 	perm, rest, err = loadCTags("device_pc0123", "|")
-	assert.Nil(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, []string{"device_pc0123"}, perm)
 	assert.Nil(t, rest)
 
 	perm, rest, err = loadCTags("pc|~phone|bad.", "|")
-	assert.NotNil(t, err)
+	assert.Error(t, err)
 	assert.Equal(t, []string{"pc"}, perm)
 	assert.Equal(t, []string{"phone"}, rest)
 }
 
 func TestNetworkRule_clientTagRules(t *testing.T) {
+	t.Parallel()
+
 	f, err := NewNetworkRule("||example.org^$ctag=pc", 0)
-	assert.Nil(t, err)
-	assert.NotNil(t, f)
+	require.Nil(t, err)
+	require.NotNil(t, f)
+
 	assert.Equal(t, []string{"pc"}, f.permittedClientTags)
 
 	r := NewRequestForURL(&url.URL{
@@ -240,57 +253,63 @@ func TestNetworkRule_clientTagRules(t *testing.T) {
 }
 
 func TestLoadClients(t *testing.T) {
+	t.Parallel()
+
 	p, r, err := loadClients("127.0.0.1", '|')
-	assert.Nil(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, *newClients("127.0.0.1"), *p)
 	assert.Nil(t, r)
 
 	p, r, err = loadClients("127.0.0.1|127.0.0.2", '|')
-	assert.Nil(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, *newClients("127.0.0.1", "127.0.0.2"), *p)
 	assert.Nil(t, r)
 
 	p, r, err = loadClients("127.0.0.1|~127.0.0.2", '|')
-	assert.Nil(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, *newClients("127.0.0.1"), *p)
 	assert.Equal(t, *newClients("127.0.0.2"), *r)
 
 	p, r, err = loadClients("'Frank\\'s laptop'", '|')
-	assert.Nil(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, *newClients("Frank's laptop"), *p)
 	assert.Nil(t, r)
 
 	p, r, err = loadClients("~\"Frank's phone\"", '|')
-	assert.Nil(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, p)
 	assert.Equal(t, *newClients("Frank's phone"), *r)
 
 	p, r, err = loadClients("~'Mary\\'s\\, John\\'s\\, and Boris\\'s laptops'", '|')
-	assert.Nil(t, err)
+	require.NoError(t, err)
 	assert.Nil(t, p)
 	assert.Equal(t, *newClients("Mary's, John's, and Boris's laptops"), *r)
 
 	p, r, err = loadClients("~Mom|~Dad|\"Kids\"", '|')
-	assert.Nil(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, *newClients("Kids"), *p)
 	assert.Equal(t, *newClients("Dad", "Mom"), *r)
 }
 
 func TestLoadInvalidClients(t *testing.T) {
+	t.Parallel()
+
 	_, _, err := loadClients("", '|')
-	assert.NotNil(t, err)
+	assert.Error(t, err)
 
 	_, _, err = loadClients("''", '|')
-	assert.NotNil(t, err)
+	assert.Error(t, err)
 
 	_, _, err = loadClients("~''", '|')
-	assert.NotNil(t, err)
+	assert.Error(t, err)
 
 	_, _, err = loadClients("~", '|')
-	assert.NotNil(t, err)
+	assert.Error(t, err)
 }
 
 func TestNetworkRule_negatesBadfilter(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		want      assert.BoolAssertionFunc
 		name      string
@@ -380,6 +399,8 @@ func TestNetworkRule_negatesBadfilter(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
 			r, err := NewNetworkRule(tc.rule, -1)
 			require.NoError(t, err)
 			require.NotNil(t, r)

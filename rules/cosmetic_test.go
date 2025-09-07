@@ -9,13 +9,13 @@ import (
 )
 
 func TestCosmeticRule_Match(t *testing.T) {
-	r, err := rules.NewCosmeticRule("##banner", testFilterListID)
+	r, err := rules.NewCosmeticRule("##banner", testListID)
 	require.NotNil(t, r)
 	require.NoError(t, err)
 
 	assert.True(t, r.Match("example.org"))
 
-	r, err = rules.NewCosmeticRule("example.org,~sub.example.org##banner", testFilterListID)
+	r, err = rules.NewCosmeticRule("example.org,~sub.example.org##banner", testListID)
 	require.NotNil(t, r)
 	require.NoError(t, err)
 
@@ -27,7 +27,7 @@ func TestCosmeticRule_Match(t *testing.T) {
 }
 
 func TestCosmeticRule_Match_wildcardTLD(t *testing.T) {
-	r, err := rules.NewCosmeticRule("example.*##banner", testFilterListID)
+	r, err := rules.NewCosmeticRule("example.*##banner", testListID)
 	require.NotNil(t, r)
 	require.NoError(t, err)
 
@@ -39,7 +39,7 @@ func TestCosmeticRule_Match_wildcardTLD(t *testing.T) {
 }
 
 func FuzzCosmeticRule_Match(f *testing.F) {
-	r, err := rules.NewCosmeticRule("example.*##banner", testFilterListID)
+	r, err := rules.NewCosmeticRule("example.*##banner", testListID)
 	require.NoError(f, err)
 
 	for _, seed := range []string{

@@ -82,7 +82,7 @@ func TestNetworkRule_Match_dnsRewrite(t *testing.T) {
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
-				r, err := rules.NewNetworkRule(tc.in, -1)
+				r, err := rules.NewNetworkRule(tc.in, testListID)
 				require.NoError(t, err)
 
 				assert.True(t, r.Match(req))
@@ -92,7 +92,7 @@ func TestNetworkRule_Match_dnsRewrite(t *testing.T) {
 
 	t.Run("success_reverse", func(t *testing.T) {
 		s := "||1.2.3.4.in-addr.arpa^$dnsrewrite=noerror;ptr;example.net"
-		r, err := rules.NewNetworkRule(s, -1)
+		r, err := rules.NewNetworkRule(s, testListID)
 		require.NoError(t, err)
 
 		req := rules.NewRequestForURL(&url.URL{
@@ -226,7 +226,7 @@ func TestNetworkRule_Match_dnsRewrite(t *testing.T) {
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
-				_, err := rules.NewNetworkRule(tc.in, -1)
+				_, err := rules.NewNetworkRule(tc.in, testListID)
 				testutil.AssertErrorMsg(t, tc.wantErrMsg, err)
 			})
 		}
@@ -294,7 +294,7 @@ func TestNetworkRule_Match_dnsRewrite(t *testing.T) {
 		}} {
 			t.Run("short_keyword_"+strings.ToLower(tc.rcode), func(t *testing.T) {
 				rule := fmt.Sprintf("||example.org^$dnsrewrite=%s", tc.rcode)
-				_, err := rules.NewNetworkRule(rule, -1)
+				_, err := rules.NewNetworkRule(rule, testListID)
 				testutil.AssertErrorMsg(t, tc.wantErrMsg, err)
 			})
 		}

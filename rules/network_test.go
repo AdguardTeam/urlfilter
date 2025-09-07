@@ -901,7 +901,7 @@ func TestNetworkRule_Match_dnsType(t *testing.T) {
 }
 
 func BenchmarkNetworkRule_Match(b *testing.B) {
-	r, err := rules.NewNetworkRule("||test.example^", testFilterListID)
+	r, err := rules.NewNetworkRule("||test.example^", testListID)
 	require.NoError(b, err)
 
 	req := rules.NewRequestForURL(testURL)
@@ -923,7 +923,7 @@ func BenchmarkNetworkRule_Match(b *testing.B) {
 }
 
 func FuzzNetworkRule_Match(f *testing.F) {
-	r, err := rules.NewNetworkRule("||test.example^", testFilterListID)
+	r, err := rules.NewNetworkRule("||test.example^", testListID)
 	require.NoError(f, err)
 
 	for _, seed := range []string{

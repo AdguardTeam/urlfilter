@@ -6,43 +6,8 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/AdguardTeam/golibs/netutil/urlutil"
 	"github.com/AdguardTeam/urlfilter/rules"
 	"github.com/stretchr/testify/assert"
-)
-
-// Common hostnames for tests.
-const (
-	testHostname = "test.example"
-
-	testSubHostname = "sub.test.example"
-
-	testLongTLDHostname = "example.org.uk"
-
-	testOtherHostname = "other.example"
-)
-
-// Common URLs for tests.
-var (
-	testURL = &url.URL{
-		Scheme: urlutil.SchemeHTTP,
-		Host:   testHostname,
-	}
-
-	testSubURL = &url.URL{
-		Scheme: urlutil.SchemeHTTP,
-		Host:   testSubHostname,
-	}
-
-	testLongTLDURL = &url.URL{
-		Scheme: urlutil.SchemeHTTP,
-		Host:   testLongTLDHostname,
-	}
-
-	testOtherURL = &url.URL{
-		Scheme: urlutil.SchemeHTTPS,
-		Host:   testOtherHostname,
-	}
 )
 
 func TestNewRequest(t *testing.T) {
