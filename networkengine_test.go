@@ -57,6 +57,8 @@ func TestEmptyNetworkEngine(t *testing.T) {
 }
 
 func TestMatchWhitelistRule(t *testing.T) {
+	t.Parallel()
+
 	r1 := "||example.org^$script"
 	r2 := "@@http://example.org^"
 	rulesText := strings.Join([]string{r1, r2}, "\n")
@@ -66,11 +68,14 @@ func TestMatchWhitelistRule(t *testing.T) {
 	r := rules.NewRequest(testURL, nil, rules.TypeScript)
 	rule, ok := engine.Match(r)
 	assert.True(t, ok)
-	assert.NotNil(t, rule)
-	assert.Equal(t, r2, rule.String())
+
+	require.NotNil(t, rule)
+	assert.Equal(t, r2, rule.Text())
 }
 
 func TestMatchImportantRule(t *testing.T) {
+	t.Parallel()
+
 	r1 := "||test2.example.org^$important"
 	r2 := "@@||example.org^"
 	r3 := "||test1.example.org^"
@@ -81,8 +86,9 @@ func TestMatchImportantRule(t *testing.T) {
 	r := rules.NewRequest(testURL, nil, rules.TypeOther)
 	rule, ok := engine.Match(r)
 	assert.True(t, ok)
-	assert.NotNil(t, rule)
-	assert.Equal(t, r2, rule.String())
+
+	require.NotNil(t, rule)
+	assert.Equal(t, r2, rule.Text())
 
 	r = rules.NewRequest(&url.URL{
 		Scheme: urlutil.SchemeHTTP,
@@ -90,8 +96,9 @@ func TestMatchImportantRule(t *testing.T) {
 	}, nil, rules.TypeOther)
 	rule, ok = engine.Match(r)
 	assert.True(t, ok)
-	assert.NotNil(t, rule)
-	assert.Equal(t, r2, rule.String())
+
+	require.NotNil(t, rule)
+	assert.Equal(t, r2, rule.Text())
 
 	r = rules.NewRequest(&url.URL{
 		Scheme: urlutil.SchemeHTTP,
@@ -99,37 +106,64 @@ func TestMatchImportantRule(t *testing.T) {
 	}, nil, rules.TypeOther)
 	rule, ok = engine.Match(r)
 	assert.True(t, ok)
-	assert.NotNil(t, rule)
-	assert.Equal(t, r1, rule.String())
+
+	require.NotNil(t, rule)
+	assert.Equal(t, r1, rule.Text())
 }
 
-func TestMatchSourceRule(t *testing.T) {
-	ruleText := "|https://$image,media,script,third-party,domain=~feedback.pornhub.com|pornhub.com|redtube.com|redtube.com.br|tube8.com|tube8.es|tube8.fr|youporn.com|youporngay.com"
+func TestNetworkEngine_Match_sourceRule(t *testing.T) {
+	t.Parallel()
+
+	ruleText := "|https://$image,media,script,third-party,domain=" +
+		"~feedback.pornhub.com|pornhub.com|redtube.com|redtube.com.br|tube8.com|" +
+		"tube8.es|tube8.fr|youporn.com|youporngay.com"
 	ruleStorage := newTestRuleStorage(t, -1, ruleText)
 	engine := NewNetworkEngine(ruleStorage)
 
-	reqURL, _ := url.Parse("https://ci.phncdn.com/videos/201809/25/184777011/original/(m=ecuKGgaaaa)(mh=VSmV9NL_iouBcWJJ)4.jpg")
-	sourceURL, _ := url.Parse("https://www.pornhub.com/view_video.php?viewkey=ph5be89d11de4b0")
+	reqURL := &url.URL{
+		Scheme: urlutil.SchemeHTTPS,
+		Host:   "ci.phncdn.com",
+		Path:   "videos/201809/25/184777011/original/(m=ecuKGgaaaa)(mh=VSmV9NL_iouBcWJJ)4.jpg",
+	}
+	sourceURL := &url.URL{
+		Scheme:   urlutil.SchemeHTTPS,
+		Host:     "www.pornhub.com",
+		Path:     "view_video.php",
+		RawQuery: "viewkey=ph5be89d11de4b0",
+	}
 
 	r := rules.NewRequest(reqURL, sourceURL, rules.TypeImage)
 	rule, ok := engine.Match(r)
 	assert.True(t, ok)
-	assert.NotNil(t, rule)
+
+	require.NotNil(t, rule)
+	assert.Equal(t, ruleText, rule.Text())
 }
 
-func TestMatchSimplePattern(t *testing.T) {
-	// Simple pattern rule
+func TestNetworkEngine_Match_simplePattern(t *testing.T) {
+	t.Parallel()
+
 	ruleText := "_prebid_"
 	ruleStorage := newTestRuleStorage(t, -1, ruleText)
 	engine := NewNetworkEngine(ruleStorage)
 
-	reqURL, _ := url.Parse("https://ap.lijit.com/rtb/bid?src=prebid_prebid_1.35.0")
-	sourceURL, _ := url.Parse("https://www.drudgereport.com/")
+	reqURL := &url.URL{
+		Scheme:   urlutil.SchemeHTTPS,
+		Host:     "ap.lijit.com",
+		Path:     "/rtb/bid",
+		RawQuery: "src=prebid_prebid_1.35.0",
+	}
+	sourceURL := &url.URL{
+		Scheme: urlutil.SchemeHTTPS,
+		Host:   "www.drudgereport.com",
+	}
 
 	r := rules.NewRequest(reqURL, sourceURL, rules.TypeXmlhttprequest)
 	rule, ok := engine.Match(r)
 	assert.True(t, ok)
-	assert.NotNil(t, rule)
+
+	require.NotNil(t, rule)
+	assert.Equal(t, ruleText, rule.Text())
 }
 
 // TODO(a.garipov):  Consider removing and replacing with tests similar to

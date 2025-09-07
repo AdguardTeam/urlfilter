@@ -590,10 +590,10 @@ func TestNetworkRule_invalidDomainRestrictions(t *testing.T) {
 	t.Parallel()
 
 	_, err := rules.NewNetworkRule("||example.org^$domain=", 0)
-	assert.NotNil(t, err)
+	assert.Error(t, err)
 
 	_, err = rules.NewNetworkRule("||example.org^$domain=|example.com", 0)
-	assert.NotNil(t, err)
+	assert.Error(t, err)
 }
 
 func TestNetworkRule_Match_client(t *testing.T) {
