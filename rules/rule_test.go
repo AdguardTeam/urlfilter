@@ -8,9 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// testFilterListID is a test filter list ID.
-const testFilterListID = 1
-
 func TestNewRule(t *testing.T) {
 	t.Parallel()
 

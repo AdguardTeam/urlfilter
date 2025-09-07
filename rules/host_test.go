@@ -10,81 +10,86 @@ import (
 )
 
 func TestNewHostRule(t *testing.T) {
-	rule, err := rules.NewHostRule(
+	r, err := rules.NewHostRule(
 		"127.0.1.1       thishost.mydomain.org  thishost",
 		testFilterListID,
 	)
-	assert.Nil(t, err)
-	assert.NotNil(t, rule)
-	assert.Equal(t, testFilterListID, rule.FilterListID)
-	assert.Equal(t, netip.MustParseAddr("127.0.1.1"), rule.IP)
-	assert.Equal(t, 2, len(rule.Hostnames))
-	assert.Equal(t, "thishost.mydomain.org", rule.Hostnames[0])
-	assert.Equal(t, "thishost", rule.Hostnames[1])
+	require.NotNil(t, r)
+	require.NoError(t, err)
+	require.Len(t, r.Hostnames, 2)
 
-	rule, err = rules.NewHostRule("209.237.226.90  www.opensource.org", testFilterListID)
-	assert.Nil(t, err)
-	assert.NotNil(t, rule)
-	assert.Equal(t, testFilterListID, rule.FilterListID)
-	assert.Equal(t, netip.MustParseAddr("209.237.226.90"), rule.IP)
-	assert.Equal(t, 1, len(rule.Hostnames))
-	assert.Equal(t, "www.opensource.org", rule.Hostnames[0])
+	assert.Equal(t, testFilterListID, r.FilterListID)
+	assert.Equal(t, netip.MustParseAddr("127.0.1.1"), r.IP)
+	assert.Equal(t, "thishost.mydomain.org", r.Hostnames[0])
+	assert.Equal(t, "thishost", r.Hostnames[1])
 
-	rule, err = rules.NewHostRule(
+	r, err = rules.NewHostRule("209.237.226.90  www.opensource.org", testFilterListID)
+	require.NotNil(t, r)
+	require.NoError(t, err)
+	require.Len(t, r.Hostnames, 1)
+
+	assert.Equal(t, testFilterListID, r.FilterListID)
+	assert.Equal(t, netip.MustParseAddr("209.237.226.90"), r.IP)
+	assert.Equal(t, "www.opensource.org", r.Hostnames[0])
+
+	r, err = rules.NewHostRule(
 		"::1             localhost ip6-localhost ip6-loopback",
 		testFilterListID,
 	)
-	assert.Nil(t, err)
-	assert.NotNil(t, rule)
-	assert.Equal(t, testFilterListID, rule.FilterListID)
-	assert.Equal(t, netip.MustParseAddr("::1"), rule.IP)
-	assert.Equal(t, 3, len(rule.Hostnames))
-	assert.Equal(t, "localhost", rule.Hostnames[0])
-	assert.Equal(t, "ip6-localhost", rule.Hostnames[1])
-	assert.Equal(t, "ip6-loopback", rule.Hostnames[2])
+	require.NotNil(t, r)
+	require.NoError(t, err)
+	require.Len(t, r.Hostnames, 3)
 
-	rule, err = rules.NewHostRule("example.org", testFilterListID)
-	assert.Nil(t, err)
-	assert.NotNil(t, rule)
-	assert.Equal(t, testFilterListID, rule.FilterListID)
-	assert.Equal(t, netip.IPv4Unspecified(), rule.IP)
-	assert.Equal(t, 1, len(rule.Hostnames))
-	assert.Equal(t, "example.org", rule.Hostnames[0])
+	assert.Equal(t, testFilterListID, r.FilterListID)
+	assert.Equal(t, netip.MustParseAddr("::1"), r.IP)
+	assert.Equal(t, "localhost", r.Hostnames[0])
+	assert.Equal(t, "ip6-localhost", r.Hostnames[1])
+	assert.Equal(t, "ip6-loopback", r.Hostnames[2])
 
-	rule, err = rules.NewHostRule(
+	r, err = rules.NewHostRule("example.org", testFilterListID)
+	require.NotNil(t, r)
+	require.NoError(t, err)
+	require.Len(t, r.Hostnames, 1)
+
+	assert.Equal(t, testFilterListID, r.FilterListID)
+	assert.Equal(t, netip.IPv4Unspecified(), r.IP)
+	assert.Equal(t, "example.org", r.Hostnames[0])
+
+	r, err = rules.NewHostRule(
 		"#::1             localhost ip6-localhost ip6-loopback",
 		testFilterListID,
 	)
-	assert.NotNil(t, err)
-	assert.Nil(t, rule)
+	require.Nil(t, r)
+	require.Error(t, err)
 
-	rule, err = rules.NewHostRule("||example.org", testFilterListID)
-	assert.NotNil(t, err)
-	assert.Nil(t, rule)
+	r, err = rules.NewHostRule("||example.org", testFilterListID)
+	require.Nil(t, r)
+	require.Error(t, err)
 
-	rule, err = rules.NewHostRule("", testFilterListID)
-	assert.NotNil(t, err)
-	assert.Nil(t, rule)
+	r, err = rules.NewHostRule("", testFilterListID)
+	require.Nil(t, r)
+	require.Error(t, err)
 
-	rule, err = rules.NewHostRule("#", testFilterListID)
-	assert.NotNil(t, err)
-	assert.Nil(t, rule)
+	r, err = rules.NewHostRule("#", testFilterListID)
+	require.Nil(t, r)
+	require.Error(t, err)
 
-	rule, err = rules.NewHostRule("0.0.0.0 www.ruclicks.com  #[clicksagent.com]", testFilterListID)
-	assert.Nil(t, err)
-	assert.NotNil(t, rule)
-	assert.Equal(t, testFilterListID, rule.FilterListID)
-	assert.Equal(t, netip.IPv4Unspecified(), rule.IP)
-	assert.Equal(t, 1, len(rule.Hostnames))
-	assert.Equal(t, "www.ruclicks.com", rule.Hostnames[0])
+	r, err = rules.NewHostRule("0.0.0.0 www.ruclicks.com  #[clicksagent.com]", testFilterListID)
+	require.NotNil(t, r)
+	require.NoError(t, err)
+	require.Len(t, r.Hostnames, 1)
 
-	rule, err = rules.NewHostRule("_prebid_", testFilterListID)
-	assert.Nil(t, rule)
-	assert.NotNil(t, err)
+	assert.Equal(t, testFilterListID, r.FilterListID)
+	assert.Equal(t, netip.IPv4Unspecified(), r.IP)
+	assert.Equal(t, "www.ruclicks.com", r.Hostnames[0])
 
-	rule, err = rules.NewHostRule("_728x90.", testFilterListID)
-	assert.Nil(t, rule)
-	assert.NotNil(t, err)
+	r, err = rules.NewHostRule("_prebid_", testFilterListID)
+	require.Nil(t, r)
+	require.Error(t, err)
+
+	r, err = rules.NewHostRule("_728x90.", testFilterListID)
+	require.Nil(t, r)
+	require.Error(t, err)
 }
 
 func TestHostRule_Match(t *testing.T) {

@@ -19,11 +19,11 @@ func TestFile_RuleListScanner(t *testing.T) {
 
 	ruleList, err := filterlist.NewFile(&filterlist.FileConfig{
 		Path: testFileRuleList,
-		ID:   filterListID,
+		ID:   testListID,
 	})
 	require.NoError(t, err)
 	testutil.CleanupAndRequireSuccess(t, ruleList.Close)
-	assert.Equal(t, filterListID, ruleList.GetID())
+	assert.Equal(t, testListID, ruleList.GetID())
 
 	scanner := ruleList.NewScanner()
 	assert.True(t, scanner.Scan())
@@ -32,7 +32,7 @@ func TestFile_RuleListScanner(t *testing.T) {
 	require.NotNil(t, f)
 
 	assert.Equal(t, "||example.org", f.Text())
-	assert.Equal(t, filterListID, f.GetFilterListID())
+	assert.Equal(t, testListID, f.GetFilterListID())
 	assert.Equal(t, 0, idx)
 
 	assert.True(t, scanner.Scan())
@@ -41,7 +41,7 @@ func TestFile_RuleListScanner(t *testing.T) {
 	require.NotNil(t, f)
 
 	assert.Equal(t, testRuleCosmetic, f.Text())
-	assert.Equal(t, filterListID, f.GetFilterListID())
+	assert.Equal(t, testListID, f.GetFilterListID())
 	assert.Equal(t, 21, idx)
 
 	// Finish scanning.
@@ -52,20 +52,20 @@ func TestFile_RuleListScanner(t *testing.T) {
 	require.NotNil(t, f)
 
 	assert.Equal(t, "||example.org", f.Text())
-	assert.Equal(t, filterListID, f.GetFilterListID())
+	assert.Equal(t, testListID, f.GetFilterListID())
 
 	f, err = ruleList.RetrieveRule(21)
 	require.NoError(t, err)
 	require.NotNil(t, f)
 
 	assert.Equal(t, testRuleCosmetic, f.Text())
-	assert.Equal(t, filterListID, f.GetFilterListID())
+	assert.Equal(t, testListID, f.GetFilterListID())
 }
 
 func BenchmarkFile_RetrieveRule(b *testing.B) {
 	conf := &filterlist.FileConfig{
 		Path: testFileRuleList,
-		ID:   filterListID,
+		ID:   testListID,
 	}
 
 	f, fileErr := filterlist.NewFile(conf)

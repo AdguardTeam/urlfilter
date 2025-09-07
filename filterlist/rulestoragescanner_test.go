@@ -5,67 +5,93 @@ import (
 	"testing"
 
 	"github.com/AdguardTeam/urlfilter/filterlist"
+	"github.com/AdguardTeam/urlfilter/rules"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRuleStorageScanner(t *testing.T) {
 	t.Parallel()
 
-	const (
-		filterList1 = testRuleTextAll
-		filterList2 = "||example.com\n! test\n##advert"
-	)
+	l1 := strings.NewReader(testRuleText)
+	l2 := strings.NewReader(testRuleTextOther)
 
-	r1 := strings.NewReader(filterList1)
-	scanner1 := filterlist.NewRuleScanner(r1, 1, false)
-
-	r2 := strings.NewReader(filterList2)
-	scanner2 := filterlist.NewRuleScanner(r2, 2, false)
+	s1 := filterlist.NewRuleScanner(l1, testListID, false)
+	s2 := filterlist.NewRuleScanner(l2, testListIDOther, false)
 
 	// Now create the storage scanner.
 	storageScanner := &filterlist.RuleStorageScanner{
-		Scanners: []*filterlist.RuleScanner{scanner1, scanner2},
+		Scanners: []*filterlist.RuleScanner{s1, s2},
 	}
 
 	// Rule 1 from the list 1.
 	assert.True(t, storageScanner.Scan())
-	f, idx := storageScanner.Rule()
+	f, id := storageScanner.Rule()
 
 	assert.NotNil(t, f)
-	assert.Equal(t, testRule, f.Text())
-	assert.Equal(t, 1, f.GetFilterListID())
-	assert.Equal(t, "0x0000000100000000", int642hex(idx))
+	assert.Equal(t, testRuleDomain, f.Text())
+	assert.Equal(t, testListID, f.GetFilterListID())
+	assert.Equal(t, testStrgID1Rule1, id)
 
 	// Rule 2 from the list 1.
 	assert.True(t, storageScanner.Scan())
-	f, idx = storageScanner.Rule()
+	f, id = storageScanner.Rule()
 
 	assert.NotNil(t, f)
 	assert.Equal(t, testRuleCosmetic, f.Text())
-	assert.Equal(t, 1, f.GetFilterListID())
-	assert.Equal(t, "0x0000000100000019", int642hex(idx))
+	assert.Equal(t, testListID, f.GetFilterListID())
+	assert.Equal(t, testStrgID1Rule2, id)
 
 	// Rule 1 from the list 2.
 	assert.True(t, storageScanner.Scan())
-	f, idx = storageScanner.Rule()
+	f, id = storageScanner.Rule()
 
 	assert.NotNil(t, f)
 	assert.Equal(t, "||example.com", f.Text())
-	assert.Equal(t, 2, f.GetFilterListID())
-	assert.Equal(t, "0x0000000200000000", int642hex(idx))
+	assert.Equal(t, testListIDOther, f.GetFilterListID())
+	assert.Equal(t, testStrgID2Rule1, id)
 
 	// Rule 2 from the list 2.
 	assert.True(t, storageScanner.Scan())
-	f, idx = storageScanner.Rule()
+	f, id = storageScanner.Rule()
 
 	assert.NotNil(t, f)
 	assert.Equal(t, "##advert", f.Text())
-	assert.Equal(t, 2, f.GetFilterListID())
-	assert.Equal(t, "0x0000000200000015", int642hex(idx))
+	assert.Equal(t, testListIDOther, f.GetFilterListID())
+	assert.Equal(t, testStrgID2Rule2, id)
 
 	// Now check that there's nothing to read.
 	assert.False(t, storageScanner.Scan())
 
 	// Check that nothing breaks if we read a finished scanner.
 	assert.False(t, storageScanner.Scan())
+}
+
+func BenchmarkRuleStorageScanner_Scan(b *testing.B) {
+	r1 := strings.NewReader(testRuleText)
+	r2 := strings.NewReader(testRuleTextOther)
+
+	s1 := filterlist.NewRuleScanner(r1, testListID, false)
+	s2 := filterlist.NewRuleScanner(r2, testListIDOther, false)
+
+	s := &filterlist.RuleStorageScanner{
+		Scanners: []*filterlist.RuleScanner{s1, s2},
+	}
+
+	var rule rules.Rule
+	b.ReportAllocs()
+	for b.Loop() {
+		for s.Scan() {
+			rule, _ = s.Rule()
+		}
+	}
+
+	require.NotNil(b, rule)
+
+	// Most recent results:
+	//	goos: linux
+	//	goarch: amd64
+	//	pkg: github.com/AdguardTeam/urlfilter/filterlist
+	//	cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
+	//	BenchmarkRuleStorageScanner_Scan-16    	18721648	        64.49 ns/op	       0 B/op	       0 allocs/op
 }

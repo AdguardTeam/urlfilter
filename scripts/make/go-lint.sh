@@ -94,7 +94,7 @@ blocklist_imports() {
 # NOTE:  Flag -H for grep is non-POSIX but all of Busybox, GNU, macOS, and
 # OpenBSD support it.
 method_const() {
-	find . \
+	find_with_ignore \
 		-type 'f' \
 		-name '*.go' \
 		-exec \
@@ -115,10 +115,11 @@ method_const() {
 # use of filenames like client_manager.go.
 underscores() {
 	underscore_files="$(
-		find . \
+		find_with_ignore \
 			-type 'f' \
 			-name '*_*.go' \
-			'!' '(' -name '*_darwin.go' \
+			'!' '(' \
+			-name '*_darwin.go' \
 			-o -name '*_generate.go' \
 			-o -name '*_linux.go' \
 			-o -name '*_test.go' \
@@ -166,21 +167,25 @@ run_linter gocognit --over 56 ./internal/ufnet/
 run_linter gocognit --over 35 ./rules/
 run_linter gocognit --over 10 \
 	./cmd/ \
+	./cosmeticengine_test.go \
 	./dnsengine.go \
+	./dnsengine_test.go \
 	./dnsrewrite.go \
-	./doc.go \
 	./engine.go \
+	./engine_test.go \
 	./examples/ \
 	./filterlist/ \
 	./internal/lookup/ \
 	./networkengine.go \
+	./urlfilter.go \
+	./urlfilter_test.go \
 	;
 
 run_linter ineffassign ./...
 
 run_linter unparam ./...
 
-find . \
+find_with_ignore \
 	-type 'f' \
 	'(' \
 	-name 'Makefile' \

@@ -25,11 +25,9 @@ import (
 // is the rule list identifier, and the second is the index of the rule inside
 // of that list.
 type RuleStorage struct {
-	// cacheMu protects cache.
-	cacheMu *sync.RWMutex
-
-	// cache with the rules which were retrieved.
-	cache map[int64]rules.Rule
+	// cache with the rules which were retrieved.  The key is the storage index
+	// and the value is the rule.
+	cache *sync.Map
 
 	// listsMap is a map with rule lists.  map key is the list ID.
 	listsMap map[int]Interface
@@ -53,8 +51,7 @@ func NewRuleStorage(lists []Interface) (s *RuleStorage, err error) {
 	}
 
 	return &RuleStorage{
-		cacheMu:  &sync.RWMutex{},
-		cache:    map[int64]rules.Rule{},
+		cache:    &sync.Map{},
 		listsMap: listsMap,
 		lists:    lists,
 	}, nil
@@ -77,15 +74,9 @@ func (s *RuleStorage) NewRuleStorageScanner() (sc *RuleStorageScanner) {
 // RetrieveRule looks for the filtering rule in this storage.  storageIdx is the
 // lookup index that you can get from the rule storage scanner.
 func (s *RuleStorage) RetrieveRule(storageIdx int64) (r rules.Rule, err error) {
-	var ok bool
-	func() {
-		s.cacheMu.RLock()
-		defer s.cacheMu.RUnlock()
-
-		r, ok = s.cache[storageIdx]
-	}()
+	ruleVal, ok := s.cache.Load(storageIdx)
 	if ok {
-		return r, nil
+		return ruleVal.(rules.Rule), nil
 	}
 
 	listID, ruleIdx := storageIdxToRuleListIdx(storageIdx)
@@ -97,12 +88,7 @@ func (s *RuleStorage) RetrieveRule(storageIdx int64) (r rules.Rule, err error) {
 
 	r, err = list.RetrieveRule(int(ruleIdx))
 	if r != nil {
-		func() {
-			s.cacheMu.Lock()
-			defer s.cacheMu.Unlock()
-
-			s.cache[storageIdx] = r
-		}()
+		s.cache.Store(storageIdx, r)
 	}
 
 	return r, err
@@ -160,6 +146,13 @@ func (s *RuleStorage) Close() (err error) {
 }
 
 // GetCacheSize returns the size of the in-memory rules cache.
+//
+// Deprecated:  This method is deprecated and will be removed in a future
+// version.
 func (s *RuleStorage) GetCacheSize() (sz int) {
-	return len(s.cache)
+	for range s.cache.Range {
+		sz++
+	}
+
+	return sz
 }

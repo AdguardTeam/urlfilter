@@ -1,34 +1,36 @@
 package filterlist_test
 
 import (
-	"fmt"
 	"strings"
 )
 
-// filterListID is the testing ID for a filter list.
-const filterListID = 1
+// Common list IDs for tests.
+//
+// TODO(a.garipov):  Introduce a type, rules.ListID.
+const (
+	testListID      int = 1
+	testListIDOther int = 2
+)
 
 // Common domains for tests.
 const testDomain = "test.example"
 
 // Common rules for tests.
 const (
-	testRule         = "||" + testDomain
+	testRuleDomain   = "||" + testDomain
 	testRuleCosmetic = "##banner"
 	testComment      = "! comment"
 )
 
 // Common text rules for tests.
 const (
-	testRuleText         = testRule + "\n"
+	testRuleTextDomain   = testRuleDomain + "\n"
 	testRuleTextCosmetic = testRuleCosmetic + "\n"
 	testCommentText      = testComment + "\n"
 
-	testRuleTextAll = testRuleText + testCommentText + testRuleTextCosmetic
+	testRuleText      = testRuleTextDomain + testCommentText + testRuleTextCosmetic
+	testRuleTextOther = "||example.com\n! test\n##advert\n"
 )
-
-// cosmeticRuleIndex is the index of the cosmetic rule in testRuleTextAll.
-var cosmeticRuleIndex = strings.Index(testRuleTextAll, testRuleCosmetic)
 
 const (
 	// testResourcesDir is the path to test resources.
@@ -44,9 +46,17 @@ const (
 	hostsRulesCount = 55997
 )
 
-// int642hex returns a hex string representation of an int64 value.
+// cosmeticRuleIndex is the index of the cosmetic rule in [testRuleText].
+var cosmeticRuleIndex = strings.Index(testRuleText, testRuleCosmetic)
+
+// Common StorageIDs for tests.
 //
-// TODO(d.kolyshev):  Remove.
-func int642hex(v int64) (s string) {
-	return fmt.Sprintf("0x%016x", v)
-}
+// NOTE:  Keep in sync with [testRuleText] and [testRuleTextOther].
+//
+// TODO(a.garipov):  Introduce a type, filterlist.StorageID.
+const (
+	testStrgID1Rule1 = int64(testListID<<32 | 0&0xFFFFFFFF)
+	testStrgID1Rule2 = int64(testListID<<32 | 25&0xFFFFFFFF)
+	testStrgID2Rule1 = int64(testListIDOther<<32 | 0&0xFFFFFFFF)
+	testStrgID2Rule2 = int64(testListIDOther<<32 | 21&0xFFFFFFFF)
+)

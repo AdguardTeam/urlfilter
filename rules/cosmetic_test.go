@@ -9,31 +9,33 @@ import (
 )
 
 func TestCosmeticRule_Match(t *testing.T) {
-	f, err := rules.NewCosmeticRule("##banner", testFilterListID)
-	assert.Nil(t, err)
-	assert.NotNil(t, f)
-	assert.True(t, f.Match("example.org"))
+	r, err := rules.NewCosmeticRule("##banner", testFilterListID)
+	require.NotNil(t, r)
+	require.NoError(t, err)
 
-	f, err = rules.NewCosmeticRule("example.org,~sub.example.org##banner", testFilterListID)
-	assert.Nil(t, err)
-	assert.NotNil(t, f)
-	assert.True(t, f.Match("example.org"))
-	assert.True(t, f.Match("test.example.org"))
-	assert.False(t, f.Match("testexample.org"))
-	assert.False(t, f.Match("sub.example.org"))
-	assert.False(t, f.Match("sub.sub.example.org"))
+	assert.True(t, r.Match("example.org"))
+
+	r, err = rules.NewCosmeticRule("example.org,~sub.example.org##banner", testFilterListID)
+	require.NotNil(t, r)
+	require.NoError(t, err)
+
+	assert.True(t, r.Match("example.org"))
+	assert.True(t, r.Match("test.example.org"))
+	assert.False(t, r.Match("testexample.org"))
+	assert.False(t, r.Match("sub.example.org"))
+	assert.False(t, r.Match("sub.sub.example.org"))
 }
 
 func TestCosmeticRule_Match_wildcardTLD(t *testing.T) {
-	f, err := rules.NewCosmeticRule("example.*##banner", testFilterListID)
-	assert.Nil(t, err)
-	assert.NotNil(t, f)
+	r, err := rules.NewCosmeticRule("example.*##banner", testFilterListID)
+	require.NotNil(t, r)
+	require.NoError(t, err)
 
-	assert.True(t, f.Match("example.org"))
-	assert.True(t, f.Match("test.example.org"))
-	assert.True(t, f.Match("example.co.uk"))
-	assert.False(t, f.Match("example.local"))
-	assert.False(t, f.Match("example.local.test"))
+	assert.True(t, r.Match("example.org"))
+	assert.True(t, r.Match("test.example.org"))
+	assert.True(t, r.Match("example.co.uk"))
+	assert.False(t, r.Match("example.local"))
+	assert.False(t, r.Match("example.local.test"))
 }
 
 func FuzzCosmeticRule_Match(f *testing.F) {

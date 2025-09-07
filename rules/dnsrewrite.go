@@ -79,50 +79,6 @@ func allUppercaseASCII(s string) (ok bool) {
 	return true
 }
 
-// isValidHostRune returns true if r is a valid rune for a hostname part.
-func isValidHostRune(r rune) (ok bool) {
-	return r == '-' || isValidHostFirstRune(r)
-}
-
-// isValidHostFirstRune returns true if r is a valid first rune for a hostname
-// part.
-func isValidHostFirstRune(r rune) (ok bool) {
-	return (r >= 'a' && r <= 'z') ||
-		(r >= 'A' && r <= 'Z') ||
-		(r >= '0' && r <= '9')
-}
-
-const invalidCharMsg = "invalid hostname part at index %d: invalid char %q at index %d"
-
-// validateHost validates the host in accordance to RFC-952 with RFC-1123's
-// inclusion of digits at the start of the host.  It also doesn't validate
-// against two or more hyphens to allow punycode and internationalized domains.
-func validateHost(host string) (err error) {
-	l := len(host)
-	if l == 0 || l > 63 {
-		return fmt.Errorf("invalid hostname length: %d", l)
-	}
-
-	parts := strings.Split(host, ".")
-	for i, p := range parts {
-		if len(p) == 0 {
-			return fmt.Errorf("empty hostname part at index %d", i)
-		}
-
-		if r := p[0]; !isValidHostFirstRune(rune(r)) {
-			return fmt.Errorf(invalidCharMsg, i, r, 0)
-		}
-
-		for j, r := range p[1:] {
-			if !isValidHostRune(r) {
-				return fmt.Errorf(invalidCharMsg, i, r, j+1)
-			}
-		}
-	}
-
-	return nil
-}
-
 // loadDNSRewritesShort loads the shorthand version of the $dnsrewrite modifier.
 func loadDNSRewriteShort(s string) (rewrite *DNSRewrite, err error) {
 	if s == "" {
@@ -163,7 +119,7 @@ func loadDNSRewriteShort(s string) (rewrite *DNSRewrite, err error) {
 		}, nil
 	}
 
-	err = validateHost(s)
+	err = netutil.ValidateHostname(s)
 	if err != nil {
 		return nil, fmt.Errorf("invalid shorthand hostname %q: %w", s, err)
 	}
@@ -208,7 +164,7 @@ type dnsRewriteRRHandler func(rcode RCode, rr RRType, valStr string) (dnsr *DNSR
 // cnameDNSRewriteRRHandler is a DNS rewrite handler that parses full-form CNAME
 // rewrites.
 func cnameDNSRewriteRRHandler(_ RCode, _ RRType, valStr string) (dnsr *DNSRewrite, err error) {
-	err = validateHost(valStr)
+	err = netutil.ValidateHostname(valStr)
 	if err != nil {
 		return nil, fmt.Errorf("invalid cname host: %w", err)
 	}
@@ -229,7 +185,7 @@ func ptrDNSRewriteRRHandler(rcode RCode, rr RRType, valStr string) (dnsr *DNSRew
 		fqdn = dns.Fqdn(valStr)
 	}
 
-	err = validateHost(valStr)
+	err = netutil.ValidateHostname(valStr)
 	if err != nil {
 		return nil, fmt.Errorf("invalid ptr host: %w", err)
 	}
@@ -284,7 +240,7 @@ func srvDNSRewriteRRHandler(rcode RCode, rr RRType, valStr string) (dnsr *DNSRew
 	//   at this domain.
 	//
 	if target != "." {
-		err = validateHost(target)
+		err = netutil.ValidateHostname(target)
 		if err != nil {
 			return nil, fmt.Errorf("invalid srv target: %w", err)
 		}
@@ -343,7 +299,7 @@ func svcbDNSRewriteRRHandler(rcode RCode, rr RRType, valStr string) (dnsr *DNSRe
 	//   a zero-length label), special rules apply.
 	//
 	if target != "." {
-		err = validateHost(target)
+		err = netutil.ValidateHostname(target)
 		if err != nil {
 			return nil, fmt.Errorf("invalid %s target: %w", name, err)
 		}
@@ -443,7 +399,7 @@ var dnsRewriteRRHandlers = map[RRType]dnsRewriteRRHandler{
 		}
 
 		exch := parts[1]
-		err = validateHost(exch)
+		err = netutil.ValidateHostname(exch)
 		if err != nil {
 			return nil, fmt.Errorf("invalid mx exchange: %w", err)
 		}

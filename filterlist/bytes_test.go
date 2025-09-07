@@ -14,13 +14,13 @@ func TestBytes_RuleListScanner(t *testing.T) {
 	t.Parallel()
 
 	conf := &filterlist.BytesConfig{
-		RulesText: []byte(testRuleTextAll),
-		ID:        filterListID,
+		RulesText: []byte(testRuleText),
+		ID:        testListID,
 	}
 
 	ruleList := filterlist.NewBytes(conf)
 	testutil.CleanupAndRequireSuccess(t, ruleList.Close)
-	assert.Equal(t, filterListID, ruleList.GetID())
+	assert.Equal(t, testListID, ruleList.GetID())
 
 	scanner := ruleList.NewScanner()
 	assert.True(t, scanner.Scan())
@@ -28,8 +28,8 @@ func TestBytes_RuleListScanner(t *testing.T) {
 	f, idx := scanner.Rule()
 	require.NotNil(t, f)
 
-	assert.Equal(t, testRule, f.Text())
-	assert.Equal(t, filterListID, f.GetFilterListID())
+	assert.Equal(t, testRuleDomain, f.Text())
+	assert.Equal(t, testListID, f.GetFilterListID())
 	assert.Equal(t, 0, idx)
 
 	assert.True(t, scanner.Scan())
@@ -38,7 +38,7 @@ func TestBytes_RuleListScanner(t *testing.T) {
 	require.NotNil(t, f)
 
 	assert.Equal(t, testRuleCosmetic, f.Text())
-	assert.Equal(t, filterListID, f.GetFilterListID())
+	assert.Equal(t, testListID, f.GetFilterListID())
 	assert.Equal(t, cosmeticRuleIndex, idx)
 
 	// Finish scanning.
@@ -48,21 +48,21 @@ func TestBytes_RuleListScanner(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, f)
 
-	assert.Equal(t, testRule, f.Text())
-	assert.Equal(t, filterListID, f.GetFilterListID())
+	assert.Equal(t, testRuleDomain, f.Text())
+	assert.Equal(t, testListID, f.GetFilterListID())
 
 	f, err = ruleList.RetrieveRule(cosmeticRuleIndex)
 	require.NoError(t, err)
 	require.NotNil(t, f)
 
 	assert.Equal(t, testRuleCosmetic, f.Text())
-	assert.Equal(t, filterListID, f.GetFilterListID())
+	assert.Equal(t, testListID, f.GetFilterListID())
 }
 
 func BenchmarkBytes_RetrieveRule(b *testing.B) {
 	conf := &filterlist.BytesConfig{
-		RulesText: []byte(testRuleTextAll),
-		ID:        filterListID,
+		RulesText: []byte(testRuleText),
+		ID:        testListID,
 	}
 
 	s := filterlist.NewBytes(conf)

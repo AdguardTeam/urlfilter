@@ -900,6 +900,28 @@ func TestNetworkRule_Match_dnsType(t *testing.T) {
 	})
 }
 
+func BenchmarkNetworkRule_Match(b *testing.B) {
+	r, err := rules.NewNetworkRule("||test.example^", testFilterListID)
+	require.NoError(b, err)
+
+	req := rules.NewRequestForURL(testURL)
+
+	var ok bool
+	b.ReportAllocs()
+	for b.Loop() {
+		ok = r.Match(req)
+	}
+
+	require.True(b, ok)
+
+	// Most recent results:
+	//	goos: linux
+	//	goarch: amd64
+	//	pkg: github.com/AdguardTeam/urlfilter/rules
+	//	cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
+	//	BenchmarkNetworkRule_Match-16    	 1859527	       646.3 ns/op	       0 B/op	       0 allocs/op
+}
+
 func FuzzNetworkRule_Match(f *testing.F) {
 	r, err := rules.NewNetworkRule("||test.example^", testFilterListID)
 	require.NoError(f, err)

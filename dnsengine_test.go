@@ -526,6 +526,10 @@ func assertMatchRuleText(t *testing.T, rulesText string, rules *DNSResult, ok bo
 //     compiling rule lists.
 //   - heap_after_matching_bytes: the size of allocated heap objects after
 //     matching a few requests with the engine.
+//
+// NOTE:  The precise values of the aforementioned metrics may vary from run to
+// run.  Benchmark with --benchtime no less than 10s and --count no less than 10
+// to get a better picture of the real changes in performance.
 func BenchmarkDNSEngine_heapAlloc(b *testing.B) {
 	ruleStorage := newRuleStorage(b)
 	testutil.CleanupAndRequireSuccess(b, ruleStorage.Close)
@@ -563,7 +567,7 @@ func BenchmarkDNSEngine_heapAlloc(b *testing.B) {
 	//	goarch: amd64
 	//	pkg: github.com/AdguardTeam/urlfilter
 	//	cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
-	//	BenchmarkDNSEngine_heapAlloc-16    	      48	 229129641 ns/op	  24802672 heap_after_loading_bytes	  25683512 heap_after_matching_bytes	  11263960 initial_heap_bytes	54175552 B/op	  874416 allocs/op
+	//	BenchmarkDNSEngine_heapAlloc-16    	      62	 188650046 ns/op	  23325288 heap_after_loading_bytes	  24206128 heap_after_matching_bytes	  11498392 initial_heap_bytes	54128187 B/op	  874266 allocs/op
 }
 
 // heapAlloc is a helper that returns the current heap-allocated bytes as
