@@ -9,18 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Common hostnames and URL strings for tests.
-const (
-	testHostname = "test.example"
-	testURLStr   = "http://" + testHostname
-
-	testSubHostname = "sub.test.example"
-	testSubURLStr   = "http://" + testSubHostname
-
-	testLongTLDHostname = "example.org.uk"
-	testLongTLDURLStr   = "http://" + testLongTLDHostname
-)
-
 func TestNewRequest(t *testing.T) {
 	t.Parallel()
 
@@ -57,8 +45,8 @@ func TestNewRequest(t *testing.T) {
 			URLLowerCase:      testURLStr,
 			Hostname:          testHostname,
 			Domain:            testHostname,
-			SourceURL:         testSubURLStr,
-			SourceHostname:    testSubHostname,
+			SourceURL:         testURLSubStr,
+			SourceHostname:    testHostnameSub,
 			SourceDomain:      testHostname,
 			SortedClientTags:  nil,
 			RequestType:       rules.TypeOther,
@@ -67,16 +55,16 @@ func TestNewRequest(t *testing.T) {
 			IsHostnameRequest: false,
 		},
 		name:      "source",
-		sourceURL: testSubURLStr,
+		sourceURL: testURLSubStr,
 		url:       testURLStr,
 	}, {
 		want: &rules.Request{
 			ClientIP:          netip.Addr{},
 			ClientName:        "",
-			URL:               testLongTLDURLStr,
-			URLLowerCase:      testLongTLDURLStr,
-			Hostname:          testLongTLDHostname,
-			Domain:            testLongTLDHostname,
+			URL:               testURLLongTLDStr,
+			URLLowerCase:      testURLLongTLDStr,
+			Hostname:          testHostnameLongTLD,
+			Domain:            testHostnameLongTLD,
 			SourceURL:         "",
 			SourceHostname:    "",
 			SourceDomain:      "",
@@ -88,7 +76,7 @@ func TestNewRequest(t *testing.T) {
 		},
 		name:      "long_tld",
 		sourceURL: "",
-		url:       testLongTLDURLStr,
+		url:       testURLLongTLDStr,
 	}, {
 		want: &rules.Request{
 			ClientIP:          netip.Addr{},
@@ -97,9 +85,9 @@ func TestNewRequest(t *testing.T) {
 			URLLowerCase:      testURLStr,
 			Hostname:          testHostname,
 			Domain:            testHostname,
-			SourceURL:         testLongTLDURLStr,
-			SourceHostname:    testLongTLDHostname,
-			SourceDomain:      testLongTLDHostname,
+			SourceURL:         testURLLongTLDStr,
+			SourceHostname:    testHostnameLongTLD,
+			SourceDomain:      testHostnameLongTLD,
 			SortedClientTags:  nil,
 			RequestType:       rules.TypeOther,
 			DNSType:           0,
@@ -107,7 +95,7 @@ func TestNewRequest(t *testing.T) {
 			IsHostnameRequest: false,
 		},
 		name:      "third_party",
-		sourceURL: testLongTLDURLStr,
+		sourceURL: testURLLongTLDStr,
 		url:       testURLStr,
 	}}
 

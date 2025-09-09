@@ -4,107 +4,129 @@ import (
 	"net/netip"
 	"testing"
 
+	"github.com/AdguardTeam/golibs/testutil"
 	"github.com/AdguardTeam/urlfilter/rules"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestNewHostRule(t *testing.T) {
-	r, err := rules.NewHostRule(
-		"127.0.1.1       thishost.mydomain.org  thishost",
-		testFilterListID,
-	)
-	require.NotNil(t, r)
-	require.NoError(t, err)
-	require.Len(t, r.Hostnames, 2)
+	t.Parallel()
 
-	assert.Equal(t, testFilterListID, r.FilterListID)
-	assert.Equal(t, netip.MustParseAddr("127.0.1.1"), r.IP)
-	assert.Equal(t, "thishost.mydomain.org", r.Hostnames[0])
-	assert.Equal(t, "thishost", r.Hostnames[1])
+	testCases := []struct {
+		input      string
+		name       string
+		wantErrMsg string
+		wantIP     netip.Addr
+		wantHosts  []string
+	}{{
+		input:      "127.0.1.1       thishost.mydomain.org  thishost",
+		name:       "hosts",
+		wantIP:     netip.MustParseAddr("127.0.1.1"),
+		wantErrMsg: "",
+		wantHosts:  []string{"thishost.mydomain.org", "thishost"},
+	}, {
+		input:      "209.237.226.90  www.opensource.org",
+		name:       "ip",
+		wantIP:     netip.MustParseAddr("209.237.226.90"),
+		wantErrMsg: "",
+		wantHosts:  []string{"www.opensource.org"},
+	}, {
+		input:      "::1             localhost ip6-localhost ip6-loopback",
+		name:       "localhost",
+		wantIP:     netip.MustParseAddr("::1"),
+		wantErrMsg: "",
+		wantHosts:  []string{"localhost", "ip6-localhost", "ip6-loopback"},
+	}, {
+		input:      "example.org",
+		name:       "ip_unspecified",
+		wantIP:     netip.IPv4Unspecified(),
+		wantErrMsg: "",
+		wantHosts:  []string{"example.org"},
+	}, {
+		input:      "#::1             test.example",
+		name:       "comment",
+		wantErrMsg: `syntax error: ParseAddr("#::1"): each colon-separated field must have at least one digit (at "#::1"), rule: test.example`,
+		wantIP:     netip.Addr{},
+		wantHosts:  nil,
+	}, {
+		input:      "||example.org",
+		name:       "network",
+		wantErrMsg: "syntax error: invalid syntax, rule: ",
+		wantIP:     netip.Addr{},
+		wantHosts:  nil,
+	}, {
+		input:      "",
+		name:       "empty",
+		wantErrMsg: "syntax error: invalid syntax, rule: ",
+		wantIP:     netip.Addr{},
+		wantHosts:  nil,
+	}, {
+		input:      "#",
+		name:       "comment_hash",
+		wantErrMsg: "syntax error: invalid syntax, rule: ",
+		wantIP:     netip.Addr{},
+		wantHosts:  nil,
+	}, {
+		input:      "0.0.0.0 www.ruclicks.com  #[clicksagent.com]",
+		name:       "comment_host",
+		wantErrMsg: "",
+		wantIP:     netip.IPv4Unspecified(),
+		wantHosts:  []string{"www.ruclicks.com"},
+	}, {
+		input:      "_prebid_",
+		name:       "cosmetic",
+		wantErrMsg: "syntax error: invalid syntax, rule: ",
+		wantIP:     netip.Addr{},
+		wantHosts:  nil,
+	}, {
+		input:      "_728x90.",
+		name:       "cosmetic_dot",
+		wantErrMsg: "syntax error: invalid syntax, rule: ",
+		wantIP:     netip.Addr{},
+		wantHosts:  nil,
+	}}
 
-	r, err = rules.NewHostRule("209.237.226.90  www.opensource.org", testFilterListID)
-	require.NotNil(t, r)
-	require.NoError(t, err)
-	require.Len(t, r.Hostnames, 1)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-	assert.Equal(t, testFilterListID, r.FilterListID)
-	assert.Equal(t, netip.MustParseAddr("209.237.226.90"), r.IP)
-	assert.Equal(t, "www.opensource.org", r.Hostnames[0])
+			r, err := rules.NewHostRule(tc.input, testListID)
+			testutil.AssertErrorMsg(t, tc.wantErrMsg, err)
 
-	r, err = rules.NewHostRule(
-		"::1             localhost ip6-localhost ip6-loopback",
-		testFilterListID,
-	)
-	require.NotNil(t, r)
-	require.NoError(t, err)
-	require.Len(t, r.Hostnames, 3)
+			if tc.wantErrMsg != "" {
+				assert.Nil(t, r)
 
-	assert.Equal(t, testFilterListID, r.FilterListID)
-	assert.Equal(t, netip.MustParseAddr("::1"), r.IP)
-	assert.Equal(t, "localhost", r.Hostnames[0])
-	assert.Equal(t, "ip6-localhost", r.Hostnames[1])
-	assert.Equal(t, "ip6-loopback", r.Hostnames[2])
+				return
+			}
 
-	r, err = rules.NewHostRule("example.org", testFilterListID)
-	require.NotNil(t, r)
-	require.NoError(t, err)
-	require.Len(t, r.Hostnames, 1)
+			require.NoError(t, err)
+			require.NotNil(t, r)
 
-	assert.Equal(t, testFilterListID, r.FilterListID)
-	assert.Equal(t, netip.IPv4Unspecified(), r.IP)
-	assert.Equal(t, "example.org", r.Hostnames[0])
-
-	r, err = rules.NewHostRule(
-		"#::1             localhost ip6-localhost ip6-loopback",
-		testFilterListID,
-	)
-	require.Nil(t, r)
-	require.Error(t, err)
-
-	r, err = rules.NewHostRule("||example.org", testFilterListID)
-	require.Nil(t, r)
-	require.Error(t, err)
-
-	r, err = rules.NewHostRule("", testFilterListID)
-	require.Nil(t, r)
-	require.Error(t, err)
-
-	r, err = rules.NewHostRule("#", testFilterListID)
-	require.Nil(t, r)
-	require.Error(t, err)
-
-	r, err = rules.NewHostRule("0.0.0.0 www.ruclicks.com  #[clicksagent.com]", testFilterListID)
-	require.NotNil(t, r)
-	require.NoError(t, err)
-	require.Len(t, r.Hostnames, 1)
-
-	assert.Equal(t, testFilterListID, r.FilterListID)
-	assert.Equal(t, netip.IPv4Unspecified(), r.IP)
-	assert.Equal(t, "www.ruclicks.com", r.Hostnames[0])
-
-	r, err = rules.NewHostRule("_prebid_", testFilterListID)
-	require.Nil(t, r)
-	require.Error(t, err)
-
-	r, err = rules.NewHostRule("_728x90.", testFilterListID)
-	require.Nil(t, r)
-	require.Error(t, err)
+			assert.Equal(t, testListID, r.FilterListID)
+			assert.Equal(t, tc.wantIP, r.IP)
+			assert.Equal(t, tc.wantHosts, r.Hostnames)
+		})
+	}
 }
 
 func TestHostRule_Match(t *testing.T) {
+	t.Parallel()
+
 	rule, err := rules.NewHostRule(
 		"127.0.1.1       thishost.mydomain.org  thishost",
-		testFilterListID,
+		testListID,
 	)
-	assert.Nil(t, err)
+	require.NoError(t, err)
+
 	assert.True(t, rule.Match("thishost.mydomain.org"))
 	assert.True(t, rule.Match("thishost"))
 	assert.False(t, rule.Match("mydomain.org"))
 	assert.False(t, rule.Match("example.org"))
 
-	rule, err = rules.NewHostRule("209.237.226.90  www.opensource.org", testFilterListID)
-	assert.Nil(t, err)
+	rule, err = rules.NewHostRule("209.237.226.90  www.opensource.org", testListID)
+	require.NoError(t, err)
+
 	assert.True(t, rule.Match("www.opensource.org"))
 	assert.False(t, rule.Match("opensource.org"))
 }
@@ -112,7 +134,7 @@ func TestHostRule_Match(t *testing.T) {
 func FuzzHostRule_Match(f *testing.F) {
 	r, err := rules.NewHostRule(
 		"127.0.1.1 example.test",
-		testFilterListID,
+		testListID,
 	)
 	require.NoError(f, err)
 
