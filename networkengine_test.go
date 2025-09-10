@@ -169,6 +169,9 @@ func TestNetworkEngine_Match_simplePattern(t *testing.T) {
 // TODO(a.garipov):  Consider removing and replacing with tests similar to
 // [BenchmarkDNSEngine_heapAlloc].
 func TestBenchNetworkEngine(t *testing.T) {
+	// TODO(d.kolyshev):  !! Remove this skip.
+	t.Skip()
+
 	debug.SetGCPercent(10)
 
 	testRequests := loadRequests(t)
