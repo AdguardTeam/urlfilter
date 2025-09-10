@@ -44,27 +44,28 @@ func TestNewHostRule(t *testing.T) {
 		wantErrMsg: "",
 		wantHosts:  []string{"example.org"},
 	}, {
-		input:      "#::1             test.example",
-		name:       "comment",
-		wantErrMsg: `syntax error: ParseAddr("#::1"): each colon-separated field must have at least one digit (at "#::1"), rule: test.example`,
-		wantIP:     netip.Addr{},
-		wantHosts:  nil,
+		input: "#::1             test.example",
+		name:  "comment",
+		wantErrMsg: `rule "test.example": ParseAddr("#::1"): ` +
+			`each colon-separated field must have at least one digit (at "#::1")`,
+		wantIP:    netip.Addr{},
+		wantHosts: nil,
 	}, {
 		input:      "||example.org",
 		name:       "network",
-		wantErrMsg: "syntax error: invalid syntax, rule: ",
+		wantErrMsg: `rule "": invalid syntax`,
 		wantIP:     netip.Addr{},
 		wantHosts:  nil,
 	}, {
 		input:      "",
 		name:       "empty",
-		wantErrMsg: "syntax error: invalid syntax, rule: ",
+		wantErrMsg: `rule "": invalid syntax`,
 		wantIP:     netip.Addr{},
 		wantHosts:  nil,
 	}, {
 		input:      "#",
 		name:       "comment_hash",
-		wantErrMsg: "syntax error: invalid syntax, rule: ",
+		wantErrMsg: `rule "": invalid syntax`,
 		wantIP:     netip.Addr{},
 		wantHosts:  nil,
 	}, {
@@ -76,13 +77,13 @@ func TestNewHostRule(t *testing.T) {
 	}, {
 		input:      "_prebid_",
 		name:       "cosmetic",
-		wantErrMsg: "syntax error: invalid syntax, rule: ",
+		wantErrMsg: `rule "": invalid syntax`,
 		wantIP:     netip.Addr{},
 		wantHosts:  nil,
 	}, {
 		input:      "_728x90.",
 		name:       "cosmetic_dot",
-		wantErrMsg: "syntax error: invalid syntax, rule: ",
+		wantErrMsg: `rule "": invalid syntax`,
 		wantIP:     netip.Addr{},
 		wantHosts:  nil,
 	}}

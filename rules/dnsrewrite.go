@@ -47,8 +47,8 @@ type DNSRewrite struct {
 	RRType RRType
 }
 
-// loadDNSRewrite loads the $dnsrewrite modifier.
-func loadDNSRewrite(s string) (rewrite *DNSRewrite, err error) {
+// parseDNSRewrite parses the $dnsrewrite modifier.
+func parseDNSRewrite(s string) (rewrite *DNSRewrite, err error) {
 	parts := strings.SplitN(s, ";", 3)
 	switch len(parts) {
 	case 1:

@@ -10,14 +10,20 @@ import (
 	"github.com/miekg/dns"
 )
 
-// RuleSyntaxError represents an error while parsing a filtering rule
+// RuleSyntaxError represents an error while parsing a filtering rule.
+//
+// TODO(a.garipov):  Consider making unwrappable.
 type RuleSyntaxError struct {
 	msg      string
 	ruleText string
 }
 
-func (e *RuleSyntaxError) Error() string {
-	return fmt.Sprintf("syntax error: %s, rule: %s", e.msg, e.ruleText)
+// type check
+var _ error = (*RuleSyntaxError)(nil)
+
+// Error implements the error interface for *RuleSyntaxError.
+func (e *RuleSyntaxError) Error() (s string) {
+	return fmt.Sprintf("rule %q: %s", e.ruleText, e.msg)
 }
 
 // ErrUnsupportedRule signals that this might be a valid rule type, but it is
@@ -80,10 +86,9 @@ func isComment(line string) bool {
 	return false
 }
 
-// loadDomains loads $domain modifier or cosmetic rules domains
-// domains is the list of domains
-// sep is the separator character. for network rules it is '|', for cosmetic it is ','.
-func loadDomains(domains, sep string) (permittedDomains, restrictedDomains []string, err error) {
+// parseDomains parses the $domain modifier or cosmetic rules domains.  sep is
+// the separator character.  For network rules it is '|'; for cosmetic, ','.
+func parseDomains(domains, sep string) (permittedDomains, restrictedDomains []string, err error) {
 	if domains == "" {
 		// TODO(a.garipov):  Here and in the whole package, use the standard
 		// error values.
@@ -131,8 +136,8 @@ func strToRRType(s string) (rr RRType, err error) {
 	return rr, nil
 }
 
-// loadDNSTypes loads the $dnstype modifier.  types is the list of types.
-func loadDNSTypes(types string) (permittedTypes, restrictedTypes []RRType, err error) {
+// parseDNSTypes parses the $dnstype modifier.  types is the list of types.
+func parseDNSTypes(types string) (permittedTypes, restrictedTypes []RRType, err error) {
 	if types == "" {
 		return nil, nil, errors.Error("no dns record types specified")
 	}
@@ -175,11 +180,10 @@ func isValidCTag(s string) bool {
 	return true
 }
 
-// loadCTags loads tags from the $ctag modifier
-// value: string value of the $ctag modifier
-// sep: separator character; for network rules it is '|'
-// returns sorted arrays with permitted and restricted $ctag
-func loadCTags(value, sep string) (permittedCTags, restrictedCTags []string, err error) {
+// parseCTags parses tags from the $ctag modifier.  sep is the separator
+// character; for network rules it is '|'.  permittedCTags and restrictedCTags
+// are sorted.
+func parseCTags(value, sep string) (permittedCTags, restrictedCTags []string, err error) {
 	if value == "" {
 		return nil, nil, errors.Error("value is empty")
 	}
@@ -194,7 +198,7 @@ func loadCTags(value, sep string) (permittedCTags, restrictedCTags []string, err
 		}
 
 		if !isValidCTag(d) {
-			return permittedCTags, restrictedCTags, fmt.Errorf("invalid ctag specified: %s", value)
+			return permittedCTags, restrictedCTags, fmt.Errorf("invalid ctag specified: %q", value)
 		}
 
 		if restricted {
@@ -240,8 +244,10 @@ func loadCTags(value, sep string) (permittedCTags, restrictedCTags []string, err
 // ~'Mary\'s\, John\'s\, and Boris\'s laptops'
 // ~Mom|~Dad|"Kids"
 //
-// Returns sorted arrays of permitted and restricted clients
-func loadClients(value string, sep byte) (permittedClients, restrictedClients *clients, err error) {
+// Returns sorted arrays of permitted and restricted clients.
+//
+// TODO(a.garipov):  Improve the documentation.
+func parseClients(value string, sep byte) (permitted, restricted *clients, err error) {
 	if value == "" {
 		return nil, nil, errors.Error("value is empty")
 	}
@@ -249,12 +255,12 @@ func loadClients(value string, sep byte) (permittedClients, restrictedClients *c
 	// First of all, split by the specified separator
 	list := splitWithEscapeCharacter(value, sep, '\\', false)
 	for _, s := range list {
-		restricted := false
+		isRestricted := false
 		client := s
 
 		// 1. Check if this is a restricted or permitted client
 		if strings.HasPrefix(client, "~") {
-			restricted = true
+			isRestricted = true
 			client = client[1:]
 		}
 
@@ -278,24 +284,24 @@ func loadClients(value string, sep byte) (permittedClients, restrictedClients *c
 		}
 
 		if client == "" {
-			return nil, nil, fmt.Errorf("invalid $client value %s", value)
+			return nil, nil, fmt.Errorf("invalid $client value %q", value)
 		}
 
-		if restricted {
-			if restrictedClients == nil {
-				restrictedClients = &clients{}
+		if isRestricted {
+			if restricted == nil {
+				restricted = &clients{}
 			}
-			restrictedClients.add(client)
+			restricted.add(client)
 		} else {
-			if permittedClients == nil {
-				permittedClients = &clients{}
+			if permitted == nil {
+				permitted = &clients{}
 			}
-			permittedClients.add(client)
+			permitted.add(client)
 		}
 	}
 
-	permittedClients.finalize()
-	restrictedClients.finalize()
+	permitted.finalize()
+	restricted.finalize()
 
-	return permittedClients, restrictedClients, nil
+	return permitted, restricted, nil
 }

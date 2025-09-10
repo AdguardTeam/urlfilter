@@ -115,16 +115,16 @@ func TestParseRuleText(t *testing.T) {
 func checkRequestType(t testing.TB, modifier string, requestType RequestType, permitted bool) {
 	t.Helper()
 
-	f, err := NewNetworkRule("||example.org^$"+modifier, 0)
+	r, err := NewNetworkRule("||example.org^$"+modifier, 0)
 	require.Nil(t, err)
-	require.NotNil(t, f)
+	require.NotNil(t, r)
 
 	if permitted {
-		assert.Equal(t, f.permittedRequestTypes, requestType)
-		assert.Equal(t, f.restrictedRequestTypes, RequestType(0))
+		assert.Equal(t, r.permittedRequestTypes, requestType)
+		assert.Equal(t, r.restrictedRequestTypes, RequestType(0))
 	} else {
-		assert.Equal(t, f.permittedRequestTypes, RequestType(0))
-		assert.Equal(t, f.restrictedRequestTypes, requestType)
+		assert.Equal(t, r.permittedRequestTypes, RequestType(0))
+		assert.Equal(t, r.restrictedRequestTypes, requestType)
 	}
 }
 
@@ -246,20 +246,20 @@ func TestFindRegexShortcut(t *testing.T) {
 	}
 }
 
-func TestLoadCTags(t *testing.T) {
+func TestParseCTags(t *testing.T) {
 	t.Parallel()
 
-	perm, rest, err := loadCTags("phone|pc|~printer", "|")
+	perm, rest, err := parseCTags("phone|pc|~printer", "|")
 	require.NoError(t, err)
 	assert.Equal(t, []string{"pc", "phone"}, perm)
 	assert.Equal(t, []string{"printer"}, rest)
 
-	perm, rest, err = loadCTags("device_pc0123", "|")
+	perm, rest, err = parseCTags("device_pc0123", "|")
 	require.NoError(t, err)
 	assert.Equal(t, []string{"device_pc0123"}, perm)
 	assert.Nil(t, rest)
 
-	perm, rest, err = loadCTags("pc|~phone|bad.", "|")
+	perm, rest, err = parseCTags("pc|~phone|bad.", "|")
 	require.Error(t, err)
 	assert.Equal(t, []string{"pc"}, perm)
 	assert.Equal(t, []string{"phone"}, rest)
@@ -320,7 +320,7 @@ func TestNetworkRule_cTagRules(t *testing.T) {
 	})
 }
 
-func TestLoadClients(t *testing.T) {
+func TestParseClients(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
@@ -365,7 +365,7 @@ func TestLoadClients(t *testing.T) {
 		t.Run(tc.input, func(t *testing.T) {
 			t.Parallel()
 
-			p, r, err := loadClients(tc.input, '|')
+			p, r, err := parseClients(tc.input, '|')
 			require.NoError(t, err)
 
 			assert.Equal(t, tc.wantClients, p)
@@ -374,19 +374,19 @@ func TestLoadClients(t *testing.T) {
 	}
 }
 
-func TestLoadClients_invalid(t *testing.T) {
+func TestParseClients_invalid(t *testing.T) {
 	t.Parallel()
 
-	_, _, err := loadClients("", '|')
+	_, _, err := parseClients("", '|')
 	assert.Error(t, err)
 
-	_, _, err = loadClients("''", '|')
+	_, _, err = parseClients("''", '|')
 	assert.Error(t, err)
 
-	_, _, err = loadClients("~''", '|')
+	_, _, err = parseClients("~''", '|')
 	assert.Error(t, err)
 
-	_, _, err = loadClients("~", '|')
+	_, _, err = parseClients("~", '|')
 	assert.Error(t, err)
 }
 
