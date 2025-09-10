@@ -11,7 +11,7 @@ import (
 func TestNewMatchingResult(t *testing.T) {
 	t.Parallel()
 
-	rs := testNewNetworkRules(t, []string{"||example.org^"})
+	rs := newTestNetworkRules(t, []string{"||example.org^"})
 	sourceRules := []*rules.NetworkRule{}
 
 	result := rules.NewMatchingResult(rs, sourceRules)
@@ -24,10 +24,10 @@ func TestNewMatchingResult(t *testing.T) {
 func TestNewMatchingResultWhitelist(t *testing.T) {
 	t.Parallel()
 
-	rs := testNewNetworkRules(t, []string{
+	rs := newTestNetworkRules(t, []string{
 		"||example.org^",
 	})
-	sourceRules := testNewNetworkRules(t, []string{
+	sourceRules := newTestNetworkRules(t, []string{
 		"@@||example.com^$document",
 	})
 
@@ -40,60 +40,65 @@ func TestNewMatchingResultWhitelist(t *testing.T) {
 	assert.Equal(t, "@@||example.com^$document", result.GetBasicResult().String())
 }
 
-// TODO(a.garipov):  Rewrite into a table-driven test.
-func TestGetCosmeticOption(t *testing.T) {
+func TestMatchingResult_GetCosmeticOption(t *testing.T) {
 	t.Parallel()
 
-	// Simple case - no limitations.
-	rs := testNewNetworkRules(t, []string{
-		"||example.org^",
-	})
 	sourceRules := []*rules.NetworkRule{}
 
-	res := rules.NewMatchingResult(rs, sourceRules)
-	assert.Equal(t, rules.CosmeticOptionAll, res.GetCosmeticOption())
+	testCases := []struct {
+		matchingResult *rules.MatchingResult
+		name           string
+		want           rules.CosmeticOption
+	}{{
+		matchingResult: rules.NewMatchingResult(
+			newTestNetworkRules(t, []string{"||test.example^"}),
+			sourceRules,
+		),
+		name: "no_limitations",
+		want: rules.CosmeticOptionAll,
+	}, {
+		matchingResult: rules.NewMatchingResult(
+			newTestNetworkRules(t, []string{"@@||test.example^$generichide"}),
+			sourceRules,
+		),
+		name: "generichide",
+		want: rules.CosmeticOptionCSS | rules.CosmeticOptionJS,
+	}, {
+		matchingResult: rules.NewMatchingResult(
+			newTestNetworkRules(t, []string{"@@||test.example^$jsinject"}),
+			sourceRules,
+		),
+		name: "jsinject",
+		want: rules.CosmeticOptionCSS | rules.CosmeticOptionGenericCSS,
+	}, {
+		matchingResult: rules.NewMatchingResult(
+			newTestNetworkRules(t, []string{"@@||test.example^$elemhide"}),
+			sourceRules,
+		),
+		name: "elemhide",
+		want: rules.CosmeticOptionJS,
+	}, {
+		matchingResult: rules.NewMatchingResult(
+			newTestNetworkRules(t, []string{"@@||test.example^$document"}),
+			sourceRules,
+		),
+		name: "document",
+		want: rules.CosmeticOptionNone,
+	}}
 
-	// $generichide modifier.
-	rs = testNewNetworkRules(t, []string{
-		"@@||example.org^$generichide",
-	})
-	sourceRules = []*rules.NetworkRule{}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-	res = rules.NewMatchingResult(rs, sourceRules)
-	assert.Equal(t, rules.CosmeticOptionCSS|rules.CosmeticOptionJS, res.GetCosmeticOption())
-
-	// $jsinject modifier.
-	rs = testNewNetworkRules(t, []string{
-		"@@||example.org^$jsinject",
-	})
-	sourceRules = []*rules.NetworkRule{}
-
-	res = rules.NewMatchingResult(rs, sourceRules)
-	assert.Equal(t, rules.CosmeticOptionCSS|rules.CosmeticOptionGenericCSS, res.GetCosmeticOption())
-
-	// $elemhide modifier.
-	rs = testNewNetworkRules(t, []string{
-		"@@||example.org^$elemhide",
-	})
-	sourceRules = []*rules.NetworkRule{}
-
-	res = rules.NewMatchingResult(rs, sourceRules)
-	assert.Equal(t, rules.CosmeticOptionJS, res.GetCosmeticOption())
-
-	// $document modifier.
-	rs = testNewNetworkRules(t, []string{
-		"@@||example.org^$document",
-	})
-	sourceRules = []*rules.NetworkRule{}
-
-	res = rules.NewMatchingResult(rs, sourceRules)
-	assert.Equal(t, rules.CosmeticOptionNone, res.GetCosmeticOption())
+			assert.Equal(t, tc.want, tc.matchingResult.GetCosmeticOption())
+		})
+	}
 }
 
-func TestNewMatchingResultBadfilter(t *testing.T) {
+func TestNewMatchingResult_badFilter(t *testing.T) {
 	t.Parallel()
 
-	rs := testNewNetworkRules(t, []string{
+	rs := newTestNetworkRules(t, []string{
 		"||example.org^",
 		"||example.org^$badfilter",
 	})
@@ -104,10 +109,10 @@ func TestNewMatchingResultBadfilter(t *testing.T) {
 	assert.Nil(t, result.DocumentRule)
 }
 
-func TestNewMatchingResultBadfilterWhitelist(t *testing.T) {
+func TestNewMatchingResult_badFilterWhitelist(t *testing.T) {
 	t.Parallel()
 
-	rs := testNewNetworkRules(t, []string{
+	rs := newTestNetworkRules(t, []string{
 		"||example.org^",
 		"@@||example.org^",
 		"@@||example.org^$badfilter",
@@ -123,18 +128,17 @@ func TestNewMatchingResultBadfilterWhitelist(t *testing.T) {
 	assert.Equal(t, "||example.org^", result.GetBasicResult().String())
 }
 
-func TestNewMatchingResultBadfilterSourceRules(t *testing.T) {
+func TestNewMatchingResult_badFilterSourceRules(t *testing.T) {
 	t.Parallel()
 
-	rs := testNewNetworkRules(t, []string{
+	rs := newTestNetworkRules(t, []string{
 		"||example.org^",
 	})
-	sourceRules := testNewNetworkRules(t, []string{
+	sourceRules := newTestNetworkRules(t, []string{
 		"@@||example.org^$document",
 		"@@||example.org^$document,badfilter",
 	})
 	result := rules.NewMatchingResult(rs, sourceRules)
-
 	assert.NotNil(t, result.BasicRule)
 	assert.Nil(t, result.DocumentRule)
 
@@ -145,24 +149,10 @@ func TestNewMatchingResultBadfilterSourceRules(t *testing.T) {
 
 // TODO(ameshkov):  Add more tests!
 
-// testNewNetworkRules returns network rules created from lines.
-func testNewNetworkRules(tb testing.TB, lines []string) (rs []*rules.NetworkRule) {
-	tb.Helper()
-
-	for _, line := range lines {
-		f, err := rules.NewNetworkRule(line, testListID)
-		require.NoError(tb, err)
-
-		rs = append(rs, f)
-	}
-
-	return rs
-}
-
 func TestGetDNSBasicRule(t *testing.T) {
-	blockRule := newTestRule(t, "example.block")
-	allowlistRule := newTestRule(t, "@@||example.allow^")
-	importantBlockRule := newTestRule(t, "example.block$important")
+	blockRule := newTestNetworkRule(t, "example.block")
+	allowlistRule := newTestNetworkRule(t, "@@||example.allow^")
+	importantBlockRule := newTestNetworkRule(t, "example.block$important")
 
 	testCases := []struct {
 		want *rules.NetworkRule
@@ -197,7 +187,7 @@ func TestGetDNSBasicRule(t *testing.T) {
 		want: blockRule,
 		rs: []*rules.NetworkRule{
 			blockRule,
-			newTestRule(t, "@@||example.org^$stealth"),
+			newTestNetworkRule(t, "@@||example.org^$stealth"),
 		},
 		name: "stealth",
 	}}
@@ -210,8 +200,19 @@ func TestGetDNSBasicRule(t *testing.T) {
 	}
 }
 
-// newTestRule returns a network rule created from given source text.
-func newTestRule(tb testing.TB, srcText string) (r *rules.NetworkRule) {
+// newTestNetworkRules returns network rules created from the given lines.
+func newTestNetworkRules(tb testing.TB, lines []string) (rs []*rules.NetworkRule) {
+	tb.Helper()
+
+	for _, line := range lines {
+		rs = append(rs, newTestNetworkRule(tb, line))
+	}
+
+	return rs
+}
+
+// newTestNetworkRule returns a network rule created from given source text.
+func newTestNetworkRule(tb testing.TB, srcText string) (r *rules.NetworkRule) {
 	tb.Helper()
 
 	r, err := rules.NewNetworkRule(srcText, testListID)

@@ -15,11 +15,11 @@ const testListID int = 1
 const (
 	testHostname = "test.example"
 
-	testSubHostname = "sub.test.example"
+	testHostnameSub = "sub.test.example"
 
-	testLongTLDHostname = "example.org.uk"
+	testHostnameLongTLD = "example.org.uk"
 
-	testOtherHostname = "other.example"
+	testHostnameOther = "other.example"
 )
 
 // Common URLs for tests.
@@ -29,18 +29,18 @@ var (
 		Host:   testHostname,
 	}
 
-	testSubURL = &url.URL{
+	testURLLongTLD = &url.URL{
 		Scheme: urlutil.SchemeHTTP,
-		Host:   testSubHostname,
+		Host:   testHostnameLongTLD,
 	}
 
-	testLongTLDURL = &url.URL{
+	testURLSub = &url.URL{
 		Scheme: urlutil.SchemeHTTP,
-		Host:   testLongTLDHostname,
+		Host:   testHostnameSub,
 	}
 
-	testOtherURL = &url.URL{
+	testURLOther = &url.URL{
 		Scheme: urlutil.SchemeHTTPS,
-		Host:   testOtherHostname,
+		Host:   testHostnameOther,
 	}
 )

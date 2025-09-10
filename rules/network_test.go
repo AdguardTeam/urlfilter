@@ -282,12 +282,12 @@ func TestNetworkRule_Match_thirdParty(t *testing.T) {
 	assert.False(t, f.Match(r))
 
 	// First-party 2.
-	r = rules.NewRequest(testSubURL, testURL, rules.TypeOther)
+	r = rules.NewRequest(testURLSub, testURL, rules.TypeOther)
 	require.NoError(t, err)
 	assert.False(t, f.Match(r))
 
 	// Third-party.
-	r = rules.NewRequest(testURL, testOtherURL, rules.TypeOther)
+	r = rules.NewRequest(testURL, testURLOther, rules.TypeOther)
 	require.NoError(t, err)
 	assert.True(t, f.Match(r))
 
@@ -299,12 +299,12 @@ func TestNetworkRule_Match_thirdParty(t *testing.T) {
 	assert.True(t, f.Match(r))
 
 	// First-party.
-	r = rules.NewRequest(testSubURL, testURL, rules.TypeOther)
+	r = rules.NewRequest(testURLSub, testURL, rules.TypeOther)
 	require.NoError(t, err)
 	assert.True(t, f.Match(r))
 
 	// Third-party.
-	r = rules.NewRequest(testURL, testOtherURL, rules.TypeOther)
+	r = rules.NewRequest(testURL, testURLOther, rules.TypeOther)
 	require.NoError(t, err)
 	assert.False(t, f.Match(r))
 }
@@ -364,7 +364,7 @@ func TestNetworkRule_Match_domainRestrictions(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, f.Match(r))
 
-	r = rules.NewRequest(testURL, testSubURL, rules.TypeScript)
+	r = rules.NewRequest(testURL, testURLSub, rules.TypeScript)
 	require.NoError(t, err)
 	assert.True(t, f.Match(r))
 
@@ -378,7 +378,7 @@ func TestNetworkRule_Match_domainRestrictions(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, f.Match(r))
 
-	r = rules.NewRequest(testURL, testSubURL, rules.TypeScript)
+	r = rules.NewRequest(testURL, testURLSub, rules.TypeScript)
 	require.NoError(t, err)
 	assert.False(t, f.Match(r))
 
@@ -392,13 +392,13 @@ func TestNetworkRule_Match_domainRestrictions(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, f.Match(r))
 
-	r = rules.NewRequest(testURL, testSubURL, rules.TypeScript)
+	r = rules.NewRequest(testURL, testURLSub, rules.TypeScript)
 	require.NoError(t, err)
 	assert.False(t, f.Match(r))
 
 	// Wide restricted.
 	f, err = rules.NewNetworkRule("$domain=test.example", 0)
-	r = rules.NewRequest(testOtherURL, testURL, rules.TypeScript)
+	r = rules.NewRequest(testURLOther, testURL, rules.TypeScript)
 	require.NoError(t, err)
 	assert.True(t, f.Match(r))
 }
@@ -448,7 +448,7 @@ func TestNetworkRule_Match_denyallow(t *testing.T) {
 		requestForHostname: false,
 	}, {
 		want:               assert.False,
-		requestURL:         testSubURL,
+		requestURL:         testURLSub,
 		sourceURL:          nil,
 		testName:           "denyallow_found_subdomain",
 		ruleText:           "*^$denyallow=test.example",
@@ -456,7 +456,7 @@ func TestNetworkRule_Match_denyallow(t *testing.T) {
 		requestForHostname: false,
 	}, {
 		want:               assert.True,
-		requestURL:         testOtherURL,
+		requestURL:         testURLOther,
 		sourceURL:          nil,
 		testName:           "denyallow_not_found",
 		ruleText:           "*^$denyallow=test.example",
@@ -472,7 +472,7 @@ func TestNetworkRule_Match_denyallow(t *testing.T) {
 		requestForHostname: false,
 	}, {
 		want:               assert.True,
-		requestURL:         testOtherURL,
+		requestURL:         testURLOther,
 		sourceURL:          testURL,
 		testName:           "denyallow_and_domain_blocking",
 		ruleText:           "*^$domain=test.example,denyallow=essentialdomain.net",
@@ -709,7 +709,9 @@ func TestNetworkRule_Match_source(t *testing.T) {
 	require.NoError(t, err)
 
 	r := rules.NewRequest(u, sourceURL, rules.TypeImage)
-	ruleText := "|https://$image,media,script,third-party,domain=~feedback.pornhub.com|pornhub.com|redtube.com|redtube.com.br|tube8.com|tube8.es|tube8.fr|youporn.com|youporngay.com"
+	ruleText := "|https://$image,media,script,third-party,domain=" +
+		"~feedback.pornhub.com|pornhub.com|redtube.com|redtube.com.br|tube8.com|" +
+		"tube8.es|tube8.fr|youporn.com|youporngay.com"
 
 	f, err := rules.NewNetworkRule(ruleText, 0)
 	require.NoError(t, err)
