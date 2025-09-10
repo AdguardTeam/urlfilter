@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// CosmeticRuleType is the enumeration of different cosmetic rules
+// CosmeticRuleType is the enumeration of different cosmetic rule types.
 type CosmeticRuleType uint8
 
 // Valid CosmeticRuleType values.

@@ -10,33 +10,19 @@ import (
 	"github.com/miekg/dns"
 )
 
-// RuleSyntaxError represents an error while parsing a filtering rule.
+// Rule is a base interface for all filtering rules.
 //
-// TODO(a.garipov):  Consider making unwrappable.
-type RuleSyntaxError struct {
-	msg      string
-	ruleText string
-}
-
-// type check
-var _ error = (*RuleSyntaxError)(nil)
-
-// Error implements the error interface for *RuleSyntaxError.
-func (e *RuleSyntaxError) Error() (s string) {
-	return fmt.Sprintf("rule %q: %s", e.ruleText, e.msg)
-}
-
-// ErrUnsupportedRule signals that this might be a valid rule type, but it is
-// not yet supported by this library
-var ErrUnsupportedRule errors.Error = "this type of rules is unsupported"
-
-// Rule is a base interface for all filtering rules
+// TODO(a.garipov):  Rename to Interface.
 type Rule interface {
-	// Text returns the original rule text
-	Text() string
+	// Text returns the original rule text.
+	//
+	// TODO(a.garipov):  Replace with String.
+	Text() (s string)
 
-	// GetFilterListID returns ID of the filter list this rule belongs to
-	GetFilterListID() int
+	// GetFilterListID returns ID of the filter list this rule belongs to.
+	//
+	// TODO(a.garipov):  Rename to ListID.
+	GetFilterListID() (id int)
 }
 
 // NewRule creates a new filtering rule from the specified line.  It returns nil
@@ -50,16 +36,17 @@ func NewRule(line string, filterListID int) (r Rule, err error) {
 		return NewCosmeticRule(line, filterListID)
 	}
 
-	var f *HostRule
-	if f, err = NewHostRule(line, filterListID); err == nil {
-		return f, nil
+	// TODO(a.garipov):  Optimize.
+	hr, err := NewHostRule(line, filterListID)
+	if err == nil {
+		return hr, nil
 	}
 
 	return NewNetworkRule(line, filterListID)
 }
 
-// isComment checks if the line is a comment
-func isComment(line string) bool {
+// isComment returns true if the line is a comment.
+func isComment(line string) (ok bool) {
 	if len(line) == 0 {
 		return false
 	}
@@ -73,7 +60,7 @@ func isComment(line string) bool {
 			return true
 		}
 
-		// Now we should check that this is not a cosmetic rule
+		// Now we should check that this is not a cosmetic rule.
 		for _, marker := range cosmeticRulesMarkers {
 			if startsAtIndexWith(line, 0, marker) {
 				return false
@@ -169,8 +156,8 @@ func parseDNSTypes(types string) (permittedTypes, restrictedTypes []RRType, err 
 	return permittedTypes, restrictedTypes, nil
 }
 
-// isValidCTag - returns TRUE if ctag value format is correct: a-z0-9_
-func isValidCTag(s string) bool {
+// isValidCTag returns true if ctag value format is correct.
+func isValidCTag(s string) (ok bool) {
 	for _, ch := range s {
 		if (ch < 'a' || ch > 'z') && (ch < '0' || ch > '9') && ch != '_' {
 			return false
@@ -215,38 +202,44 @@ func parseCTags(value, sep string) (permittedCTags, restrictedCTags []string, er
 	return permittedCTags, restrictedCTags, nil
 }
 
+// parseClients parses the client modifier string with the specified separator
+// byte.
+//
 // The $client modifier allows specifying clients this rule will be working for.
 // It accepts client names, IP addresses, or CIDR address ranges.
 //
 // The syntax is:
 //
-// $client=value1|value2|...
-// You can also specify "restricted" clients by adding a ~ character before the client IP or name.
-// In this case, the rule will not be applied to this client's requests.
+//	$client=value1|value2|...
 //
-// $client=~value1
+// It is also possible to restrict clients by adding a '~' before the client IP
+// or name.  In this case, the rule will not be applied to this client's
+// requests:
 //
-// ## Specifying client names
-// Client names usually contain spaces or other special characters, that's why you
-// should enclose the name in quotes (both double-quotes and single-quotes are supported).
-// If the client name contains quotes, use `\` to escape them.
-// Also, you need to escape commas (`,`) and pipes (`|`).
+//	$client=~value1
 //
-// Please note, that when specifying a "restricted" client, you must keep `~` out of the quotes.
+// # Specifying client names
 //
-// Examples of the input value:
-// 127.0.0.1
-// 192.168.3.0/24
-// ::
-// fe01::/64
-// 'Frank\'s laptop'
-// "Frank's phone"
-// ~'Mary\'s\, John\'s\, and Boris\'s laptops'
-// ~Mom|~Dad|"Kids"
+// Client names can contain spaces or other special characters.  These should be
+// enclosed in quotes; both double-quotes and single-quotes are supported.  If
+// the client name contains quotes, use '\' to escape them.  Commas ',' and
+// pipes '|' should also be escaped.
 //
-// Returns sorted arrays of permitted and restricted clients.
+// Please note, that when specifying a restricted client, you must keep `~` out
+// of the quotes.
 //
-// TODO(a.garipov):  Improve the documentation.
+// Examples of the input values:
+//
+//	127.0.0.1
+//	192.168.3.0/24
+//	::
+//	fe01::/64
+//	'Frank\'s laptop'
+//	"Frank's phone"
+//	~'Mary\'s\, John\'s\, and Boris\'s laptops'
+//	~Mom|~Dad|"Kids"
+//
+// TODO(a.garipov):  Refactor.
 func parseClients(value string, sep byte) (permitted, restricted *clients, err error) {
 	if value == "" {
 		return nil, nil, errors.Error("value is empty")

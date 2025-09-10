@@ -9,7 +9,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/AdguardTeam/golibs/errors"
 	"github.com/AdguardTeam/golibs/netutil"
 )
 
@@ -21,11 +20,6 @@ const (
 	optionsDelimiter = '$'
 	escapeCharacter  = '\\'
 )
-
-// ErrTooWideRule is returned if the rule matches all urls but has no domain,
-// denyallow, client or ctag restrictions.
-var ErrTooWideRule errors.Error = "the rule is too wide, add domain, denyallow, client, " +
-	"or ctag restrictions or make it more specific"
 
 // Common regular expressions.
 var (

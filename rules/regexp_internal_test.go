@@ -6,7 +6,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestPatternToRegex(t *testing.T) {
+func TestPatternToRegexp(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		name    string
 		pattern string
@@ -36,6 +38,8 @@ func TestPatternToRegex(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
 			assert.Equal(t, tc.want, patternToRegexp(tc.pattern))
 		})
 	}
