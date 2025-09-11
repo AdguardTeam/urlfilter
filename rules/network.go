@@ -10,10 +10,10 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/AdguardTeam/golibs/errors"
 	"github.com/AdguardTeam/golibs/netutil"
 )
 
+// Parts of rules.
 const (
 	maskWhiteList    = "@@"
 	maskRegexRule    = "/"
@@ -22,82 +22,128 @@ const (
 	escapeCharacter  = '\\'
 )
 
-// ErrTooWideRule is returned if the rule matches all urls but has no domain,
-// denyallow, client or ctag restrictions.
-var ErrTooWideRule errors.Error = "the rule is too wide, add domain, denyallow, client, " +
-	"or ctag restrictions or make it more specific"
-
+// Common regular expressions.
 var (
-	reEscapedOptionsDelimiter = regexp.MustCompile(regexp.QuoteMeta("\\$"))
-	reRegexpBrackets1         = regexp.MustCompile(`([^\\])\(.*[^\\]\)`)
-	reRegexpBrackets2         = regexp.MustCompile(`([^\\])\{.*[^\\]\}`)
-	reRegexpBrackets3         = regexp.MustCompile(`([^\\])\[.*[^\\]\]`)
-	reRegexpEscapedCharacters = regexp.MustCompile(`([^\\])\[a-zA-Z]`)
-	reRegexpSpecialCharacters = regexp.MustCompile(`[\\^$*+?.()|[\]{}]`)
+	regexpBracketsCurly           = regexp.MustCompile(`([^\\])\{.*[^\\]\}`)
+	regexpBracketsRound           = regexp.MustCompile(`([^\\])\(.*[^\\]\)`)
+	regexpBracketsSquare          = regexp.MustCompile(`([^\\])\[.*[^\\]\]`)
+	regexpEscapedCharacters       = regexp.MustCompile(`([^\\])\[a-zA-Z]`)
+	regexpEscapedOptionsDelimiter = regexp.MustCompile(regexp.QuoteMeta("\\$"))
+	regexpSpecialCharacters       = regexp.MustCompile(`[\\^$*+?.()|[\]{}]`)
 )
 
-// NetworkRuleOption is the enumeration of various rule options
-// In order to save memory, we store some options as a flag
+// NetworkRuleOption is the bitset of various rule options.
 type NetworkRuleOption uint64
 
-// NetworkRuleOption enumeration
+// NetworkRuleOption masks.
+//
+// TODO(a.garipov):  Rename to NetworkOptionFoo etc.
 const (
-	OptionThirdParty NetworkRuleOption = 1 << iota // $third-party modifier
-	OptionMatchCase                                // $match-case modifier
-	OptionImportant                                // $important modifier
-	OptionBadfilter                                // $badfilter modifier
+	// OptionThirdParty means that the $third-party modifier is set.
+	OptionThirdParty NetworkRuleOption = 1 << iota
 
-	// Whitelist rules modifiers
-	// Each of them can disable part of the functionality
+	// OptionMatchCase means that the $match-case modifier is set.
+	OptionMatchCase
 
-	OptionElemhide     // $elemhide modifier
-	OptionGenerichide  // $generichide modifier
-	OptionGenericblock // $genericblock modifier
-	OptionJsinject     // $jsinject modifier
-	OptionUrlblock     // $urlblock modifier
-	OptionContent      // $content modifier
-	OptionExtension    // $extension modifier
+	// OptionImportant means that the $important modifier is set.
+	OptionImportant
 
-	// Whitelist -- specific to Stealth mode
-	OptionStealth // $stealth
+	// OptionBadfilter means that the $badfilter modifier is set.
+	OptionBadfilter
 
-	// Content-modifying (TODO: get rid of, deprecated in favor of $redirect)
-	OptionEmpty // $empty
-	OptionMp4   // $mp4
+	// OptionElemhide means that the $elemhide modifier is set.
+	OptionElemhide
 
-	// Blocking
-	OptionPopup // $popup
+	// OptionGenerichide means that the $generichide modifier is set.
+	OptionGenerichide
 
-	// Advanced (TODO: Implement)
-	OptionCsp      // $csp
-	OptionReplace  // $replace
-	OptionCookie   // $cookie
-	OptionRedirect // $redirect
+	// OptionGenericblock means that the $genericblock modifier is set.
+	OptionGenericblock
 
-	// Blacklist-only options
-	OptionBlacklistOnly = OptionPopup | OptionEmpty | OptionMp4
+	// OptionJsinject means that the $jsinject modifier is set.
+	OptionJsinject
 
-	// Whitelist-only options
-	OptionWhitelistOnly = OptionElemhide | OptionGenericblock | OptionGenerichide |
-		OptionJsinject | OptionUrlblock | OptionContent | OptionExtension |
-		OptionStealth
+	// OptionUrlblock means that the $urlblock modifier is set.
+	OptionUrlblock
 
-	// Options supported by host-level network rules
+	// OptionContent means that the $content modifier is set.
+	OptionContent
+
+	// OptionExtension means that the $extension modifier is set.
+	OptionExtension
+
+	// OptionStealth means that the $stealth modifier is set.
+	OptionStealth
+
+	// OptionEmpty means that the $empty modifier is set.
+	//
+	// TODO(ameshkov):  Get rid of it, as it is deprecated in favor of
+	// $redirect.
+	OptionEmpty
+
+	// OptionMp4 means that the $mp4 modifier is set.
+	//
+	// TODO(ameshkov):  Get rid of it, as it is deprecated in favor of
+	// $redirect.
+	OptionMp4
+
+	// OptionPopup means that the $popup modifier is set.
+	OptionPopup
+
+	// OptionCsp means that the $csp modifier is set.
+	//
+	// TODO(ameshkov):  Implement.
+	OptionCsp
+
+	// OptionReplace means that the $replace modifier is set.
+	//
+	// TODO(ameshkov):  Implement.
+	OptionReplace
+
+	// OptionCookie means that the $cookie modifier is set.
+	//
+	// TODO(ameshkov):  Implement.
+	OptionCookie
+
+	// OptionRedirect means that the $redirect modifier is set.
+	//
+	// TODO(ameshkov):  Implement.
+	OptionRedirect
+
+	// OptionBlacklistOnly are the blacklist-only options.
+	OptionBlacklistOnly = OptionEmpty |
+		OptionMp4 |
+		OptionPopup
+
+	// OptionWhitelistOnly are the whitelist-only options.
+	OptionWhitelistOnly = OptionContent |
+		OptionElemhide |
+		OptionExtension |
+		OptionGenericblock |
+		OptionGenerichide |
+		OptionJsinject |
+		OptionStealth |
+		OptionUrlblock
+
+	// OptionHostLevelRulesOnly are the options supported by host-level network
+	// rules.
 	OptionHostLevelRulesOnly = OptionImportant | OptionBadfilter
 )
 
-// Count returns the count of enabled options.
-func (o NetworkRuleOption) Count() int {
+// Count returns the number of enabled options.
+func (o NetworkRuleOption) Count() (n int) {
 	return bits.OnesCount64(uint64(o))
 }
 
-// NetworkRule is a basic filtering rule
-// https://kb.adguard.com/en/general/how-to-create-your-own-ad-filters#basic-rules
+// NetworkRule is a basic filtering rule.
+//
+// See https://adguard.com/kb/general/ad-filtering/create-own-filters/#basic-rules.
 type NetworkRule struct {
 	// permittedClients are permitted clients from the $client modifier.
 	//
 	// See https://github.com/AdguardTeam/AdGuardHome/issues/1761.
 	permittedClients *clients
+
 	// restrictedClients are restricted clients from the $client modifier.
 	//
 	// See https://github.com/AdguardTeam/AdGuardHome/issues/1761.
@@ -106,23 +152,29 @@ type NetworkRule struct {
 	// DNSRewrite is the DNS rewrite rule, if any.
 	DNSRewrite *DNSRewrite
 
-	// regex is the regular expression compiled from the pattern.
-	regex *regexp.Regexp
+	// regexp is the regular expression compiled from the pattern.
+	regexp *regexp.Regexp
 
 	// RuleText is the original rule text.
+	//
+	// TODO(a.garipov):  Unexport.
 	RuleText string
+
 	// Shortcut is the longest substring of the rule pattern with no special
 	// characters.
 	Shortcut string
+
 	// pattern is the basic rule pattern ready to be compiled to regex.
 	pattern string
 
 	// permittedDomains is a list of permitted domains from the $domain
 	// modifier.
 	permittedDomains []string
+
 	// restrictedDomains is a list of restricted domains from the $domain
 	// modifier.
 	restrictedDomains []string
+
 	// denyAllowDomains is a list of excluded domains from the $denyallow
 	// modifier.
 	denyAllowDomains []string
@@ -130,8 +182,9 @@ type NetworkRule struct {
 	// permittedDNSTypes is the list of permitted DNS record type names from
 	// the $dnstype modifier.
 	permittedDNSTypes []RRType
-	// restrictedDNSTypes is the list of restricted DNS record type names
-	// from the $dnstype modifier.
+
+	// restrictedDNSTypes is the list of restricted DNS record type names from
+	// the $dnstype modifier.
 	restrictedDNSTypes []RRType
 
 	// permittedClientTags is a sorted list of permitted client tags from the
@@ -139,6 +192,7 @@ type NetworkRule struct {
 	//
 	// See https://github.com/AdguardTeam/AdGuardHome/issues/1081#issuecomment-575142737.
 	permittedClientTags []string
+
 	// restrictedClientTags is a sorted list of restricted client tags from the
 	// $ctag modifier.
 	//
@@ -147,6 +201,7 @@ type NetworkRule struct {
 
 	// enabledOptions are the flags with all enabled rule options.
 	enabledOptions NetworkRuleOption
+
 	// disabledOptions are the flags with all disabled rule options.
 	disabledOptions NetworkRuleOption
 
@@ -165,6 +220,7 @@ type NetworkRule struct {
 	// permittedRequestTypes are the flags with all permitted request types. 0
 	// means ALL.
 	permittedRequestTypes RequestType
+
 	// restrictedRequestTypes are the flags with all restricted request types. 0
 	// means NONE.
 	restrictedRequestTypes RequestType
@@ -182,13 +238,9 @@ type NetworkRule struct {
 	matchesAll bool
 }
 
-// NewNetworkRule parses the rule text and returns a filter rule
+// NewNetworkRule parses the rule text and returns a filter rule.
 func NewNetworkRule(ruleText string, filterListID int) (r *NetworkRule, err error) {
-	// split rule into pattern and options
-
-	var pattern, options string
-	var whitelist bool
-	pattern, options, whitelist, err = parseRuleText(ruleText)
+	pattern, options, whitelist, err := parseRuleText(ruleText)
 	if err != nil {
 		return nil, err
 	}
@@ -200,19 +252,20 @@ func NewNetworkRule(ruleText string, filterListID int) (r *NetworkRule, err erro
 		pattern:      pattern,
 	}
 
-	// Parse options.
 	if err = r.loadOptions(options); err != nil {
 		return nil, err
 	}
 
-	// example.org/* -> example.org^
+	// Normalize rules like "example.org/*" into "example.org^".
 	if strings.HasSuffix(r.pattern, "/*") {
 		r.pattern = r.pattern[:len(r.pattern)-len("/*")] + "^"
 	}
 
-	// validate rule
-	if pattern == MaskStartURL || pattern == MaskPipe ||
-		pattern == MaskAnyCharacter || pattern == "" ||
+	// Validate rule for wideness.
+	if pattern == MaskStartURL ||
+		pattern == MaskPipe ||
+		pattern == MaskAnyCharacter ||
+		pattern == "" ||
 		len(pattern) < 3 {
 		if len(r.permittedDomains) == 0 &&
 			len(r.restrictedDomains) == 0 &&
@@ -229,78 +282,83 @@ func NewNetworkRule(ruleText string, filterListID int) (r *NetworkRule, err erro
 		}
 	}
 
-	r.loadShortcut()
+	r.setShortcut()
+
 	return r, nil
 }
 
-// Text returns the original rule text
-// Implements the `Rule` interface
-func (f *NetworkRule) Text() string {
-	return f.RuleText
+// type check
+var _ Rule = (*NetworkRule)(nil)
+
+// Text implements the [Rule] interface for *NetworkRule.
+func (r *NetworkRule) Text() (s string) {
+	return r.RuleText
 }
 
-// GetFilterListID returns ID of the filter list this rule belongs to
-func (f *NetworkRule) GetFilterListID() int {
-	return f.FilterListID
+// GetFilterListID implements the [Rule] interface for *NetworkRule.
+func (r *NetworkRule) GetFilterListID() (id int) {
+	return r.FilterListID
 }
 
-// String returns original rule text
-func (f *NetworkRule) String() string {
-	return f.RuleText
+// String returns original rule text.
+func (r *NetworkRule) String() (s string) {
+	return r.RuleText
 }
 
-// Match checks if this filtering rule matches the specified request.
-func (f *NetworkRule) Match(r *Request) (ok bool) {
+// Match checks if this filtering rule matches the specified request.  req must
+// not be nil.
+func (r *NetworkRule) Match(req *Request) (ok bool) {
 	switch {
 	case
-		!f.matchShortcut(r),
-		f.IsOptionEnabled(OptionThirdParty) && !r.ThirdParty,
-		f.IsOptionDisabled(OptionThirdParty) && r.ThirdParty,
-		!f.matchRequestType(r.RequestType),
-		!f.matchRequestDomain(r.Hostname, r.IsHostnameRequest),
-		!f.matchSourceDomain(r.SourceHostname),
-		!f.matchDNSType(r.DNSType),
-		!f.matchClientTags(r.SortedClientTags),
-		!f.matchClient(r.ClientName, r.ClientIP),
-		!f.matchPattern(r):
+		!r.matchShortcut(req),
+		r.IsOptionEnabled(OptionThirdParty) && !req.ThirdParty,
+		r.IsOptionDisabled(OptionThirdParty) && req.ThirdParty,
+		!r.matchRequestType(req.RequestType),
+		!r.matchRequestDomain(req.Hostname, req.IsHostnameRequest),
+		!r.matchSourceDomain(req.SourceHostname),
+		!r.matchDNSType(req.DNSType),
+		!r.matchClientTags(req.SortedClientTags),
+		!r.matchClient(req.ClientName, req.ClientIP),
+		!r.matchPattern(req):
 		return false
 	}
 
 	return true
 }
 
-// IsOptionEnabled returns true if the specified option is enabled
-func (f *NetworkRule) IsOptionEnabled(option NetworkRuleOption) bool {
-	return (f.enabledOptions & option) == option
+// IsOptionEnabled returns true if the specified option is enabled.
+func (r *NetworkRule) IsOptionEnabled(option NetworkRuleOption) (ok bool) {
+	return (r.enabledOptions & option) == option
 }
 
-// IsOptionDisabled returns true if the specified option is disabled
-func (f *NetworkRule) IsOptionDisabled(option NetworkRuleOption) bool {
-	return (f.disabledOptions & option) == option
+// IsOptionDisabled returns true if the specified option is disabled.
+func (r *NetworkRule) IsOptionDisabled(option NetworkRuleOption) (ok bool) {
+	return (r.disabledOptions & option) == option
 }
 
-// GetPermittedDomains - returns an array of domains this rule is allowed on
-func (f *NetworkRule) GetPermittedDomains() []string {
-	return f.permittedDomains
+// GetPermittedDomains returns the domains this rule is allowed on.
+func (r *NetworkRule) GetPermittedDomains() (domains []string) {
+	return r.permittedDomains
 }
 
-// IsHostLevelNetworkRule checks if this rule can be used for hosts-level blocking
-func (f *NetworkRule) IsHostLevelNetworkRule() bool {
-	if len(f.permittedDomains) > 0 || len(f.restrictedDomains) > 0 {
+// IsHostLevelNetworkRule checks if this rule can be used for hosts-level
+// blocking.
+func (r *NetworkRule) IsHostLevelNetworkRule() (ok bool) {
+	if len(r.permittedDomains) > 0 || len(r.restrictedDomains) > 0 {
 		return false
 	}
 
-	if f.permittedRequestTypes != 0 && f.restrictedRequestTypes != 0 {
+	if r.permittedRequestTypes != 0 && r.restrictedRequestTypes != 0 {
 		return false
 	}
 
-	if f.disabledOptions != 0 {
+	if r.disabledOptions != 0 {
 		return false
 	}
 
-	if f.enabledOptions != 0 {
-		return ((f.enabledOptions & OptionHostLevelRulesOnly) |
-			(f.enabledOptions ^ OptionHostLevelRulesOnly)) == OptionHostLevelRulesOnly
+	if r.enabledOptions != 0 {
+		return ((r.enabledOptions & OptionHostLevelRulesOnly) |
+			(r.enabledOptions ^ OptionHostLevelRulesOnly)) == OptionHostLevelRulesOnly
 	}
 
 	return true
@@ -308,34 +366,39 @@ func (f *NetworkRule) IsHostLevelNetworkRule() bool {
 
 // isRegexPattern returns true if pattern may be treated as a regular expression
 // rule.
-func isRegexPattern(pattern string) bool {
+func isRegexPattern(pattern string) (ok bool) {
 	return len(pattern) > 1 && pattern[0] == '/' && pattern[len(pattern)-1] == '/'
 }
 
-// IsRegexRule returns true if the rule is a regular expression rule
-func (f *NetworkRule) IsRegexRule() (ok bool) {
-	return isRegexPattern(f.pattern)
+// IsRegexRule returns true if the rule is a regular expression rule.
+func (r *NetworkRule) IsRegexRule() (ok bool) {
+	return isRegexPattern(r.pattern)
 }
 
-// IsGeneric returns true if the rule is considered "generic"
-// "generic" means that the rule is not restricted to a limited set of domains
-// Please note that it might be forbidden on some domains, though.
-func (f *NetworkRule) IsGeneric() bool {
-	return len(f.permittedDomains) == 0
+// IsGeneric returns true if the rule is considered generic.  A generic rule is
+// not restricted to a set of domains.  Note that it might be forbidden on some
+// domains, though.
+func (r *NetworkRule) IsGeneric() (ok bool) {
+	return len(r.permittedDomains) == 0
 }
 
-// IsHigherPriority checks if the rule has higher priority that the specified rule
-// whitelist + $important > $important > whitelist > basic rules
-// nolint: gocyclo
-func (f *NetworkRule) IsHigherPriority(r *NetworkRule) bool {
-	important := f.IsOptionEnabled(OptionImportant)
-	rImportant := r.IsOptionEnabled(OptionImportant)
+// IsHigherPriority checks if the rule has higher priority that the specified
+// rule.  The priority rules are:
+//  1. whitelist + $important;
+//  2. $important;
+//  3. whitelist;
+//  4. basic rules.
+//
+// TODO(a.garipov):  Refactor.
+func (r *NetworkRule) IsHigherPriority(other *NetworkRule) (ok bool) {
+	important := r.IsOptionEnabled(OptionImportant)
+	rImportant := other.IsOptionEnabled(OptionImportant)
 
-	if (f.Whitelist && important) && (!r.Whitelist || !rImportant) {
+	if (r.Whitelist && important) && (!other.Whitelist || !rImportant) {
 		return true
 	}
 
-	if (r.Whitelist && rImportant) && (!f.Whitelist || !important) {
+	if (other.Whitelist && rImportant) && (!r.Whitelist || !important) {
 		return false
 	}
 
@@ -347,154 +410,161 @@ func (f *NetworkRule) IsHigherPriority(r *NetworkRule) bool {
 		return false
 	}
 
-	if f.Whitelist && !r.Whitelist {
+	if r.Whitelist && !other.Whitelist {
 		return true
 	}
 
-	if r.Whitelist && !f.Whitelist {
+	if other.Whitelist && !r.Whitelist {
 		return false
 	}
 
-	redirect := f.IsOptionEnabled(OptionRedirect)
-	rRedirect := r.IsOptionEnabled(OptionRedirect)
-	if redirect && !rRedirect {
-		// $redirect rules have "slightly" higher priority than regular basic rules
+	redirect := r.IsOptionEnabled(OptionRedirect)
+	otherRedirect := other.IsOptionEnabled(OptionRedirect)
+	if redirect && !otherRedirect {
+		// $redirect rules have "slightly" higher priority than regular basic
+		// rules.
 		return true
 	}
 
-	generic := f.IsGeneric()
-	rGeneric := r.IsGeneric()
-	if !generic && rGeneric {
-		// specific rules have priority over generic rules
+	generic := r.IsGeneric()
+	otherGeneric := other.IsGeneric()
+	if !generic && otherGeneric {
+		// Specific rules have priority over generic rules.
 		return true
 	}
 
-	// More specific rules (i.e. with more modifiers) have higher priority
-	count := f.enabledOptions.Count() + f.disabledOptions.Count() +
-		f.permittedRequestTypes.Count() + f.restrictedRequestTypes.Count()
-	if len(f.permittedDomains) != 0 || len(f.restrictedDomains) != 0 {
-		count++
-	}
-	if len(f.permittedDNSTypes) != 0 || len(f.restrictedDNSTypes) != 0 {
-		count++
-	}
-	if len(f.permittedClientTags) != 0 || len(f.restrictedClientTags) != 0 {
-		count++
-	}
-	if f.permittedClients.len() != 0 || f.restrictedClients.len() != 0 {
-		count++
-	}
-	if len(f.denyAllowDomains) != 0 {
-		count++
-	}
-	rCount := r.enabledOptions.Count() + r.disabledOptions.Count() +
+	// More specific rules (i.e. with more modifiers) have higher priority.
+	count := r.enabledOptions.Count() + r.disabledOptions.Count() +
 		r.permittedRequestTypes.Count() + r.restrictedRequestTypes.Count()
+
+	// TODO(a.garipov):  Use mathutil.BoolToNumber.
 	if len(r.permittedDomains) != 0 || len(r.restrictedDomains) != 0 {
-		rCount++
+		count++
 	}
 	if len(r.permittedDNSTypes) != 0 || len(r.restrictedDNSTypes) != 0 {
-		rCount++
+		count++
 	}
 	if len(r.permittedClientTags) != 0 || len(r.restrictedClientTags) != 0 {
-		rCount++
+		count++
 	}
-	return count > rCount
+	if r.permittedClients.len() != 0 || r.restrictedClients.len() != 0 {
+		count++
+	}
+	if len(r.denyAllowDomains) != 0 {
+		count++
+	}
+
+	otherCount := other.enabledOptions.Count() + other.disabledOptions.Count() +
+		other.permittedRequestTypes.Count() + other.restrictedRequestTypes.Count()
+	if len(other.permittedDomains) != 0 || len(other.restrictedDomains) != 0 {
+		otherCount++
+	}
+	if len(other.permittedDNSTypes) != 0 || len(other.restrictedDNSTypes) != 0 {
+		otherCount++
+	}
+	if len(other.permittedClientTags) != 0 || len(other.restrictedClientTags) != 0 {
+		otherCount++
+	}
+
+	return count > otherCount
 }
 
-// negatesBadfilter only makes sense when the "f" rule has a `badfilter` modifier
-// it returns true if the "f" rule negates the specified "r" rule
-func (f *NetworkRule) negatesBadfilter(r *NetworkRule) bool {
+// negatesBadfilter only makes sense when r has a `badfilter` modifier.  It
+// returns true if r negates other.
+func (r *NetworkRule) negatesBadfilter(other *NetworkRule) (ok bool) {
 	switch {
 	case
-		!f.IsOptionEnabled(OptionBadfilter),
-		f.Whitelist != r.Whitelist,
-		f.pattern != r.pattern,
-		f.permittedRequestTypes != r.permittedRequestTypes,
-		f.restrictedRequestTypes != r.restrictedRequestTypes,
-		(f.enabledOptions ^ OptionBadfilter) != r.enabledOptions,
-		f.disabledOptions != r.disabledOptions,
-		!slices.Equal(f.permittedDomains, r.permittedDomains),
-		!slices.Equal(f.restrictedDomains, r.restrictedDomains),
-		!slices.Equal(f.permittedClientTags, r.permittedClientTags),
-		!slices.Equal(f.restrictedClientTags, r.restrictedClientTags),
-		!f.permittedClients.equal(r.permittedClients),
-		!f.restrictedClients.equal(r.restrictedClients):
+		!r.IsOptionEnabled(OptionBadfilter),
+		r.Whitelist != other.Whitelist,
+		r.pattern != other.pattern,
+		r.permittedRequestTypes != other.permittedRequestTypes,
+		r.restrictedRequestTypes != other.restrictedRequestTypes,
+		(r.enabledOptions ^ OptionBadfilter) != other.enabledOptions,
+		r.disabledOptions != other.disabledOptions,
+		!slices.Equal(r.permittedDomains, other.permittedDomains),
+		!slices.Equal(r.restrictedDomains, other.restrictedDomains),
+		!slices.Equal(r.permittedClientTags, other.permittedClientTags),
+		!slices.Equal(r.restrictedClientTags, other.restrictedClientTags),
+		!r.permittedClients.equal(other.permittedClients),
+		!r.restrictedClients.equal(other.restrictedClients):
 		return false
 	}
 
 	return true
 }
 
-// isDocumentRule checks if the rule is a document-level whitelist rule
-// This means that the rule is supposed to disable or modify blocking
-// of the page subrequests.
-// For instance, `@@||example.org^$urlblock` unblocks all sub-requests.
-func (f *NetworkRule) isDocumentWhitelistRule() bool {
-	return f.Whitelist && (f.IsOptionEnabled(OptionUrlblock) ||
-		f.IsOptionEnabled(OptionGenericblock))
+// isDocumentRule checks if the rule is a document-level whitelist rule.  This
+// means that the rule is supposed to disable or modify blocking of the page
+// subrequests.  For example, "@@||example.org^$urlblock" unblocks all
+// sub-requests.
+func (r *NetworkRule) isDocumentWhitelistRule() (ok bool) {
+	return r.Whitelist &&
+		(r.IsOptionEnabled(OptionUrlblock) || r.IsOptionEnabled(OptionGenericblock))
 }
 
 // preparePattern converts the pattern to a regexp and parses it.  It should be
 // called before matching the rule by pattern.  It sets either isInvalid,
 // matchesAll, or regex.
-func (f *NetworkRule) preparePattern() {
-	pattern := patternToRegexp(f.pattern)
+func (r *NetworkRule) preparePattern() {
+	pattern := patternToRegexp(r.pattern)
 	if pattern == RegexAnyCharacter {
-		f.matchesAll = true
+		r.matchesAll = true
 	}
 
-	if !f.IsOptionEnabled(OptionMatchCase) {
+	if !r.IsOptionEnabled(OptionMatchCase) {
 		pattern = "(?i)" + pattern
 	}
 
 	// TODO(a.garipov):  Consider ways to log the error.  Perhaps, a logger from
 	// a context?
 	var err error
-	f.regex, err = regexp.Compile(pattern)
-	f.isInvalid = err != nil
+	r.regexp, err = regexp.Compile(pattern)
+	r.isInvalid = err != nil
 }
 
-// matchPattern uses the regex pattern to match the request URL.  r must not be
-// nil.
-func (f *NetworkRule) matchPattern(r *Request) (matched bool) {
-	f.initOnce.Do(f.preparePattern)
+// matchPattern uses the regex pattern to match the request URL.  req must not
+// be nil.
+func (r *NetworkRule) matchPattern(req *Request) (matched bool) {
+	r.initOnce.Do(r.preparePattern)
 
-	if f.isInvalid {
+	if r.isInvalid {
 		return false
-	} else if f.matchesAll {
+	} else if r.matchesAll {
 		return true
 	}
 
-	if f.shouldMatchHostname(r) {
-		return f.regex.MatchString(r.Hostname)
+	if r.shouldMatchHostname(req) {
+		return r.regexp.MatchString(req.Hostname)
 	}
 
-	b, _ := r.URL.MarshalBinary()
+	b, _ := req.URL.MarshalBinary()
 
-	return f.regex.Match(b)
+	return r.regexp.Match(b)
 }
 
-// shouldMatchHostname checks if we should match hostnames and not the URL
-// this is important for the cases when we use urlfilter for DNS-level blocking
-// Note, that even though we may work on a DNS-level, we should still sometimes
-// match full URL instead:
-// https://github.com/AdguardTeam/AdGuardHome/issues/1249
-func (f *NetworkRule) shouldMatchHostname(r *Request) bool {
-	if !r.IsHostnameRequest {
+// shouldMatchHostname checks if we should match hostname and not the URL.  This
+// is important for DNS-level blocking.
+//
+// NOTE:  Full URL matching should be performed in some cases, see
+// https://github.com/AdguardTeam/AdGuardHome/issues/1249.
+//
+// TODO(a.garipov):  Refactor.
+func (r *NetworkRule) shouldMatchHostname(req *Request) (ok bool) {
+	if !req.IsHostnameRequest {
 		return false
 	}
 
-	if strings.HasPrefix(f.pattern, MaskStartURL) ||
-		strings.HasPrefix(f.pattern, "http://") ||
-		strings.HasPrefix(f.pattern, "https://") ||
-		strings.HasPrefix(f.pattern, "://") {
+	if strings.HasPrefix(r.pattern, MaskStartURL) ||
+		strings.HasPrefix(r.pattern, "http://") ||
+		strings.HasPrefix(r.pattern, "https://") ||
+		strings.HasPrefix(r.pattern, "://") {
 		return false
 	}
 
-	// Check if the pattern "/hostname." contains only allowed characters
-	if len(f.pattern) > 3 && f.pattern[0] == '/' && f.pattern[len(f.pattern)-1] == '.' {
-		for i := 1; i < len(f.pattern)-1; i++ {
-			ch := f.pattern[i]
+	// Check if the pattern "/hostname." contains only allowed characters.
+	if len(r.pattern) > 3 && r.pattern[0] == '/' && r.pattern[len(r.pattern)-1] == '.' {
+		for i := 1; i < len(r.pattern)-1; i++ {
+			ch := r.pattern[i]
 			if (ch < 'a' || ch > 'z') &&
 				(ch < 'A' || ch > 'Z') &&
 				(ch < '0' || ch > '9') &&
@@ -502,66 +572,69 @@ func (f *NetworkRule) shouldMatchHostname(r *Request) bool {
 				return true
 			}
 		}
+
 		return false
 	}
 
 	return true
 }
 
-// matchShortcut simply checks if shortcut is a substring of the URL
-func (f *NetworkRule) matchShortcut(r *Request) (ok bool) {
-	b, _ := r.URL.MarshalBinary()
+// matchShortcut simply checks if shortcut is a substring of the URL.
+func (r *NetworkRule) matchShortcut(req *Request) (ok bool) {
+	b, _ := req.URL.MarshalBinary()
 
 	// TODO(d.kolyshev): Is it possible to save lowercased URL?
 	// TODO(d.kolyshev): !! Make f.Shortcut []byte.
-	return bytes.Contains(bytes.ToLower(b), []byte(f.Shortcut))
+	return bytes.Contains(bytes.ToLower(b), []byte(r.Shortcut))
 }
 
 // matchRequestDomain checks if the filtering rule is allowed to match this
-// request domain, e.g. it checks it against the $denyallow modifier. Please,
-// pay attention at how $denyallow works:  the rule will work if the request
-// hostname **does not** belong to $denyallow domains.  The idea is to allow
-// rules that block anything EXCEPT FOR some domains.  For instance, if we have
-// a website that we know to load a lot of third-party crap, but some of the
-// domains are crucial for this website, we may want to add something like this:
-// "*$script,domain=example.org,denyallow=essential1.com|essential2.com".
-func (f *NetworkRule) matchRequestDomain(domain string, hostnameRequest bool) (ok bool) {
-	if len(f.denyAllowDomains) == 0 {
+// request domain, e.g. it checks it against the $denyallow modifier.
+//
+// NOTE:  The rule will work if the request hostname DOES NOT belong to
+// $denyallow domains.  The idea is to allow rules that block anything EXCEPT
+// for some domains.  For example, if there is a website that loads a lot of
+// third-party trackers, but some of the domains are crucial for this website,
+// something like this can be used:
+//
+//	"*$script,domain=example.org,denyallow=essential1.com|essential2.com"
+func (r *NetworkRule) matchRequestDomain(domain string, hostnameRequest bool) (ok bool) {
+	if len(r.denyAllowDomains) == 0 {
 		return true
 	}
 
-	// If this is a hostname request, we're probably dealing with DNS filtering.
-	// In this case, we should avoid matching IP addresses here since they can
-	// only come from CNAME filtering.  So regardless of whether it actually
-	// matches the "denyallow" list, we consider that it does not.
-	// Original issue: https://github.com/AdguardTeam/AdGuardHome/issues/3175.
+	// If this is a hostname request, it's likely DNS-level filtering.  Avoid
+	// matching IP addresses here since they can only come from CNAME filtering,
+	// so regardless of whether it actually matches the "denyallow" list,
+	// consider that it does not.
+	//
+	// See: https://github.com/AdguardTeam/AdGuardHome/issues/3175.
 	if hostnameRequest && netutil.IsValidIPString(domain) {
 		return false
 	}
 
-	return !isDomainOrSubdomainOfAny(domain, f.denyAllowDomains)
+	return !isDomainOrSubdomainOfAny(domain, r.denyAllowDomains)
 }
 
 // matchSourceDomain checks if the specified filtering rule is allowed on this
-// domain e.g. it checks the domain against what's specified in the $domain
-// modifier.
-func (f *NetworkRule) matchSourceDomain(domain string) bool {
-	if len(f.permittedDomains) == 0 && len(f.restrictedDomains) == 0 {
+// domain.  That is, it checks the domain against what's specified in the
+// $domain modifier.
+func (r *NetworkRule) matchSourceDomain(domain string) (ok bool) {
+	if len(r.permittedDomains) == 0 && len(r.restrictedDomains) == 0 {
 		return true
 	}
 
-	if len(f.restrictedDomains) > 0 {
-		if isDomainOrSubdomainOfAny(domain, f.restrictedDomains) {
-			// Domain or host is restricted
-			// i.e. $domain=~example.org
+	if len(r.restrictedDomains) > 0 {
+		if isDomainOrSubdomainOfAny(domain, r.restrictedDomains) {
+			// Domain or host is restricted, i.e. $domain=~example.org.
 			return false
 		}
 	}
 
-	if len(f.permittedDomains) > 0 {
-		if !isDomainOrSubdomainOfAny(domain, f.permittedDomains) {
-			// Domain is not among permitted
-			// i.e. $domain=example.org and we're checking example.com
+	if len(r.permittedDomains) > 0 {
+		if !isDomainOrSubdomainOfAny(domain, r.permittedDomains) {
+			// Domain is not among permitted, i.e. $domain=example.org and we're
+			// checking example.com.
 			return false
 		}
 	}
@@ -571,71 +644,77 @@ func (f *NetworkRule) matchSourceDomain(domain string) bool {
 
 // matchDNSType checks if the specified filtering rule is allowed for this DNS
 // request record type.
-func (f *NetworkRule) matchDNSType(rtype uint16) (allowed bool) {
-	if len(f.permittedDNSTypes) == 0 && len(f.restrictedDNSTypes) == 0 {
+func (r *NetworkRule) matchDNSType(rtype uint16) (allowed bool) {
+	if len(r.permittedDNSTypes) == 0 && len(r.restrictedDNSTypes) == 0 {
 		return true
 	}
 
-	if slices.Contains(f.restrictedDNSTypes, rtype) {
+	if slices.Contains(r.restrictedDNSTypes, rtype) {
 		return false
 	}
 
-	if len(f.permittedDNSTypes) > 0 {
-		return slices.Contains(f.permittedDNSTypes, rtype)
+	if len(r.permittedDNSTypes) > 0 {
+		return slices.Contains(r.permittedDNSTypes, rtype)
 	}
 
 	return true
 }
 
-// Find an identical entry (case-sensitive) in two sorted arrays
-// Return TRUE if found
-func matchClientTagsSpecific(sortedRuleTags, sortedClientTags []string) bool {
-	iRule := 0
-	iClient := 0
-	for iRule != len(sortedRuleTags) && iClient != len(sortedClientTags) {
-		r := strings.Compare(sortedRuleTags[iRule], sortedClientTags[iClient])
-		if r == 0 {
+// matchClientTagsSpecific returns true if there is a common element in the two
+// slices.  The matching is case-sensitive.
+//
+// TODO(a.garipov):  Test and optimize.
+func matchClientTagsSpecific(sortedRuleTags, sortedClientTags []string) (ok bool) {
+	idxRule := 0
+	idxCli := 0
+	for idxRule != len(sortedRuleTags) && idxCli != len(sortedClientTags) {
+		res := strings.Compare(sortedRuleTags[idxRule], sortedClientTags[idxCli])
+		if res == 0 {
 			return true
-		} else if r < 0 {
-			iRule++
+		} else if res < 0 {
+			idxRule++
 		} else {
-			iClient++
+			idxCli++
 		}
 	}
+
 	return false
 }
 
-// Return TRUE if this rule matches with the tags associated with a client
-func (f *NetworkRule) matchClientTags(sortedTags []string) bool {
-	if len(f.restrictedClientTags) == 0 && len(f.permittedClientTags) == 0 {
+// matchClientTags returns true if r matches one of sortedTags.
+func (r *NetworkRule) matchClientTags(sortedTags []string) (ok bool) {
+	if len(r.restrictedClientTags) == 0 && len(r.permittedClientTags) == 0 {
 		// the rule doesn't contain $ctag extension
 		return true
 	}
-	if matchClientTagsSpecific(f.restrictedClientTags, sortedTags) {
+
+	if matchClientTagsSpecific(r.restrictedClientTags, sortedTags) {
 		// matched by restricted client tag
 		return false
 	}
-	if len(f.permittedClientTags) != 0 {
+
+	if len(r.permittedClientTags) != 0 {
 		// If the rule is permitted for specific tags only,
 		// we should check whether our tag is among permitted or not
 		// and return the result the result immediately
-		return matchClientTagsSpecific(f.permittedClientTags, sortedTags)
+		return matchClientTagsSpecific(r.permittedClientTags, sortedTags)
 	}
+
 	return true
 }
 
 // matchClient returns true if the rule is specified for client defined by
 // host or ip.  Both host and ip can be empty.
-func (f *NetworkRule) matchClient(host string, ip netip.Addr) bool {
-	restLen := f.restrictedClients.len()
-	permLen := f.permittedClients.len()
+func (r *NetworkRule) matchClient(host string, ip netip.Addr) (ok bool) {
+	restLen := r.restrictedClients.len()
+	permLen := r.permittedClients.len()
 
 	if restLen == 0 && permLen == 0 {
 		// The rule has no $client modifier.
 		return true
 	}
 
-	if f.restrictedClients.containsAny(host, ip) {
+	if r.restrictedClients.containsAny(host, ip) {
 		// The client is in the restricted set.
 		return false
 	}
@@ -643,7 +722,7 @@ func (f *NetworkRule) matchClient(host string, ip netip.Addr) bool {
 	if permLen != 0 {
 		// If the rule is permitted for specific client only, check whether the
 		// client is among permitted.
-		return f.permittedClients.containsAny(host, ip)
+		return r.permittedClients.containsAny(host, ip)
 	}
 
 	// If we got here, permitted list is empty and the client is not among
@@ -651,16 +730,16 @@ func (f *NetworkRule) matchClient(host string, ip netip.Addr) bool {
 	return true
 }
 
-// matchRequestType checks if the specified request type matches the rule properties
-func (f *NetworkRule) matchRequestType(requestType RequestType) bool {
-	if f.permittedRequestTypes != 0 {
-		if (f.permittedRequestTypes & requestType) != requestType {
+// matchRequestType returns true if rt matches the rule properties.
+func (r *NetworkRule) matchRequestType(rt RequestType) (ok bool) {
+	if r.permittedRequestTypes != 0 {
+		if (r.permittedRequestTypes & rt) != rt {
 			return false
 		}
 	}
 
-	if f.restrictedRequestTypes != 0 {
-		if (f.restrictedRequestTypes & requestType) == requestType {
+	if r.restrictedRequestTypes != 0 {
+		if (r.restrictedRequestTypes & rt) == rt {
 			return false
 		}
 	}
@@ -668,48 +747,48 @@ func (f *NetworkRule) matchRequestType(requestType RequestType) bool {
 	return true
 }
 
-// setRequestType permits or forbids the specified request type
-func (f *NetworkRule) setRequestType(requestType RequestType, permitted bool) {
+// setRequestType permits or forbids the specified request type.
+func (r *NetworkRule) setRequestType(requestType RequestType, permitted bool) {
 	if permitted {
-		f.permittedRequestTypes |= requestType
+		r.permittedRequestTypes |= requestType
 	} else {
-		f.restrictedRequestTypes |= requestType
+		r.restrictedRequestTypes |= requestType
 	}
 }
 
-// setOptionEnabled enables or disables the specified option
-// it can return error if this option cannot be used with this type of rules
-func (f *NetworkRule) setOptionEnabled(option NetworkRuleOption, enabled bool) error {
-	if f.Whitelist && (option&OptionBlacklistOnly) == option {
-		return fmt.Errorf("modifier cannot be used in a whitelist rule: %v", option)
+// setOptionEnabled enables or disables the specified option.  It return an
+// error if option cannot be used with this type of rules.
+func (r *NetworkRule) setOptionEnabled(option NetworkRuleOption, enabled bool) (err error) {
+	if r.Whitelist && (option&OptionBlacklistOnly) == option {
+		return fmt.Errorf("modifier cannot be used in whitelist rules: %v", option)
 	}
 
-	if !f.Whitelist && (option&OptionWhitelistOnly) == option {
-		return fmt.Errorf("modifier cannot be used in a blacklist rule: %v", option)
+	if !r.Whitelist && (option&OptionWhitelistOnly) == option {
+		return fmt.Errorf("modifier cannot be used in blacklist rules: %v", option)
 	}
 
 	if enabled {
-		f.enabledOptions |= option
+		r.enabledOptions |= option
 	} else {
-		f.disabledOptions |= option
+		r.disabledOptions |= option
 	}
 
 	return nil
 }
 
-// loadOptions parses and adds all the options to f.
+// loadOptions parses and adds all options from optStr to r.
 //
-// See https://kb.adguard.com/en/general/how-to-create-your-own-ad-filters#basic-rules.
-func (f *NetworkRule) loadOptions(options string) (err error) {
-	if options == "" {
+// See https://adguard.com/kb/general/ad-filtering/create-own-filters/#basic-rules.
+func (r *NetworkRule) loadOptions(optStr string) (err error) {
+	if optStr == "" {
 		return nil
 	}
 
-	for _, o := range splitWithEscapeCharacter(options, ',', '\\', false) {
+	for _, o := range splitWithEscapeCharacter(optStr, ',', '\\', false) {
 		if eqIdx := strings.IndexByte(o, '='); eqIdx > 0 {
-			err = f.loadOption(o[:eqIdx], o[eqIdx+1:])
+			err = r.setOption(o[:eqIdx], o[eqIdx+1:])
 		} else {
-			err = f.loadOption(o, "")
+			err = r.setOption(o, "")
 		}
 		if err != nil {
 			return err
@@ -718,16 +797,16 @@ func (f *NetworkRule) loadOptions(options string) (err error) {
 
 	switch {
 	case
-		f.IsOptionEnabled(OptionJsinject),
-		f.IsOptionEnabled(OptionElemhide),
-		f.IsOptionEnabled(OptionContent),
-		f.IsOptionEnabled(OptionUrlblock),
-		f.IsOptionEnabled(OptionGenericblock),
-		f.IsOptionEnabled(OptionGenerichide),
-		f.IsOptionEnabled(OptionExtension),
-		f.IsOptionEnabled(OptionPopup):
+		r.IsOptionEnabled(OptionJsinject),
+		r.IsOptionEnabled(OptionElemhide),
+		r.IsOptionEnabled(OptionContent),
+		r.IsOptionEnabled(OptionUrlblock),
+		r.IsOptionEnabled(OptionGenericblock),
+		r.IsOptionEnabled(OptionGenerichide),
+		r.IsOptionEnabled(OptionExtension),
+		r.IsOptionEnabled(OptionPopup):
 		// Rules of these types can be applied to documents only.
-		f.permittedRequestTypes = TypeDocument
+		r.permittedRequestTypes = TypeDocument
 	default:
 		// Go on.
 	}
@@ -735,183 +814,191 @@ func (f *NetworkRule) loadOptions(options string) (err error) {
 	return nil
 }
 
-// loadOption loads specified option with its value (optional)
-// nolint:gocyclo
-func (f *NetworkRule) loadOption(name, value string) error {
+// setOption sets the specified option with its optional value.
+//
+// TODO(a.garipov):  Test and refactor.
+func (r *NetworkRule) setOption(name, value string) (err error) {
 	switch name {
-	// General options
+	// General options.
 	case "third-party", "~first-party":
-		return f.setOptionEnabled(OptionThirdParty, true)
+		return r.setOptionEnabled(OptionThirdParty, true)
 	case "~third-party", "first-party":
-		return f.setOptionEnabled(OptionThirdParty, false)
+		return r.setOptionEnabled(OptionThirdParty, false)
 	case "match-case":
-		return f.setOptionEnabled(OptionMatchCase, true)
+		return r.setOptionEnabled(OptionMatchCase, true)
 	case "~match-case":
-		return f.setOptionEnabled(OptionMatchCase, false)
+		return r.setOptionEnabled(OptionMatchCase, false)
 	case "important":
-		return f.setOptionEnabled(OptionImportant, true)
+		return r.setOptionEnabled(OptionImportant, true)
 	case "badfilter":
-		return f.setOptionEnabled(OptionBadfilter, true)
+		return r.setOptionEnabled(OptionBadfilter, true)
 	// $dnstype, the DNS request record type filter.
 	case "dnstype":
-		permitted, restricted, err := loadDNSTypes(value)
-		f.permittedDNSTypes = permitted
-		f.restrictedDNSTypes = restricted
+		permitted, restricted, parseErr := parseDNSTypes(value)
+		r.permittedDNSTypes = permitted
+		r.restrictedDNSTypes = restricted
 
-		return err
+		return parseErr
 	// $dnsrewrite, the DNS request rewrite filter.
 	case "dnsrewrite":
-		rewrite, err := loadDNSRewrite(value)
-		f.DNSRewrite = rewrite
+		rewrite, parseErr := parseDNSRewrite(value)
+		r.DNSRewrite = rewrite
 
-		return err
-	// $domain -- limits the rule for selected source domains
+		return parseErr
+	// $domain limits the rule for selected source domains.
 	case "domain":
-		permitted, restricted, err := loadDomains(value, "|")
-		f.permittedDomains = permitted
-		f.restrictedDomains = restricted
-		return err
+		permitted, restricted, parseErr := parseDomains(value, "|")
+		r.permittedDomains = permitted
+		r.restrictedDomains = restricted
+		return parseErr
 
-	// $denyallow -- disables the rule for the selected request domains
+	// $denyallow disables the rule for the selected request domains.
 	case "denyallow":
-		permitted, restricted, err := loadDomains(value, "|")
-		if err != nil {
-			return err
+		permitted, restricted, parseErr := parseDomains(value, "|")
+		if parseErr != nil {
+			return parseErr
 		}
+
 		if len(restricted) > 0 || len(permitted) == 0 {
-			return fmt.Errorf("invalid $denyallow value: %s", value)
+			return fmt.Errorf("invalid $denyallow value: %q", value)
 		}
-		f.denyAllowDomains = permitted
+
+		r.denyAllowDomains = permitted
+
 		return nil
-
-	// $ctag - limits the rule for selected "Client tags"
+	// $ctag limits the rule for selected client tags.
 	case "ctag":
-		permitted, restricted, err := loadCTags(value, "|")
-		if err == nil {
-			f.permittedClientTags = permitted
-			f.restrictedClientTags = restricted
+		permitted, restricted, parseErr := parseCTags(value, "|")
+		if parseErr == nil {
+			r.permittedClientTags = permitted
+			r.restrictedClientTags = restricted
 		}
-		return err
 
-	// $client - limits the rule for selected "Clients" (either IP or client name)
+		return parseErr
+	// $client limits the rule for selected clients.
 	case "client":
-		permitted, restricted, err := loadClients(value, '|')
-		if err == nil {
-			f.permittedClients = permitted
-			f.restrictedClients = restricted
+		permitted, restricted, parseErr := parseClients(value, '|')
+		if parseErr == nil {
+			r.permittedClients = permitted
+			r.restrictedClients = restricted
 		}
-		return err
 
-	// Document-level whitelist rules
+		return parseErr
+	// Document-level whitelist rules.
 	case "elemhide":
-		return f.setOptionEnabled(OptionElemhide, true)
+		return r.setOptionEnabled(OptionElemhide, true)
 	case "generichide":
-		return f.setOptionEnabled(OptionGenerichide, true)
+		return r.setOptionEnabled(OptionGenerichide, true)
 	case "genericblock":
-		return f.setOptionEnabled(OptionGenericblock, true)
+		return r.setOptionEnabled(OptionGenericblock, true)
 	case "jsinject":
-		return f.setOptionEnabled(OptionJsinject, true)
+		return r.setOptionEnabled(OptionJsinject, true)
 	case "urlblock":
-		return f.setOptionEnabled(OptionUrlblock, true)
+		return r.setOptionEnabled(OptionUrlblock, true)
 	case "content":
-		return f.setOptionEnabled(OptionContent, true)
-
-	// $extension can be also disabled
+		return r.setOptionEnabled(OptionContent, true)
+	// $extension can be also disabled.
 	case "extension":
-		return f.setOptionEnabled(OptionExtension, true)
+		return r.setOptionEnabled(OptionExtension, true)
 	case "~extension":
 		// $document must be specified before ~extension
-		// TODO: Depends on options order, this is not good
-		f.enabledOptions = f.enabledOptions ^ OptionExtension
+		// TODO(ameshkov):  Depends on options order, this is not good.
+		r.enabledOptions = r.enabledOptions ^ OptionExtension
+
 		return nil
-
-	// $document
+	// $document.
 	case "document":
-		err := f.setOptionEnabled(OptionElemhide, true)
-		// Ignore others
-		_ = f.setOptionEnabled(OptionJsinject, true)
-		_ = f.setOptionEnabled(OptionUrlblock, true)
-		_ = f.setOptionEnabled(OptionContent, true)
-		_ = f.setOptionEnabled(OptionExtension, true)
-		return err
+		optErr := r.setOptionEnabled(OptionElemhide, true)
+		// Ignore others.
+		_ = r.setOptionEnabled(OptionJsinject, true)
+		_ = r.setOptionEnabled(OptionUrlblock, true)
+		_ = r.setOptionEnabled(OptionContent, true)
+		_ = r.setOptionEnabled(OptionExtension, true)
 
-	// Stealth mode
+		return optErr
+	// Stealth mode.
 	case "stealth":
-		return f.setOptionEnabled(OptionStealth, true)
-
-	// $popup blocking options
+		return r.setOptionEnabled(OptionStealth, true)
+	// $popup blocking options.
 	case "popup":
-		return f.setOptionEnabled(OptionPopup, true)
-
-	// $empty and $mp4
-	// TODO: Deprecate in favor of $redirect
+		return r.setOptionEnabled(OptionPopup, true)
+	// $empty and $mp4.
+	// TODO(ameshkov):  Deprecate in favor of $redirect.
 	case "empty":
-		return f.setOptionEnabled(OptionEmpty, true)
+		return r.setOptionEnabled(OptionEmpty, true)
 	case "mp4":
-		return f.setOptionEnabled(OptionMp4, true)
-
-	// Content type options
+		return r.setOptionEnabled(OptionMp4, true)
+	// Content type options.
 	case "script", "~script":
-		f.setRequestType(TypeScript, name[0] != '~')
+		r.setRequestType(TypeScript, name[0] != '~')
+
 		return nil
 	case "stylesheet", "~stylesheet":
-		f.setRequestType(TypeStylesheet, name[0] != '~')
+		r.setRequestType(TypeStylesheet, name[0] != '~')
+
 		return nil
 	case "subdocument", "~subdocument":
-		f.setRequestType(TypeSubdocument, name[0] != '~')
+		r.setRequestType(TypeSubdocument, name[0] != '~')
+
 		return nil
 	case "object", "~object":
-		f.setRequestType(TypeObject, name[0] != '~')
+		r.setRequestType(TypeObject, name[0] != '~')
+
 		return nil
 	case "image", "~image":
-		f.setRequestType(TypeImage, name[0] != '~')
+		r.setRequestType(TypeImage, name[0] != '~')
+
 		return nil
 	case "xmlhttprequest", "~xmlhttprequest":
-		f.setRequestType(TypeXmlhttprequest, name[0] != '~')
+		r.setRequestType(TypeXmlhttprequest, name[0] != '~')
+
 		return nil
 	case "media", "~media":
-		f.setRequestType(TypeMedia, name[0] != '~')
+		r.setRequestType(TypeMedia, name[0] != '~')
+
 		return nil
 	case "font", "~font":
-		f.setRequestType(TypeFont, name[0] != '~')
+		r.setRequestType(TypeFont, name[0] != '~')
+
 		return nil
 	case "websocket", "~websocket":
-		f.setRequestType(TypeWebsocket, name[0] != '~')
+		r.setRequestType(TypeWebsocket, name[0] != '~')
+
 		return nil
 	case "ping", "~ping":
-		f.setRequestType(TypePing, name[0] != '~')
+		r.setRequestType(TypePing, name[0] != '~')
+
 		return nil
 	case "other", "~other":
-		f.setRequestType(TypeOther, name[0] != '~')
+		r.setRequestType(TypeOther, name[0] != '~')
+
 		return nil
 	}
 
-	return fmt.Errorf("unknown filter modifier: %s=%s", name, value)
+	return fmt.Errorf("unknown filter modifier: %q=%q", name, value)
 }
 
-// loadShortcut extracts a shortcut from the pattern.
-// shortcut is the longest substring of the pattern that does not contain
-// any special characters
-func (f *NetworkRule) loadShortcut() {
+// setShortcut extracts a shortcut from the pattern and sets it in r.  A
+// shortcut is the longest substring of the pattern that does not contain any
+// special characters.
+//
+// TODO(a.garipov):  Test and optimize to not call strings.ToLower.
+func (r *NetworkRule) setShortcut() {
 	var shortcut string
-	if f.IsRegexRule() {
-		shortcut = findRegexpShortcut(f.pattern)
+	if r.IsRegexRule() {
+		shortcut = findRegexpShortcut(r.pattern)
 	} else {
-		shortcut = findShortcut(f.pattern)
+		shortcut = findShortcut(r.pattern)
 	}
 
-	// shortcut needs to be at least longer than 1 character
+	// A shortcut needs to be at least longer than 1 character.
 	if len(shortcut) > 1 {
-		f.Shortcut = strings.ToLower(shortcut)
+		r.Shortcut = strings.ToLower(shortcut)
 	}
 }
 
 // findShortcut searches for the longest substring of the pattern that does not
-// contain any of the special characters which are:
-//
-//	*
-//	^
-//	|
+// contain any of the special characters, which are '*', '^', and '|'.
 func findShortcut(pattern string) (shortcut string) {
 	for pattern != "" {
 		i := strings.IndexAny(pattern, "*^|")
@@ -926,22 +1013,28 @@ func findShortcut(pattern string) (shortcut string) {
 		if i > len(shortcut) {
 			shortcut = pattern[:i]
 		}
+
 		pattern = pattern[i+1:]
 	}
 
 	return shortcut
 }
 
-// findRegexpShortcut searches for a shortcut inside of a regexp pattern.
-// Shortcut in this case is a longest string with no REGEX special characters
-// Also, we discard complicated regexps right away.
-func findRegexpShortcut(pattern string) string {
-	// strip backslashes
+// findRegexpShortcut searches for a shortcut inside of a regexp pattern.  A
+// shortcut in this case is a longest string with no regexp special characters.
+// It also discards complicated regexps right away.
+//
+// TODO(a.garipov):  This requires a deep refactoring and optimization.
+func findRegexpShortcut(pattern string) (shortcut string) {
+	// Strip backslashes.
 	pattern = pattern[1 : len(pattern)-1]
 
 	if strings.Contains(pattern, "?") {
-		// Do not mess with complex expressions which use lookahead
-		// And with those using ? special character: https://github.com/AdguardTeam/AdguardBrowserExtension/issues/978
+		// Do not mess with complex expressions which use lookahead.
+		//
+		// See https://github.com/AdguardTeam/AdguardBrowserExtension/issues/978.
+		//
+		// TODO(a.garipov):  Reinspect.
 		return ""
 	}
 
@@ -951,16 +1044,16 @@ func findRegexpShortcut(pattern string) string {
 	// (Dirty) prepend specialCharacter for the following replace calls to work properly
 	pattern = specialCharacter + pattern
 
-	//// Strip all types of brackets
-	pattern = reRegexpBrackets1.ReplaceAllString(pattern, "$1"+specialCharacter)
-	pattern = reRegexpBrackets2.ReplaceAllString(pattern, "$1"+specialCharacter)
-	pattern = reRegexpBrackets3.ReplaceAllString(pattern, "$1"+specialCharacter)
+	// Strip all types of brackets.
+	pattern = regexpBracketsCurly.ReplaceAllString(pattern, "$1"+specialCharacter)
+	pattern = regexpBracketsRound.ReplaceAllString(pattern, "$1"+specialCharacter)
+	pattern = regexpBracketsSquare.ReplaceAllString(pattern, "$1"+specialCharacter)
 
-	// Strip some escaped characters
-	pattern = reRegexpEscapedCharacters.ReplaceAllString(pattern, "$1"+specialCharacter)
+	// Strip some escaped characters.
+	pattern = regexpEscapedCharacters.ReplaceAllString(pattern, "$1"+specialCharacter)
 
-	// Split by special characters
-	parts := reRegexpSpecialCharacters.Split(pattern, -1)
+	// Split by special characters.
+	parts := regexpSpecialCharacters.Split(pattern, -1)
 	longest := ""
 	for _, part := range parts {
 		if len(part) > len(longest) {
@@ -971,19 +1064,19 @@ func findRegexpShortcut(pattern string) string {
 	return longest
 }
 
-// parseRuleText splits the rule's text into:
+// parseRuleText splits the rule's text into pattern, which is a basic rule
+// pattern that can be easily converted into a regular expression, and options,
+// a string containing the rule's options.  isWhitelist is true if the rule
+// should unblock requests instead of blocking them.
 //
-//	pattern, which is a basic rule pattern that can be easily converted into a regular expression;
-//	options, a string containing all the rule's options.
-//
-// whitelist is true if the rule should unblock requests instead of blocking them.
-func parseRuleText(ruleText string) (pattern, options string, whitelist bool, err error) {
+// TODO(a.garipov):  Refactor.
+func parseRuleText(ruleText string) (pattern, options string, isWhitelist bool, err error) {
 	if ruleText == "" || ruleText == maskWhiteList {
-		return "", "", whitelist, fmt.Errorf("the rule %s is too short", ruleText)
+		return "", "", isWhitelist, fmt.Errorf("the rule %s is too short", ruleText)
 	}
 
 	if strings.HasPrefix(ruleText, maskWhiteList) {
-		whitelist = true
+		isWhitelist = true
 		ruleText = ruleText[len(maskWhiteList):]
 	}
 
@@ -991,7 +1084,7 @@ func parseRuleText(ruleText string) (pattern, options string, whitelist bool, er
 	if strings.HasPrefix(ruleText, maskRegexRule) &&
 		strings.HasSuffix(ruleText, maskRegexRule) &&
 		!strings.Contains(ruleText, replaceOption+"=") {
-		return ruleText, "", whitelist, nil
+		return ruleText, "", isWhitelist, nil
 	}
 
 	hasEscaped := false
@@ -1007,7 +1100,7 @@ func parseRuleText(ruleText string) (pattern, options string, whitelist bool, er
 
 		ruleText, options = ruleText[:idx], ruleText[idx+1:]
 		if hasEscaped {
-			options = reEscapedOptionsDelimiter.ReplaceAllString(options, string(optionsDelimiter))
+			options = regexpEscapedOptionsDelimiter.ReplaceAllString(options, string(optionsDelimiter))
 		}
 
 		// Exit the loop since the options delimiter has been found.
@@ -1015,5 +1108,5 @@ func parseRuleText(ruleText string) (pattern, options string, whitelist bool, er
 
 	}
 
-	return ruleText, options, whitelist, nil
+	return ruleText, options, isWhitelist, nil
 }

@@ -1,77 +1,78 @@
 package rules
 
-// CosmeticOption is the enumeration of various content script options.
-// Depending on the set of enabled flags the content script will contain different set of settings.
+// CosmeticOption is the bitset of various content script options.
 type CosmeticOption uint32
 
-// CosmeticOption enumeration
+// Valid CosmeticOption masks.
 const (
-	// CosmeticOptionGenericCSS - if generic elemhide and CSS rules are enabled.
-	// Can be disabled by a $generichide rule.
+	// CosmeticOptionGenericCSS is set if generic elemhide and CSS rules are
+	// enabled.  It can be disabled by a $generichide rule.
 	CosmeticOptionGenericCSS CosmeticOption = 1 << iota
-	// CosmeticOptionCSS - if elemhide and CSS rules are enabled.
-	// Can be disabled by an $elemhide rule.
+
+	// CosmeticOptionCSS is set if elemhide and CSS rules are enabled.  It can
+	// be disabled by an $elemhide rule.
 	CosmeticOptionCSS
-	// CosmeticOptionJS - if JS rules and scriptlets are enabled.
-	// Can be disabled by a $jsinject rule.
+
+	// CosmeticOptionJS is set if JS rules and scriptlets are enabled.  It can
+	// be disabled by a $jsinject rule.
 	CosmeticOptionJS
 
-	// TODO: Add support for these flags
-	// They are useful when content script is injected into an iframe
-	// In this case we can check what flags were applied to the top-level frame
+	// TODO(ameshkov):  Add support for these flags.  They are useful when
+	// content script is injected into an iframe.  In this case we can check
+	// what flags were applied to the top-level frame.
+
 	CosmeticOptionSourceGenericCSS
 	CosmeticOptionSourceCSS
 	CosmeticOptionSourceJS
 
-	// CosmeticOptionAll - everything is enabled
-	CosmeticOptionAll = CosmeticOptionGenericCSS | CosmeticOptionCSS | CosmeticOptionJS
-
-	// CosmeticOptionNone - everything is disabled
+	CosmeticOptionAll  = CosmeticOptionGenericCSS | CosmeticOptionCSS | CosmeticOptionJS
 	CosmeticOptionNone = CosmeticOption(0)
 )
 
-// MatchingResult contains all the rules matching a web request, and provides methods
-// that define how a web request should be processed
+// MatchingResult contains all rules matching a web request and provides methods
+// for processing of the request.
 type MatchingResult struct {
-	// BasicRule - a rule matching the request.
-	// It could lead to one of the following:
-	// * block the request
-	// * unblock the request (a regular whitelist rule or a document-level whitelist rule)
-	// * modify the way cosmetic rules work for this request
-	// * modify the response (see $redirect rules)
+	// BasicRule is a rule matching the request.  It could lead to one of the
+	// following:
+	//   - block the request;
+	//   - unblock the request (a regular whitelist rule or a document-level
+	//     whitelist rule);
+	//   - modify the way cosmetic rules work for this request;
+	//   - modify the response (see $redirect rules).
 	BasicRule *NetworkRule
 
-	// DocumentRule - a rule matching the request's referrer and having on of the following modifiers:
-	// * $document -- this one basically disables everything
-	// * $urlblock -- disables network-level rules (not cosmetic)
-	// * $genericblock -- disables generic network-level rules
+	// DocumentRule is a rule matching the request's referrer and having one of
+	// the following modifiers:
+	//   - $document: this one basically disables everything;
+	//   - $urlblock: disables network-level rules (not cosmetic);
+	//   - $genericblock: disables generic network-level rules.
 	//
-	// Other document-level modifiers like $jsinject or $content will be ignored here
-	// as they don't do anything
+	// Other document-level modifiers like $jsinject or $content will be ignored
+	// here as they don't do anything
 	DocumentRule *NetworkRule
 
-	// StealthRule - this is a whitelist rule that negates stealth mode features
-	// Note that the stealth rule can be received from both rules and sourceRules
-	// https://kb.adguard.com/en/general/how-to-create-your-own-ad-filters#stealth-modifier
+	// StealthRule is a whitelist rule that negates stealth-mode features.  Note
+	// that the stealth rule can be received from both rules and sourceRules.
+	//
+	// See https://adguard.com/kb/general/ad-filtering/create-own-filters/#stealth-modifier.
 	StealthRule *NetworkRule
 
-	// CspRules - a set of rules modifying the response's content-security-policy
-	// See $csp modifier
+	// CspRules are rules modifying the response's content-security-policy.  See
+	// modifier $csp.
 	CspRules []*NetworkRule
 
-	// CookieRules - a set of rules modifying the request's and response's cookies
-	// See $cookie modifier
+	// CookieRules are rules modifying the request's and response's cookies.
+	// See modifier $cookie.
 	CookieRules []*NetworkRule
 
-	// ReplaceRules -- a set of rules modifying the response's content
-	// See $replace modifier
+	// ReplaceRules are rules modifying the response's content.  See modifier
+	// $replace.
 	ReplaceRules []*NetworkRule
 }
 
-// NewMatchingResult creates an instance of the MatchingResult struct and fills it with the rules.
-// rules - a set of rules matching the request URL
-// sourceRules - a set of rules matching the referrer
-// nolint:gocyclo
+// NewMatchingResult returns a new properly initialized *MatchingResult.  rules
+// are the rules matching the request URL.  sourceRules are the rules matching
+// the referrer.  Items of rules and sourceRules must not be nil.
 func NewMatchingResult(rules, sourceRules []*NetworkRule) (result *MatchingResult) {
 	rules = removeBadfilterRules(rules)
 	rules = removeDNSRewriteRules(rules)
@@ -81,7 +82,7 @@ func NewMatchingResult(rules, sourceRules []*NetworkRule) (result *MatchingResul
 
 	result = &MatchingResult{}
 
-	// First, find document-level whitelist rules.
+	// Firstly, find document-level whitelist rules.
 	for _, rule := range sourceRules {
 		if rule.isDocumentWhitelistRule() {
 			if result.DocumentRule == nil || rule.IsHigherPriority(result.DocumentRule) {
@@ -94,10 +95,9 @@ func NewMatchingResult(rules, sourceRules []*NetworkRule) (result *MatchingResul
 		}
 	}
 
-	// Second - check if blocking rules (generic or all of them) are allowed
-	// generic blocking rules are allowed by default
+	// Secondly, check if blocking rules (generic or all of them) are allowed.
+	// Generic and basic rules are allowed by default.
 	genericAllowed := true
-	// basic blocking rules are allowed by default
 	basicAllowed := true
 	if result.DocumentRule != nil {
 		if result.DocumentRule.IsOptionEnabled(OptionUrlblock) {
@@ -107,7 +107,7 @@ func NewMatchingResult(rules, sourceRules []*NetworkRule) (result *MatchingResul
 		}
 	}
 
-	// Iterate through the list of rules and fill the MatchingResult struct
+	// Iterate through the list of rules and fill the MatchingResult struct.
 	for _, rule := range rules {
 		switch {
 		case rule.IsOptionEnabled(OptionCookie):
@@ -119,7 +119,7 @@ func NewMatchingResult(rules, sourceRules []*NetworkRule) (result *MatchingResul
 		case rule.IsOptionEnabled(OptionStealth):
 			result.StealthRule = rule
 		default:
-			// Check blocking rules against $genericblock / $urlblock
+			// Check blocking rules against $genericblock / $urlblock.
 			if !rule.Whitelist {
 				if !basicAllowed {
 					continue
@@ -139,6 +139,7 @@ func NewMatchingResult(rules, sourceRules []*NetworkRule) (result *MatchingResul
 }
 
 // GetDNSBasicRule returns a rule that should be applied to the DNS request.
+// Elements of rules must not be nil.
 func GetDNSBasicRule(rules []*NetworkRule) (basicRule *NetworkRule) {
 	rules = removeBadfilterRules(rules)
 	rules = removeDNSRewriteRules(rules)
@@ -167,19 +168,25 @@ func GetDNSBasicRule(rules []*NetworkRule) (basicRule *NetworkRule) {
 // GetBasicResult returns a rule that should be applied to the web request.
 //
 // Possible outcomes are:
-// * returns nil -- bypass the request.
-// * returns a whitelist rule -- bypass the request.
-// * returns a blocking rule -- block the request.
-func (m *MatchingResult) GetBasicResult() *NetworkRule {
-	// https://kb.adguard.com/en/general/how-to-create-your-own-ad-filters#replace-modifier
-	// 1. $replace rules have a higher priority than other basic rules (including exception rules).
-	//    So if a request corresponds to two different rules one of which has the $replace modifier, this rule will be applied.
-	// 2. Document-level exception rules with $content or $document modifiers do disable $replace rules for requests matching them.
+//   - If r is nil, bypass the request.
+//   - If r is a whitelist rule, bypass the request.
+//   - If r is a blocking rule, block the request.
+func (m *MatchingResult) GetBasicResult() (r *NetworkRule) {
+	// 1. $replace rules have a higher priority than other basic rules
+	//    (including exception rules).  So if a request corresponds to two
+	//    different rules one of which has the $replace modifier, this rule will
+	//    be applied.
+	// 2. Document-level exception rules with $content or $document modifiers
+	//    disable $replace rules for requests matching them.
+	//
+	// See https://adguard.com/kb/general/ad-filtering/create-own-filters/#replace-modifier.
 	if m.ReplaceRules != nil {
-		// TODO: implement the $replace selection algorithm
-		// 1. check that ReplaceRules aren't negated by themselves (for instance, that there's no @@||example.org^$replace rule)
-		// 2. check that they aren't disabled by a document-level exception (check both DocumentRule and BasicRule)
-		// 3. return nil if that is so
+		// TODO(ameshkov):  Implement the $replace selection algorithm:
+		// 1. check that ReplaceRules aren't negated by themselves (for
+		//    instance, that there's no @@||example.org^$replace rule);
+		// 2. check that they aren't disabled by a document-level exception
+		//    (check both DocumentRule and BasicRule);
+		// 3. return nil if that is so.
 		return nil
 	}
 
@@ -190,33 +197,36 @@ func (m *MatchingResult) GetBasicResult() *NetworkRule {
 	return m.BasicRule
 }
 
-// GetCosmeticOption returns a bit-flag with the list of cosmetic options
-func (m *MatchingResult) GetCosmeticOption() CosmeticOption {
+// GetCosmeticOption returns the cosmetic options.
+func (m *MatchingResult) GetCosmeticOption() (o CosmeticOption) {
 	if m.BasicRule == nil || !m.BasicRule.Whitelist {
 		return CosmeticOptionAll
 	}
 
-	option := CosmeticOptionAll
+	o = CosmeticOptionAll
 
 	if m.BasicRule.IsOptionEnabled(OptionElemhide) {
-		option = option ^ CosmeticOptionCSS
-		option = option ^ CosmeticOptionGenericCSS
+		o ^= CosmeticOptionCSS
+		o ^= CosmeticOptionGenericCSS
 	}
 
 	if m.BasicRule.IsOptionEnabled(OptionGenerichide) {
-		option = option ^ CosmeticOptionGenericCSS
+		o ^= CosmeticOptionGenericCSS
 	}
 
 	if m.BasicRule.IsOptionEnabled(OptionJsinject) {
-		option = option ^ CosmeticOptionJS
+		o ^= CosmeticOptionJS
 	}
 
-	return option
+	return o
 }
 
-// removeBadfilterRules looks if there are any matching $badfilter rules and removes
-// matching bad filters from the array (see the $badfilter description for more info)
-func removeBadfilterRules(rules []*NetworkRule) []*NetworkRule {
+// removeBadfilterRules looks if there are any matching $badfilter rules and
+// removes matching bad filters from rules (see the $badfilter description
+// for more info).
+//
+// TODO(a.garipov):  Refactor.
+func removeBadfilterRules(rules []*NetworkRule) (res []*NetworkRule) {
 	var badfilterRules []*NetworkRule
 
 	for _, badfilter := range rules {
@@ -225,6 +235,7 @@ func removeBadfilterRules(rules []*NetworkRule) []*NetworkRule {
 			if badfilterRules == nil {
 				badfilterRules = []*NetworkRule{}
 			}
+
 			badfilterRules = append(badfilterRules, badfilter)
 		}
 	}
@@ -238,17 +249,18 @@ func removeBadfilterRules(rules []*NetworkRule) []*NetworkRule {
 				}
 			}
 		}
+
 		return filteredRules
 	}
 
 	return rules
 }
 
-// removeDNSRewriteRules removes DNS rewrite rules from rules and
-// returns the filtered slice or the original slice if there were none.
+// removeDNSRewriteRules removes DNS rewrite rules from rules and returns the
+// filtered slice or the original slice if there were none.
 func removeDNSRewriteRules(rules []*NetworkRule) (filtered []*NetworkRule) {
-	// Assume that DNS rewrite rules are rare, and return the
-	// original slice if there are none.
+	// Assume that DNS rewrite rules are rare, and return the original slice if
+	// there are none.
 
 	var i int
 	var found bool

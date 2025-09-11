@@ -117,7 +117,7 @@ func (f *HostRule) GetFilterListID() (id int) {
 	return f.FilterListID
 }
 
-// String returns original rule text
+// String returns original rule text.
 func (f *HostRule) String() (s string) {
 	return f.RuleText
 }

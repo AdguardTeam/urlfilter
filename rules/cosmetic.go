@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// CosmeticRuleType is the enumeration of different cosmetic rules
+// CosmeticRuleType is the enumeration of different cosmetic rule types.
 type CosmeticRuleType uint8
 
 // Valid CosmeticRuleType values.
@@ -156,7 +156,7 @@ func NewCosmeticRule(ruleText string, filterListID int) (r *CosmeticRule, err er
 	if index > 0 {
 		// The marker is preceded by the list of domains.  Parse immediately.
 		domains := ruleText[:index]
-		r.permittedDomains, r.restrictedDomains, err = loadDomains(domains, ",")
+		r.permittedDomains, r.restrictedDomains, err = parseDomains(domains, ",")
 		if err != nil {
 			return nil, &RuleSyntaxError{
 				msg:      "cannot load domains",

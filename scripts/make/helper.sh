@@ -77,7 +77,7 @@ run_linter() (
 # find_with_ignore is a wrapper around find that does not descend into ignored
 # directories, such as ./tmp/.
 #
-# NOTE:  The arguments must contain on of -exec, -ok, or -print; see
+# NOTE:  The arguments must contain one of -exec, -ok, or -print; see
 # https://pubs.opengroup.org/onlinepubs/9799919799/utilities/find.html.
 #
 # TODO(a.garipov):  Find a way to integrate the entire gitignore, including the

@@ -9,46 +9,65 @@ import (
 	"golang.org/x/net/publicsuffix"
 )
 
-// RequestType is the request types enumeration
+// RequestType is a bitset of the types of a request to be filtered.
+//
+// TODO(a.garipov):  Consider switching to uint16.
 type RequestType uint32
 
+// RequestType masks.
+//
+// See https://adguard.com/kb/general/ad-filtering/create-own-filters/#content-type-modifiers.
+//
+// TODO(a.garipov):  Rename consistently.
 const (
-	// TypeDocument (main frame)
+	// TypeDocument means the main frame.
 	TypeDocument RequestType = 1 << iota
-	// TypeSubdocument (iframe) $subdocument
+
+	// TypeSubdocument means iframe requests; see the $subdocument modifier.
 	TypeSubdocument
-	// TypeScript (javascript, etc) $script
+
+	// TypeScript means JavaScript and other script requests; see the $script
+	// modifier.
 	TypeScript
-	// TypeStylesheet (css) $stylesheet
+
+	// TypeStylesheet means CSS requests; see the $stylesheet modifier.
 	TypeStylesheet
-	// TypeObject (flash, etc) $object
+
+	// TypeObject means Flash and similar objects; see the $object modifier.
 	TypeObject
-	// TypeImage (any image) $image
+
+	// TypeImage means images; see the $image modifier.
 	TypeImage
-	// TypeXmlhttprequest (ajax/fetch) $xmlhttprequest
+
+	// TypeXmlhttprequest means AJAX or fetch requests, see the $xmlhttprequest
+	// modifier.
 	TypeXmlhttprequest
-	// TypeMedia (video/music) $media
+
+	// TypeMedia means video, music, etc.; see the $media modifier.
 	TypeMedia
-	// TypeFont (any custom font) $font
+
+	// TypeFont means any custom font; see the $font modifier.
 	TypeFont
-	// TypeWebsocket (a websocket connection) $websocket
+
+	// TypeWebsocket means a WebSocket connection; see the $websocket modifier.
 	TypeWebsocket
-	// TypePing (navigator.sendBeacon() or ping attribute on links) $ping
+
+	// TypePing means navigator.sendBeacon() or ping attribute on links; see the
+	// $ping modifier.
 	TypePing
-	// TypeOther - any other request type
+
+	// TypeOther means any other request type.
 	TypeOther
 )
 
-// Count returns the count of the enabled flags.
-func (t RequestType) Count() int {
+// Count returns the number of the enabled request types.
+func (t RequestType) Count() (n int) {
 	return bits.OnesCount32(uint32(t))
 }
 
-// Request represents a web filtering request with all it's necessary
-// properties.
+// Request is a web filtering request.
 type Request struct {
-	// ClientIP is the IP address to match against $client modifiers.  The
-	// default zero value won't be considered.
+	// ClientIP is the IP address to match against $client modifiers, if any.
 	ClientIP netip.Addr
 
 	// SourceURL is the full URL of the source.
@@ -57,8 +76,7 @@ type Request struct {
 	// URL is the full request URL.
 	URL *url.URL
 
-	// ClientName is the name to match against $client modifiers.  The default
-	// empty value won't be considered.
+	// ClientName is the name to match against $client modifiers, if any.
 	ClientName string
 
 	// Hostname is the hostname to filter.
@@ -82,8 +100,8 @@ type Request struct {
 	RequestType RequestType
 
 	// DNSType is the type of the resource record (RR) of a DNS request, for
-	// example "A" or "AAAA".  See [RRValue] for all acceptable constants and
-	// their corresponding values.
+	// example A or AAAA.  See [RRValue] for all acceptable constants and their
+	// corresponding values.
 	DNSType uint16
 
 	// ThirdParty is true if the filtering request should consider $third-party
@@ -96,13 +114,13 @@ type Request struct {
 	IsHostnameRequest bool
 }
 
-// NewRequest creates a new instance of "Request" and populates it's fields.
+// NewRequest returns a properly initialized *Request.
 //
 // TODO(d.kolyshev):  Limit the URL length by 4 KiB. It appears that there
 // can be URLs longer than a megabyte, and it makes no sense to go through
 // the whole URL.
-func NewRequest(u, sourceURL *url.URL, requestType RequestType) *Request {
-	r := Request{
+func NewRequest(u, sourceURL *url.URL, requestType RequestType) (r *Request) {
+	r = &Request{
 		SourceURL:   sourceURL,
 		URL:         u,
 		Hostname:    u.Hostname(),
@@ -131,7 +149,7 @@ func NewRequest(u, sourceURL *url.URL, requestType RequestType) *Request {
 		r.ThirdParty = true
 	}
 
-	return &r
+	return r
 }
 
 // NewRequestForURL creates a new instance of [Request] for matching the URL's
@@ -160,8 +178,11 @@ func FillRequestForURL(r *Request, u *url.URL) {
 	}
 }
 
-// effectiveTLDPlusOne is a faster version of publicsuffix.EffectiveTLDPlusOne
-// that avoids using fmt.Errorf when the domain is less or equal the suffix.
+// effectiveTLDPlusOne is a faster version of [publicsuffix.EffectiveTLDPlusOne]
+// that avoids using [fmt.Errorf] when the domain is less than or equal to the
+// suffix.
+//
+// TODO(a.garipov):  Reinspect and consider moving to golibs.
 func effectiveTLDPlusOne(hostname string) (domain string) {
 	hostnameLen := len(hostname)
 	if hostnameLen < 1 {
