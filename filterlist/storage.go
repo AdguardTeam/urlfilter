@@ -26,7 +26,7 @@ import (
 // of that list.
 type RuleStorage struct {
 	// cache with the rules which were retrieved.  The key is the storage index
-	// and the value is the rule.
+	// and the value is the rule.  cache can be nil only in tests.
 	cache *sync.Map
 
 	// listsMap is a map with rule lists.  map key is the list ID.
@@ -74,9 +74,11 @@ func (s *RuleStorage) NewRuleStorageScanner() (sc *RuleStorageScanner) {
 // RetrieveRule looks for the filtering rule in this storage.  storageIdx is the
 // lookup index that you can get from the rule storage scanner.
 func (s *RuleStorage) RetrieveRule(storageIdx int64) (r rules.Rule, err error) {
-	ruleVal, ok := s.cache.Load(storageIdx)
-	if ok {
-		return ruleVal.(rules.Rule), nil
+	if s.cache != nil {
+		ruleVal, ok := s.cache.Load(storageIdx)
+		if ok {
+			return ruleVal.(rules.Rule), nil
+		}
 	}
 
 	listID, ruleIdx := storageIdxToRuleListIdx(storageIdx)
@@ -87,7 +89,7 @@ func (s *RuleStorage) RetrieveRule(storageIdx int64) (r rules.Rule, err error) {
 	}
 
 	r, err = list.RetrieveRule(int(ruleIdx))
-	if r != nil {
+	if r != nil && s.cache != nil {
 		s.cache.Store(storageIdx, r)
 	}
 

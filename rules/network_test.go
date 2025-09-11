@@ -887,7 +887,10 @@ func BenchmarkNetworkRule_Match(b *testing.B) {
 
 	req := rules.NewRequestForHostname("example.org")
 
-	var ok bool
+	// Warmup to make sure the init has run.
+	ok := r.Match(req)
+	require.True(b, ok)
+
 	b.ReportAllocs()
 	for b.Loop() {
 		ok = r.Match(req)
@@ -900,7 +903,7 @@ func BenchmarkNetworkRule_Match(b *testing.B) {
 	//	goarch: amd64
 	//	pkg: github.com/AdguardTeam/urlfilter/rules
 	//	cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
-	//	BenchmarkNetworkRule_Match-16    	 1859527	       646.3 ns/op	       0 B/op	       0 allocs/op
+	//	BenchmarkNetworkRule_Match-16    	 1739766	       662.7 ns/op	       0 B/op	       0 allocs/op
 }
 
 func FuzzNetworkRule_Match(f *testing.F) {

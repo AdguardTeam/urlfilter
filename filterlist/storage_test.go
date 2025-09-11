@@ -127,22 +127,42 @@ func BenchmarkStorage_RetrieveRule(b *testing.B) {
 		ID:        testListIDOther,
 	})
 
-	s, err := filterlist.NewRuleStorage([]filterlist.Interface{l1, l2})
-	require.NoError(b, err)
+	s, consErr := filterlist.NewRuleStorage([]filterlist.Interface{l1, l2})
+	require.NoError(b, consErr)
 
-	var rule rules.Rule
-	b.ReportAllocs()
-	for b.Loop() {
-		rule, err = s.RetrieveRule(testStrgID2Rule2)
-	}
+	require.True(b, b.Run("cached", func(b *testing.B) {
+		// Warmup to fill the cache.
+		r, err := s.RetrieveRule(testStrgID2Rule2)
 
-	require.Nil(b, err)
-	require.NotNil(b, rule)
+		b.ReportAllocs()
+		for b.Loop() {
+			r, err = s.RetrieveRule(testStrgID2Rule2)
+		}
+
+		require.Nil(b, err)
+		require.NotNil(b, r)
+	}))
+
+	require.True(b, b.Run("no_cache", func(b *testing.B) {
+		s.DisableCache()
+
+		var r rules.Rule
+		var err error
+
+		b.ReportAllocs()
+		for b.Loop() {
+			r, err = s.RetrieveRule(testStrgID2Rule2)
+		}
+
+		require.Nil(b, err)
+		require.NotNil(b, r)
+	}))
 
 	// Most recent results:
 	//	goos: linux
 	//	goarch: amd64
 	//	pkg: github.com/AdguardTeam/urlfilter/filterlist
 	//	cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
-	//	BenchmarkStorage_RetrieveRule-16       	83909101	        15.09 ns/op	       0 B/op	       0 allocs/op
+	//	BenchmarkStorage_RetrieveRule/cached-16         	81577381	        13.93 ns/op	       0 B/op	       0 allocs/op
+	//	BenchmarkStorage_RetrieveRule/no_cache-16       	 3115383	       370.8 ns/op	      96 B/op	       1 allocs/op
 }

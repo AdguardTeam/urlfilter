@@ -8,17 +8,13 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"runtime/debug"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/AdguardTeam/golibs/errors"
-	"github.com/AdguardTeam/golibs/log"
 	"github.com/AdguardTeam/golibs/testutil"
 	"github.com/AdguardTeam/urlfilter/filterlist"
 	"github.com/AdguardTeam/urlfilter/rules"
-	"github.com/shirou/gopsutil/v3/process"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -116,84 +112,100 @@ func TestMatchSimplePattern(t *testing.T) {
 	assert.NotNil(t, rule)
 }
 
-// TODO(a.garipov):  Consider removing and replacing with tests similar to
-// [BenchmarkDNSEngine_heapAlloc].
-func TestBenchNetworkEngine(t *testing.T) {
-	debug.SetGCPercent(10)
-
-	testRequests := loadRequests(t)
-	assert.True(t, len(testRequests) > 0)
+// BenchmarkNetworkEngine_heapAlloc is a benchmark used to measure changes in
+// the heap-allocated memory during typical operation of a network engine.  It
+// reports the following additional metrics:
+//   - heap_initial_bytes/op: the average size of allocated heap objects before
+//     doing anything.
+//   - heap_after_compilation_bytes/op: the average size of allocated heap
+//     objects after compiling rule lists.
+//   - heap_after_matching_bytes/op: the average size of allocated heap objects
+//     after matching a few requests with the engine.
+//
+// NOTE:  The precise values of the aforementioned metrics may vary from run to
+// run.  Benchmark with --benchtime no less than 10s and --count no less than 10
+// to get a better picture of the real changes in performance.
+func BenchmarkNetworkEngine_heapAlloc(b *testing.B) {
 	var requests []*rules.Request
+	testRequests := loadRequests(b)
 	for _, req := range testRequests {
-		r := rules.NewRequest(req.URL, req.FrameURL, testGetRequestType(req.RequestType))
-		requests = append(requests, r)
+		req := rules.NewRequest(req.URL, req.FrameURL, reqTypeToInternal(req.RequestType))
+		requests = append(requests, req)
 	}
 
-	startHeap, startRSS := alloc(t)
-	t.Logf(
-		"Allocated before loading rules (heap/RSS, kiB): %d/%d",
-		startHeap,
-		startRSS,
-	)
+	m := &networkEngineMeasurement{}
 
-	startParse := time.Now()
-	engine := newTestNetworkEngine(t)
-	assert.NotNil(t, engine)
-	testutil.CleanupAndRequireSuccess(t, engine.ruleStorage.Close)
-
-	t.Logf("Elapsed on parsing rules: %v", time.Since(startParse))
-
-	loadHeap, loadRSS := alloc(t)
-	t.Logf(
-		"Allocated after loading rules (heap/RSS, kiB): %d/%d (%d/%d diff)",
-		loadHeap,
-		loadRSS,
-		loadHeap-startHeap,
-		loadRSS-startRSS,
-	)
-
-	totalMatches := 0
-	totalElapsed := time.Duration(0)
-	minElapsedMatch := time.Hour
-	maxElapsedMatch := time.Duration(0)
-
-	for i, req := range requests {
-		if i != 0 && i%10000 == 0 {
-			t.Logf("Processed %d requests", i)
-		}
-
-		startMatch := time.Now()
-		rule, ok := engine.Match(req)
-		elapsedMatch := time.Since(startMatch)
-		totalElapsed += elapsedMatch
-		if elapsedMatch > maxElapsedMatch {
-			maxElapsedMatch = elapsedMatch
-		}
-		if elapsedMatch < minElapsedMatch {
-			minElapsedMatch = elapsedMatch
-		}
-
-		if ok && !rule.Whitelist {
-			totalMatches++
-		}
+	b.ReportAllocs()
+	for b.Loop() {
+		m.run(b, requests)
 	}
 
-	t.Logf("Total matches: %d", totalMatches)
-	t.Logf("Total elapsed: %v", totalElapsed)
-	t.Logf("Average per request: %v", time.Duration(int64(totalElapsed)/int64(len(requests))))
-	t.Logf("Max per request: %v", maxElapsedMatch)
-	t.Logf("Min per request: %v", minElapsedMatch)
-	//lint:ignore SA1019 TODO(a.garipov): Remove the method
-	t.Logf("Storage cache length: %d", engine.ruleStorage.GetCacheSize())
+	n := float64(b.N)
 
-	matchHeap, matchRSS := alloc(t)
-	t.Logf(
-		"Allocated after matching (heap/RSS, kiB): %d/%d (%d/%d diff)",
-		matchHeap,
-		matchRSS,
-		matchHeap-loadHeap,
-		matchRSS-loadRSS,
-	)
+	b.ReportMetric(m.initialSum/n, "heap_initial_bytes/op")
+	b.ReportMetric(m.afterCompilationSum/n, "heap_after_compilation_bytes/op")
+	b.ReportMetric(m.afterMatchingSum/n, "heap_after_matching_bytes/op")
+
+	// Most recent results:
+	//	goos: linux
+	//	goarch: amd64
+	//	pkg: github.com/AdguardTeam/urlfilter
+	//	cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
+	//	BenchmarkNetworkEngine_heapAlloc-16    	      16	 685767583 ns/op	  26823070 heap_after_compilation_bytes/op	  38823596 heap_after_matching_bytes/op	  17057441 heap_initial_bytes/op	51036463 B/op	  515101 allocs/op
+}
+
+// networkEngineMeasurement emulates a life cycle of a network filtering engine.
+type networkEngineMeasurement struct {
+	initialSum          float64
+	afterCompilationSum float64
+	afterMatchingSum    float64
+}
+
+// run performs a network engine life cycle.  Items of requests must not be nil.
+func (m *networkEngineMeasurement) run(tb testing.TB, requests []*rules.Request) {
+	tb.Helper()
+
+	runtime.GC()
+
+	m.initialSum += heapAlloc(tb)
+
+	e := newTestNetworkEngine(tb)
+
+	m.afterCompilationSum += heapAlloc(tb)
+
+	for _, req := range requests {
+		_, _ = e.Match(req)
+	}
+
+	m.afterMatchingSum += heapAlloc(tb)
+}
+
+// reqTypeToInternal converts a string value from requests.json to a valid
+// RequestType.  This maps puppeteer types to WebRequest types.
+func reqTypeToInternal(s string) (t rules.RequestType) {
+	switch s {
+	case "document":
+		// Consider document requests as sub_document.  This is because the
+		// request dataset does not contain sub_frame or main_frame but only
+		// 'document'.
+		return rules.TypeSubdocument
+	case "stylesheet":
+		return rules.TypeStylesheet
+	case "font":
+		return rules.TypeFont
+	case "image":
+		return rules.TypeImage
+	case "media":
+		return rules.TypeMedia
+	case "script":
+		return rules.TypeScript
+	case "xhr", "fetch":
+		return rules.TypeXmlhttprequest
+	case "websocket":
+		return rules.TypeWebsocket
+	default:
+		return rules.TypeOther
+	}
 }
 
 func FuzzNetworkEngine_Match(f *testing.F) {
@@ -230,33 +242,6 @@ func FuzzNetworkEngine_Match(f *testing.F) {
 			_, _ = engine.Match(rules.NewRequestForHostname(host))
 		})
 	})
-}
-
-// assumeRequestType converts string value from requests.json to RequestType
-// This maps puppeteer types to WebRequest types
-func testGetRequestType(t string) rules.RequestType {
-	switch t {
-	case "document":
-		// Consider document requests as sub_document. This is because the request
-		// dataset does not contain sub_frame or main_frame but only 'document'.
-		return rules.TypeSubdocument
-	case "stylesheet":
-		return rules.TypeStylesheet
-	case "font":
-		return rules.TypeFont
-	case "image":
-		return rules.TypeImage
-	case "media":
-		return rules.TypeMedia
-	case "script":
-		return rules.TypeScript
-	case "xhr", "fetch":
-		return rules.TypeXmlhttprequest
-	case "websocket":
-		return rules.TypeWebsocket
-	default:
-		return rules.TypeOther
-	}
 }
 
 func isSupportedURL(url string) bool {
@@ -298,21 +283,22 @@ func newTestRuleStorage(t *testing.T, listID int, rulesText string) *filterlist.
 	return ruleStorage
 }
 
-func loadRequests(t testing.TB) []testRequest {
+// loadRequests loads requests for tests from the testdata.
+func loadRequests(tb testing.TB) (requests []testRequest) {
+	tb.Helper()
+
 	if _, err := os.Stat(requestsPath); errors.Is(err, os.ErrNotExist) {
 		err = unzip(requestsPath+".zip", testResourcesDir)
 		if err != nil {
-			t.Fatalf("cannot unzip %s.zip", requestsPath)
+			tb.Fatalf("cannot unzip %s.zip", requestsPath)
 		}
 	}
 
 	file, err := os.Open(requestsPath)
 	if err != nil {
-		t.Fatalf("cannot load %s: %s", requestsPath, err)
+		tb.Fatalf("cannot load %s: %s", requestsPath, err)
 	}
-	testutil.CleanupAndRequireSuccess(t, file.Close)
-
-	var requests []testRequest
+	testutil.CleanupAndRequireSuccess(tb, file.Close)
 
 	scanner := bufio.NewScanner(file)
 	lineNumber := 0
@@ -331,10 +317,9 @@ func loadRequests(t testing.TB) []testRequest {
 	}
 
 	if err = scanner.Err(); err != nil {
-		t.Fatal(err)
+		tb.Fatal(err)
 	}
 
-	log.Printf("Loaded %d requests from %s", len(requests), requestsPath)
 	return requests
 }
 
@@ -399,18 +384,4 @@ func unzip(src, dest string) (err error) {
 	}
 
 	return nil
-}
-
-// alloc returns the heap and RSS memory sizes, in kibibytes.
-func alloc(t testing.TB) (heap, rss uint64) {
-	p, err := process.NewProcess(int32(os.Getpid()))
-	require.NoError(t, err)
-
-	mi, err := p.MemoryInfo()
-	require.NoError(t, err)
-
-	ms := &runtime.MemStats{}
-	runtime.ReadMemStats(ms)
-
-	return ms.Alloc / 1024, mi.RSS / 1024
 }

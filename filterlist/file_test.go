@@ -6,7 +6,6 @@ import (
 
 	"github.com/AdguardTeam/golibs/testutil"
 	"github.com/AdguardTeam/urlfilter/filterlist"
-	"github.com/AdguardTeam/urlfilter/rules"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -72,8 +71,9 @@ func BenchmarkFile_RetrieveRule(b *testing.B) {
 	require.NoError(b, fileErr)
 	testutil.CleanupAndRequireSuccess(b, f.Close)
 
-	var r rules.Rule
-	var err error
+	// Warmup to fill the buffer.
+	r, err := f.RetrieveRule(0)
+	require.NoError(b, err)
 
 	b.ReportAllocs()
 	for b.Loop() {
@@ -84,10 +84,9 @@ func BenchmarkFile_RetrieveRule(b *testing.B) {
 	assert.NotZero(b, r)
 
 	// Most recent results:
-	//
-	//	goos: darwin
-	//	goarch: arm64
+	//	goos: linux
+	//	goarch: amd64
 	//	pkg: github.com/AdguardTeam/urlfilter/filterlist
-	//	cpu: Apple M1 Pro
-	//	BenchmarkFile_RetrieveRule-8   	  995864	      1173 ns/op	     448 B/op	       4 allocs/op
+	//	cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
+	//	BenchmarkFile_RetrieveRule-16  	  642164	      2675 ns/op	     448 B/op	       4 allocs/op
 }

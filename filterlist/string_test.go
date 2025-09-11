@@ -81,9 +81,9 @@ func BenchmarkString_RetrieveRule(b *testing.B) {
 
 	// Most recent results:
 	//
-	//	goos: darwin
-	//	goarch: arm64
+	//	goos: linux
+	//	goarch: amd64
 	//	pkg: github.com/AdguardTeam/urlfilter/filterlist
-	//	cpu: Apple M1 Pro
-	//	BenchmarkString_RetrieveRule-8   	 6182457	       185.4 ns/op	     432 B/op	       3 allocs/op
+	//	cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
+	//	BenchmarkString_RetrieveRule-16  	 2005084	       560.3 ns/op	     432 B/op	       3 allocs/op
 }

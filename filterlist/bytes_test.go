@@ -80,10 +80,9 @@ func BenchmarkBytes_RetrieveRule(b *testing.B) {
 	assert.NotZero(b, r)
 
 	// Most recent results:
-	//
-	//	goos: darwin
-	//	goarch: arm64
+	//	goos: linux
+	//	goarch: amd64
 	//	pkg: github.com/AdguardTeam/urlfilter/filterlist
-	//	cpu: Apple M1 Pro
-	//	BenchmarkBytes_RetrieveRule-8   	 6178849	       184.0 ns/op	     448 B/op	       4 allocs/op
+	//	cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
+	//	BenchmarkBytes_RetrieveRule-16  	 2415882	       524.2 ns/op	     448 B/op	       4 allocs/op
 }

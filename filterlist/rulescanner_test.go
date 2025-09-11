@@ -76,5 +76,5 @@ func BenchmarkRuleScanner_Scan(b *testing.B) {
 	//	goarch: amd64
 	//	pkg: github.com/AdguardTeam/urlfilter/filterlist
 	//	cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
-	//	BenchmarkRuleScanner_Scan-16       	20089935	        59.03 ns/op	       0 B/op	       0 allocs/op
+	//	BenchmarkRuleScanner_Scan-16       	30498922	        37.58 ns/op	       0 B/op	       0 allocs/op
 }
