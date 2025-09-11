@@ -33,32 +33,6 @@ type DNSEngine struct {
 	RulesCount int
 }
 
-// DNSResult is the result of matching a DNS filtering request.
-type DNSResult struct {
-	// NetworkRule is the matched network rule, if any.  If it is nil,
-	// HostRulesV4 and HostRulesV6 may still contain matched hosts-file style
-	// rules.
-	NetworkRule *rules.NetworkRule
-
-	// HostRulesV4 are the host rules with IPv4 addresses.
-	HostRulesV4 []*rules.HostRule
-
-	// HostRulesV6 are the host rules with IPv6 addresses.
-	HostRulesV6 []*rules.HostRule
-
-	// NetworkRules are all matched network rules.  These include unprocessed
-	// DNS rewrites, exception rules, and so on.
-	NetworkRules []*rules.NetworkRule
-}
-
-// Reset makes res ready for reuse.
-func (res *DNSResult) Reset() {
-	res.NetworkRule = nil
-	res.HostRulesV4 = res.HostRulesV4[:0]
-	res.HostRulesV6 = res.HostRulesV6[:0]
-	res.NetworkRules = res.NetworkRules[:0]
-}
-
 // DNSRequest represents a DNS query with associated metadata.
 type DNSRequest struct {
 	// ClientIP is the IP address to match against $client modifiers.  The
