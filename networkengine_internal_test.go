@@ -34,7 +34,7 @@ type testRequest struct {
 }
 
 func TestEmptyNetworkEngine(t *testing.T) {
-	ruleStorage := newTestRuleStorage(t, 1, "")
+	ruleStorage := newTestRuleStorage(t, testListID, "")
 	engine := NewNetworkEngine(ruleStorage)
 	r := rules.NewRequest("http://example.org/", "", rules.TypeOther)
 	rule, ok := engine.Match(r)
@@ -46,7 +46,7 @@ func TestMatchWhitelistRule(t *testing.T) {
 	r1 := "||example.org^$script"
 	r2 := "@@http://example.org^"
 	rulesText := strings.Join([]string{r1, r2}, "\n")
-	ruleStorage := newTestRuleStorage(t, -1, rulesText)
+	ruleStorage := newTestRuleStorage(t, testListID, rulesText)
 	engine := NewNetworkEngine(ruleStorage)
 
 	r := rules.NewRequest("http://example.org/", "", rules.TypeScript)
@@ -61,7 +61,7 @@ func TestMatchImportantRule(t *testing.T) {
 	r2 := "@@||example.org^"
 	r3 := "||test1.example.org^"
 	rulesText := strings.Join([]string{r1, r2, r3}, "\n")
-	ruleStorage := newTestRuleStorage(t, -1, rulesText)
+	ruleStorage := newTestRuleStorage(t, testListID, rulesText)
 	engine := NewNetworkEngine(ruleStorage)
 
 	r := rules.NewRequest("http://example.org/", "", rules.TypeOther)
@@ -85,7 +85,7 @@ func TestMatchImportantRule(t *testing.T) {
 
 func TestMatchSourceRule(t *testing.T) {
 	ruleText := "|https://$image,media,script,third-party,domain=~feedback.pornhub.com|pornhub.com|redtube.com|redtube.com.br|tube8.com|tube8.es|tube8.fr|youporn.com|youporngay.com"
-	ruleStorage := newTestRuleStorage(t, -1, ruleText)
+	ruleStorage := newTestRuleStorage(t, testListID, ruleText)
 	engine := NewNetworkEngine(ruleStorage)
 
 	url := "https://ci.phncdn.com/videos/201809/25/184777011/original/(m=ecuKGgaaaa)(mh=VSmV9NL_iouBcWJJ)4.jpg"
@@ -100,7 +100,7 @@ func TestMatchSourceRule(t *testing.T) {
 func TestMatchSimplePattern(t *testing.T) {
 	// Simple pattern rule
 	ruleText := "_prebid_"
-	ruleStorage := newTestRuleStorage(t, -1, ruleText)
+	ruleStorage := newTestRuleStorage(t, testListID, ruleText)
 	engine := NewNetworkEngine(ruleStorage)
 
 	url := "https://ap.lijit.com/rtb/bid?src=prebid_prebid_1.35.0"
@@ -151,7 +151,7 @@ func BenchmarkNetworkEngine_heapAlloc(b *testing.B) {
 	//	goarch: amd64
 	//	pkg: github.com/AdguardTeam/urlfilter
 	//	cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
-	//	BenchmarkNetworkEngine_heapAlloc-16    	      16	 685767583 ns/op	  26823070 heap_after_compilation_bytes/op	  38823596 heap_after_matching_bytes/op	  17057441 heap_initial_bytes/op	51036463 B/op	  515101 allocs/op
+	//	BenchmarkNetworkEngine_heapAlloc-16    	      16	 677506907 ns/op	  27030262 heap_after_compilation_bytes/op	  40732900 heap_after_matching_bytes/op	  17041048 heap_initial_bytes/op	51480404 B/op	  515107 allocs/op
 }
 
 // networkEngineMeasurement emulates a life cycle of a network filtering engine.
@@ -225,7 +225,7 @@ func FuzzNetworkEngine_Match(f *testing.F) {
 	lists := []filterlist.Interface{
 		filterlist.NewString(&filterlist.StringConfig{
 			RulesText:      rulesText,
-			ID:             1,
+			ID:             testListID,
 			IgnoreCosmetic: true,
 		}),
 	}
@@ -260,7 +260,7 @@ func newTestNetworkEngine(tb testing.TB) (engine *NetworkEngine) {
 	lists := []filterlist.Interface{
 		filterlist.NewBytes(&filterlist.BytesConfig{
 			RulesText:      filterBytes,
-			ID:             1,
+			ID:             testListID,
 			IgnoreCosmetic: true,
 		}),
 	}
@@ -271,16 +271,16 @@ func newTestNetworkEngine(tb testing.TB) (engine *NetworkEngine) {
 	return NewNetworkEngine(ruleStorage)
 }
 
-func newTestRuleStorage(t *testing.T, listID int, rulesText string) *filterlist.RuleStorage {
+func newTestRuleStorage(t *testing.T, id rules.ListID, text string) (s *filterlist.RuleStorage) {
 	list := filterlist.NewString(&filterlist.StringConfig{
-		RulesText: rulesText,
-		ID:        listID,
+		RulesText: text,
+		ID:        id,
 	})
-	ruleStorage, err := filterlist.NewRuleStorage([]filterlist.Interface{list})
-	if err != nil {
-		t.Fatalf("cannot initialize rule storage: %s", err)
-	}
-	return ruleStorage
+
+	s, err := filterlist.NewRuleStorage([]filterlist.Interface{list})
+	require.NoError(t, err)
+
+	return s
 }
 
 // loadRequests loads requests for tests from the testdata.

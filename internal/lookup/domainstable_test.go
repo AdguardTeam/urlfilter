@@ -105,7 +105,7 @@ func BenchmarkDomainsTable_AppendMatching(b *testing.B) {
 	//	goarch: amd64
 	//	pkg: github.com/AdguardTeam/urlfilter/internal/lookup
 	//	cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
-	//	BenchmarkDomainsTable_AppendMatching-16     	 1000000	      1114 ns/op	       0 B/op	       0 allocs/op
+	//	BenchmarkDomainsTable_AppendMatching-16     	 1000000	      1093 ns/op	       0 B/op	       0 allocs/op
 }
 
 func BenchmarkDomainsTable_AppendMatching_baseFilter(b *testing.B) {
@@ -134,5 +134,5 @@ func BenchmarkDomainsTable_AppendMatching_baseFilter(b *testing.B) {
 	//	goarch: amd64
 	//	pkg: github.com/AdguardTeam/urlfilter/internal/lookup
 	//	cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
-	//	BenchmarkDomainsTable_AppendMatching_baseFilter-16     	  743889	      1623 ns/op	       0 B/op	       0 allocs/op
+	//	BenchmarkDomainsTable_AppendMatching_baseFilter-16     	  744973	      1620 ns/op	       0 B/op	       0 allocs/op
 }

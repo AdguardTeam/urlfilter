@@ -8,6 +8,7 @@ import (
 	"github.com/AdguardTeam/golibs/errors"
 	"github.com/AdguardTeam/golibs/logutil/slogutil"
 	"github.com/AdguardTeam/urlfilter/rules"
+	"github.com/c2h5oh/datasize"
 )
 
 // RuleStorage is an abstraction that combines several rule lists.  It can be
@@ -20,34 +21,40 @@ import (
 // rule lists once in order to fill up the lookup tables.  We use rule indexes
 // as a unique rule identifier instead of the rule itself.  The rule is created
 // (see [RuleStorage.RetrieveRule]) only when there's a chance that it's needed.
-//
-// Rule index is an int64 value that actually consists of two int32 values: one
-// is the rule list identifier, and the second is the index of the rule inside
-// of that list.
 type RuleStorage struct {
 	// cache with the rules which were retrieved.  The key is the storage index
 	// and the value is the rule.  cache can be nil only in tests.
+	//
+	// TODO(a.garipov):  Use syncutil.Map.
 	cache *sync.Map
 
 	// listsMap is a map with rule lists.  map key is the list ID.
-	listsMap map[int]Interface
+	//
+	// TODO(a.garipov):  Consider using an ID-to-index mapping bound to lists
+	// below.
+	listsMap map[rules.ListID]Interface
 
 	// lists is an array of rules lists which can be accessed using this
 	// RuleStorage.
 	lists []Interface
+
+	// sizeEst is the size estimate of all rule-lists in the storage.
+	sizeEst datasize.ByteSize
 }
 
 // NewRuleStorage creates a new instance of the [*RuleStorage] and validates the
 // list of rules specified.
 func NewRuleStorage(lists []Interface) (s *RuleStorage, err error) {
-	listsMap := make(map[int]Interface, len(lists))
-	for i, list := range lists {
-		id := list.GetID()
+	var sizeEst datasize.ByteSize
+	listsMap := make(map[rules.ListID]Interface, len(lists))
+	for i, l := range lists {
+		id := l.ListID()
 		if _, ok := listsMap[id]; ok {
-			return nil, fmt.Errorf("at index %d: id: %w: %q", i, errors.ErrDuplicated, id)
+			return nil, fmt.Errorf("at index %d: id: %w: %d", i, errors.ErrDuplicated, id)
 		}
 
-		listsMap[id] = list
+		listsMap[id] = l
+		sizeEst += l.SizeEstimate()
 	}
 
 	return &RuleStorage{
@@ -71,26 +78,24 @@ func (s *RuleStorage) NewRuleStorageScanner() (sc *RuleStorageScanner) {
 	}
 }
 
-// RetrieveRule looks for the filtering rule in this storage.  storageIdx is the
-// lookup index that you can get from the rule storage scanner.
-func (s *RuleStorage) RetrieveRule(storageIdx int64) (r rules.Rule, err error) {
+// RetrieveRule looks for the filtering rule in this storage.  id is the storage
+// ID as received from the scanner.
+func (s *RuleStorage) RetrieveRule(id StorageID) (r rules.Rule, err error) {
 	if s.cache != nil {
-		ruleVal, ok := s.cache.Load(storageIdx)
+		ruleVal, ok := s.cache.Load(id)
 		if ok {
 			return ruleVal.(rules.Rule), nil
 		}
 	}
 
-	listID, ruleIdx := storageIdxToRuleListIdx(storageIdx)
-
-	list, ok := s.listsMap[int(listID)]
+	list, ok := s.listsMap[id.listID]
 	if !ok {
-		return nil, fmt.Errorf("list %d does not exist", listID)
+		return nil, fmt.Errorf("list %d does not exist", id.listID)
 	}
 
-	r, err = list.RetrieveRule(int(ruleIdx))
+	r, err = list.RetrieveRule(id.ruleIdx)
 	if r != nil && s.cache != nil {
-		s.cache.Store(storageIdx, r)
+		s.cache.Store(id, r)
 	}
 
 	return r, err
@@ -99,11 +104,14 @@ func (s *RuleStorage) RetrieveRule(storageIdx int64) (r rules.Rule, err error) {
 // RetrieveNetworkRule is a helper method that retrieves a network rule from the
 // storage.  It returns a pointer to the rule or nil in any other case (not
 // found or error).
-func (s *RuleStorage) RetrieveNetworkRule(idx int64) (nr *rules.NetworkRule) {
-	r, err := s.RetrieveRule(idx)
+//
+// TODO(a.garipov):  Rewrite into a helper function instead of a method and
+// return the error.
+func (s *RuleStorage) RetrieveNetworkRule(id StorageID) (nr *rules.NetworkRule) {
+	r, err := s.RetrieveRule(id)
 	if err != nil {
 		// TODO(a.garipov):  Add better support for log/slog.
-		slog.Error("cannot retrieve network rule", "idx", idx, slogutil.KeyError, err)
+		slog.Error("cannot retrieve network rule", "id", id, slogutil.KeyError, err)
 
 		return nil
 	}
@@ -116,11 +124,14 @@ func (s *RuleStorage) RetrieveNetworkRule(idx int64) (nr *rules.NetworkRule) {
 // RetrieveHostRule is a helper method that retrieves a host rule from the
 // storage.  It returns a pointer to the rule or nil in any other case (not
 // found or error).
-func (s *RuleStorage) RetrieveHostRule(idx int64) (hr *rules.HostRule) {
-	r, err := s.RetrieveRule(idx)
+//
+// TODO(a.garipov):  Rewrite into a helper function instead of a method and
+// return the error.
+func (s *RuleStorage) RetrieveHostRule(id StorageID) (hr *rules.HostRule) {
+	r, err := s.RetrieveRule(id)
 	if err != nil {
 		// TODO(a.garipov):  Add better support for log/slog.
-		slog.Error("cannot retrieve host rule", "idx", idx, slogutil.KeyError, err)
+		slog.Error("cannot retrieve host rule", "id", id, slogutil.KeyError, err)
 
 		return nil
 	}
@@ -128,6 +139,11 @@ func (s *RuleStorage) RetrieveHostRule(idx int64) (hr *rules.HostRule) {
 	hr, _ = r.(*rules.HostRule)
 
 	return hr
+}
+
+// SizeEstimate returns the size estimate of all rule-lists in the storage.
+func (s *RuleStorage) SizeEstimate() (est datasize.ByteSize) {
+	return s.sizeEst
 }
 
 // Close closes the storage instance.
@@ -145,16 +161,4 @@ func (s *RuleStorage) Close() (err error) {
 	}
 
 	return errors.Annotate(errors.Join(errs...), "closing rule lists: %w")
-}
-
-// GetCacheSize returns the size of the in-memory rules cache.
-//
-// Deprecated:  This method is deprecated and will be removed in a future
-// version.
-func (s *RuleStorage) GetCacheSize() (sz int) {
-	for range s.cache.Range {
-		sz++
-	}
-
-	return sz
 }

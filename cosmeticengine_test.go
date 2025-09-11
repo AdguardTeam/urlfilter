@@ -108,7 +108,7 @@ example.org#@#banner_generic_disabled`
 	lists := []filterlist.Interface{
 		filterlist.NewString(&filterlist.StringConfig{
 			RulesText: rulesText,
-			ID:        1,
+			ID:        testListID,
 		}),
 	}
 

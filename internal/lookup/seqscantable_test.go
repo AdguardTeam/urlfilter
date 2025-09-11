@@ -79,7 +79,7 @@ func BenchmarkSeqScanTable_AppendMatching(b *testing.B) {
 	//	goarch: amd64
 	//	pkg: github.com/AdguardTeam/urlfilter/internal/lookup
 	//	cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
-	//	BenchmarkSeqScanTable_AppendMatching-16     	 1331782	       885.7 ns/op	       0 B/op	       0 allocs/op
+	//	BenchmarkSeqScanTable_AppendMatching-16     	 1359025	       871.1 ns/op	       0 B/op	       0 allocs/op
 }
 
 func BenchmarkSeqScanTable_AppendMatching_baseFilter(b *testing.B) {
@@ -111,5 +111,5 @@ func BenchmarkSeqScanTable_AppendMatching_baseFilter(b *testing.B) {
 	//	goarch: amd64
 	//	pkg: github.com/AdguardTeam/urlfilter/internal/lookup
 	//	cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
-	//	BenchmarkSeqScanTable_AppendMatching_baseFilter-16     	     379	   3149445 ns/op	       0 B/op	       0 allocs/op
+	//	BenchmarkSeqScanTable_AppendMatching_baseFilter-16    	     392	   3057949 ns/op	       0 B/op	       0 allocs/op
 }

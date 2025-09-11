@@ -20,7 +20,7 @@ func TestString_RuleListScanner(t *testing.T) {
 
 	ruleList := filterlist.NewString(conf)
 	testutil.CleanupAndRequireSuccess(t, ruleList.Close)
-	assert.Equal(t, testListID, ruleList.GetID())
+	assert.Equal(t, testListID, ruleList.ListID())
 
 	scanner := ruleList.NewScanner()
 	assert.True(t, scanner.Scan())
@@ -30,7 +30,7 @@ func TestString_RuleListScanner(t *testing.T) {
 
 	assert.Equal(t, testRuleDomain, f.Text())
 	assert.Equal(t, testListID, f.GetFilterListID())
-	assert.Equal(t, 0, idx)
+	assert.Equal(t, int64(0), idx)
 
 	assert.True(t, scanner.Scan())
 
@@ -85,5 +85,5 @@ func BenchmarkString_RetrieveRule(b *testing.B) {
 	//	goarch: amd64
 	//	pkg: github.com/AdguardTeam/urlfilter/filterlist
 	//	cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
-	//	BenchmarkString_RetrieveRule-16  	 2005084	       560.3 ns/op	     432 B/op	       3 allocs/op
+	//	BenchmarkString_RetrieveRule-16  	 2499549	       508.9 ns/op	     432 B/op	       3 allocs/op
 }

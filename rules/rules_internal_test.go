@@ -7,6 +7,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Common ListIDs for tests.
+const (
+	testListID ListID = 1
+)
+
 func TestSplitWithEscapeCharacter(t *testing.T) {
 	str := "opt1,opt2"
 	parts := splitWithEscapeCharacter(str, ',', '\\', false)

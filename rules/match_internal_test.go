@@ -3,39 +3,30 @@ package rules
 import (
 	"testing"
 
+	"github.com/AdguardTeam/golibs/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestRemoveDNSRewriteRules(t *testing.T) {
-	rs := []*NetworkRule{{
-		RuleText:   "host1",
-		DNSRewrite: nil,
-	}, {
-		RuleText:   "host2",
-		DNSRewrite: nil,
-	}, {
-		RuleText:   "host3",
-		DNSRewrite: nil,
-	}}
+	rs := []*NetworkRule{
+		errors.Must(NewNetworkRule("host1", testListID)),
+		errors.Must(NewNetworkRule("host2", testListID)),
+		errors.Must(NewNetworkRule("host3", testListID)),
+	}
 
 	got := removeDNSRewriteRules(rs)
 	assert.Equal(t, rs, got)
 
-	rs = []*NetworkRule{{
-		RuleText:   "host1",
-		DNSRewrite: nil,
-	}, {
-		RuleText:   "host2",
-		DNSRewrite: &DNSRewrite{},
-	}, {
-		RuleText:   "host3",
-		DNSRewrite: nil,
-	}}
+	rs = []*NetworkRule{
+		errors.Must(NewNetworkRule("host1", testListID)),
+		errors.Must(NewNetworkRule("host2^$dnsrewrite=127.0.0.1", testListID)),
+		errors.Must(NewNetworkRule("host3", testListID)),
+	}
 
 	got = removeDNSRewriteRules(rs)
 	require.Len(t, got, 2)
 
-	assert.Equal(t, "host1", got[0].RuleText)
-	assert.Equal(t, "host3", got[1].RuleText)
+	assert.Equal(t, "host1", got[0].String())
+	assert.Equal(t, "host3", got[1].String())
 }

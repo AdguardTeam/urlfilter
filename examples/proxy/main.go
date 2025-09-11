@@ -15,6 +15,7 @@ import (
 	"github.com/AdguardTeam/gomitmproxy"
 	"github.com/AdguardTeam/gomitmproxy/mitm"
 	"github.com/AdguardTeam/urlfilter/proxy"
+	"github.com/AdguardTeam/urlfilter/rules"
 )
 
 func main() {
@@ -84,7 +85,7 @@ func main() {
 		MITMConfig:     mitmConfig,
 		MITMExceptions: []string{"example.com"},
 	}
-	config.FiltersPaths = map[int]string{
+	config.FiltersPaths = map[rules.ListID]string{
 		1: "adguard_base_filter.txt",
 		2: "adguard_russian_filter.txt",
 	}

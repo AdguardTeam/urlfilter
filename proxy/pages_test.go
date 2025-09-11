@@ -13,7 +13,7 @@ func TestBuildBlockedPage(t *testing.T) {
 	s := &Session{
 		Request: rules.NewRequest("https://example.org/", "", rules.TypeDocument),
 	}
-	f, err := rules.NewNetworkRule("||example.org^", 0)
+	f, err := rules.NewNetworkRule("||example.org^", 1)
 	assert.Nil(t, err)
 
 	page := buildBlockedPage(s, f)

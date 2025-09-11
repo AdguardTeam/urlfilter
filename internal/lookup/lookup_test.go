@@ -100,7 +100,7 @@ func assertMatch(
 
 	require.Len(tb, gotRules, 1)
 
-	assert.Equal(tb, wantRuleText, gotRules[0].RuleText)
+	assert.Equal(tb, wantRuleText, gotRules[0].String())
 }
 
 // assertRuleIsAdded is a helper to assert if a single rule has been added to
@@ -118,8 +118,8 @@ func assertRuleIsAdded(
 	for sc.Scan() {
 		num++
 
-		r, idx := sc.Rule()
-		want(tb, tbl.Add(r.(*rules.NetworkRule), idx))
+		r, id := sc.Rule()
+		want(tb, tbl.Add(r.(*rules.NetworkRule), id))
 	}
 
 	assert.Equal(tb, 1, num)
@@ -131,9 +131,9 @@ func loadTable(tb testing.TB, tbl lookup.Table, s *filterlist.RuleStorage) {
 
 	sc := s.NewRuleStorageScanner()
 	for sc.Scan() {
-		r, idx := sc.Rule()
+		r, id := sc.Rule()
 		if nr, ok := r.(*rules.NetworkRule); ok {
-			_ = tbl.Add(nr, idx)
+			_ = tbl.Add(nr, id)
 		}
 	}
 }

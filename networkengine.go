@@ -35,10 +35,10 @@ func NewNetworkEngine(s *filterlist.RuleStorage) (engine *NetworkEngine) {
 	scanner := s.NewRuleStorageScanner()
 
 	for scanner.Scan() {
-		f, idx := scanner.Rule()
+		f, id := scanner.Rule()
 		rule, ok := f.(*rules.NetworkRule)
 		if ok {
-			engine.AddRule(rule, idx)
+			engine.AddRule(rule, id)
 		}
 	}
 
@@ -100,11 +100,12 @@ func (n *NetworkEngine) AppendAllMatching(
 	return res
 }
 
-// AddRule adds rule to the network engine.
-func (n *NetworkEngine) AddRule(f *rules.NetworkRule, storageIdx int64) {
+// AddRule adds rule to the network engine.  r must not be nil.
+func (n *NetworkEngine) AddRule(r *rules.NetworkRule, id filterlist.StorageID) {
 	for _, table := range n.lookupTables {
-		if table.Add(f, storageIdx) {
+		if table.Add(r, id) {
 			n.RulesCount++
+
 			return
 		}
 	}

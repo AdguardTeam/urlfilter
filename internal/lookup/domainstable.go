@@ -19,7 +19,7 @@ type DomainsTable struct {
 	subdomainsPool *syncutil.Pool[[]string]
 
 	// domainsIndex is the index of domains to rules that match them.
-	domainsIndex map[string][]int64
+	domainsIndex map[string][]filterlist.StorageID
 }
 
 // subdomainsEst is the estimate for the number of subdomains in a domain.
@@ -30,7 +30,7 @@ func NewDomainsTable(rs *filterlist.RuleStorage) (s *DomainsTable) {
 	return &DomainsTable{
 		ruleStorage:    rs,
 		subdomainsPool: syncutil.NewSlicePool[string](subdomainsEst),
-		domainsIndex:   map[string][]int64{},
+		domainsIndex:   map[string][]filterlist.StorageID{},
 	}
 }
 
@@ -38,7 +38,7 @@ func NewDomainsTable(rs *filterlist.RuleStorage) (s *DomainsTable) {
 var _ Table = (*DomainsTable)(nil)
 
 // Add implements the [Table] interface for *DomainsTable.
-func (d *DomainsTable) Add(f *rules.NetworkRule, storageIdx int64) (ok bool) {
+func (d *DomainsTable) Add(f *rules.NetworkRule, id filterlist.StorageID) (ok bool) {
 	permittedDomains := f.GetPermittedDomains()
 	if len(permittedDomains) == 0 {
 		return false
@@ -46,7 +46,7 @@ func (d *DomainsTable) Add(f *rules.NetworkRule, storageIdx int64) (ok bool) {
 
 	for _, domain := range permittedDomains {
 		rulesIndexes := d.domainsIndex[domain]
-		rulesIndexes = append(rulesIndexes, storageIdx)
+		rulesIndexes = append(rulesIndexes, id)
 		d.domainsIndex[domain] = rulesIndexes
 	}
 
@@ -72,9 +72,9 @@ func (d *DomainsTable) AppendMatching(
 	}
 
 	for _, domain := range *subdomainsPtr {
-		matchingRules := d.domainsIndex[domain]
-		for _, idx := range matchingRules {
-			rule := d.ruleStorage.RetrieveNetworkRule(idx)
+		matchingIDs := d.domainsIndex[domain]
+		for _, id := range matchingIDs {
+			rule := d.ruleStorage.RetrieveNetworkRule(id)
 			if rule != nil && rule.Match(r) {
 				res = append(res, rule)
 			}

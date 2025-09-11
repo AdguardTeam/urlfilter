@@ -3,7 +3,10 @@ package filterlist
 import (
 	"strings"
 
+	"github.com/AdguardTeam/golibs/errors"
+	"github.com/AdguardTeam/golibs/validate"
 	"github.com/AdguardTeam/urlfilter/rules"
+	"github.com/c2h5oh/datasize"
 )
 
 // StringConfig represents configuration for a string-based rule list.
@@ -12,7 +15,7 @@ type StringConfig struct {
 	RulesText string
 
 	// ID is the rule list identifier.
-	ID int
+	ID rules.ListID
 
 	// IgnoreCosmetic tells whether to ignore cosmetic rules or not.
 	IgnoreCosmetic bool
@@ -21,7 +24,7 @@ type StringConfig struct {
 // String is an [Interface] implementation which stores rules within a string.
 type String struct {
 	rulesText      string
-	id             int
+	id             rules.ListID
 	ignoreCosmetic bool
 }
 
@@ -37,30 +40,42 @@ func NewString(conf *StringConfig) (s *String) {
 // type check
 var _ Interface = (*String)(nil)
 
-// GetID implements the [Interface] interface for *String.
-func (s *String) GetID() (id int) {
+// Close implements the [Interface] interface for *String.
+func (s *String) Close() (err error) {
+	return nil
+}
+
+// ListID implements the [Interface] interface for *String.
+func (s *String) ListID() (id rules.ListID) {
 	return s.id
 }
 
 // NewScanner implements the [Interface] interface for *String.
 func (s *String) NewScanner() (sc *RuleScanner) {
-	return NewRuleScanner(strings.NewReader(s.rulesText), s.id, s.ignoreCosmetic)
+	return NewRuleScanner(
+		strings.NewReader(s.rulesText),
+		s.id,
+		s.ignoreCosmetic,
+	)
 }
 
 // RetrieveRule implements the [Interface] interface for *String.
-func (s *String) RetrieveRule(ruleIdx int) (r rules.Rule, err error) {
-	if ruleIdx < 0 || ruleIdx >= len(s.rulesText) {
+func (s *String) RetrieveRule(ruleIdx int64) (r rules.Rule, err error) {
+	errors.Check(validate.NotNegative("ruleIdx", ruleIdx))
+
+	if ruleIdx >= int64(len(s.rulesText)) {
 		return nil, ErrRuleRetrieval
 	}
 
-	endOfLine := strings.IndexByte(s.rulesText[ruleIdx:], '\n')
-	if endOfLine == -1 {
-		endOfLine = len(s.rulesText)
+	var lastIdx int64
+	eolIdx := strings.IndexByte(s.rulesText[ruleIdx:], '\n')
+	if eolIdx == -1 {
+		lastIdx = int64(len(s.rulesText))
 	} else {
-		endOfLine += ruleIdx
+		lastIdx = ruleIdx + int64(eolIdx)
 	}
 
-	line := strings.TrimSpace(s.rulesText[ruleIdx:endOfLine])
+	line := strings.TrimSpace(s.rulesText[ruleIdx:lastIdx])
 	if len(line) == 0 {
 		return nil, ErrRuleRetrieval
 	}
@@ -68,7 +83,7 @@ func (s *String) RetrieveRule(ruleIdx int) (r rules.Rule, err error) {
 	return rules.NewRule(line, s.id)
 }
 
-// Close implements the [Interface] interface for *String.
-func (s *String) Close() (err error) {
-	return nil
+// SizeEstimate implements the [Interface] interface for *String.
+func (s *String) SizeEstimate() (est datasize.ByteSize) {
+	return datasize.ByteSize(len(s.rulesText))
 }

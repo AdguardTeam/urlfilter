@@ -98,10 +98,8 @@ func init() {
 
 // CosmeticRule represents a cosmetic rule (element hiding, CSS, scriptlet).
 type CosmeticRule struct {
-	// RuleText is the original rule text.
-	//
-	// TODO(a.garipov):  Unexport.
-	RuleText string
+	// text is the original rule text.
+	text string
 
 	// Content meaning depends on the rule type:
 	//  - Element hiding: content is just a selector;
@@ -115,10 +113,8 @@ type CosmeticRule struct {
 	// restrictedDomains is a list of restricted domains for this rule.
 	restrictedDomains []string
 
-	// FilterListID is a list identifier.
-	//
-	// TODO(a.garipov):  Unexport.
-	FilterListID int
+	// id is the filtering-rule list identifier.
+	id ListID
 
 	// Type of the rule.
 	Type CosmeticRuleType
@@ -128,7 +124,7 @@ type CosmeticRule struct {
 	//
 	// See https://adguard.com/kb/general/ad-filtering/create-own-filters/#elemhide-exceptions
 	//
-	// TODO(a.garipov):  Unexport.
+	// TODO(a.garipov):  Consider unexporting.
 	Whitelist bool
 
 	// ExtendedCSS means that this rule is supposed to be applied by the
@@ -139,10 +135,10 @@ type CosmeticRule struct {
 }
 
 // NewCosmeticRule parses the rule text and creates a rule.
-func NewCosmeticRule(ruleText string, filterListID int) (r *CosmeticRule, err error) {
+func NewCosmeticRule(ruleText string, id ListID) (r *CosmeticRule, err error) {
 	r = &CosmeticRule{
-		RuleText:     ruleText,
-		FilterListID: filterListID,
+		text: ruleText,
+		id:   id,
 	}
 
 	index, m := findCosmeticRuleMarker(ruleText)
@@ -201,17 +197,17 @@ var _ Rule = (*CosmeticRule)(nil)
 
 // Text implements the [Rule] interface for *CosmeticRule.
 func (r *CosmeticRule) Text() (s string) {
-	return r.RuleText
+	return r.text
 }
 
 // GetFilterListID implements the [Rule] interface for *CosmeticRule.
-func (r *CosmeticRule) GetFilterListID() (id int) {
-	return r.FilterListID
+func (r *CosmeticRule) GetFilterListID() (id ListID) {
+	return r.id
 }
 
 // String returns original rule text.
 func (r *CosmeticRule) String() (s string) {
-	return r.RuleText
+	return r.text
 }
 
 // GetPermittedDomains returns a slice of permitted domains.

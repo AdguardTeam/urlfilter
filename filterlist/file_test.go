@@ -22,7 +22,7 @@ func TestFile_RuleListScanner(t *testing.T) {
 	})
 	require.NoError(t, err)
 	testutil.CleanupAndRequireSuccess(t, ruleList.Close)
-	assert.Equal(t, testListID, ruleList.GetID())
+	assert.Equal(t, testListID, ruleList.ListID())
 
 	scanner := ruleList.NewScanner()
 	assert.True(t, scanner.Scan())
@@ -32,7 +32,7 @@ func TestFile_RuleListScanner(t *testing.T) {
 
 	assert.Equal(t, "||example.org", f.Text())
 	assert.Equal(t, testListID, f.GetFilterListID())
-	assert.Equal(t, 0, idx)
+	assert.Equal(t, int64(0), idx)
 
 	assert.True(t, scanner.Scan())
 
@@ -41,7 +41,7 @@ func TestFile_RuleListScanner(t *testing.T) {
 
 	assert.Equal(t, testRuleCosmetic, f.Text())
 	assert.Equal(t, testListID, f.GetFilterListID())
-	assert.Equal(t, 21, idx)
+	assert.Equal(t, int64(21), idx)
 
 	// Finish scanning.
 	assert.False(t, scanner.Scan())
@@ -88,5 +88,5 @@ func BenchmarkFile_RetrieveRule(b *testing.B) {
 	//	goarch: amd64
 	//	pkg: github.com/AdguardTeam/urlfilter/filterlist
 	//	cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
-	//	BenchmarkFile_RetrieveRule-16  	  642164	      2675 ns/op	     448 B/op	       4 allocs/op
+	//	BenchmarkFile_RetrieveRule-16  	  527451	      2989 ns/op	     448 B/op	       4 allocs/op
 }

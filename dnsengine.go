@@ -14,7 +14,7 @@ import (
 // Then, if nothing found, it looks up the host rules.
 type DNSEngine struct {
 	// ruleIndex is a map for hosts mapped to the list of rule indexes.
-	ruleIndex map[string][]int64
+	ruleIndex map[string][]filterlist.StorageID
 
 	// networkEngine is a network rules engine constructed from the network
 	// rules.
@@ -98,47 +98,39 @@ func (r *DNSRequest) Reset() {
 	r.Answer = false
 }
 
+// bytesPerRuleEst is the estimate of how many bytes a single rule generally
+// takes.  It is based on the AdGuard Base DNS list.
+const bytesPerRuleEst = 64
+
 // NewDNSEngine parses the specified filter lists and returns a *DNSEngine built
 // from them.  s must not be nil.
 func NewDNSEngine(s *filterlist.RuleStorage) (d *DNSEngine) {
-	// Count rules in the rule storage to pre-allocate lookup tables.
-	var hostRulesCount, networkRulesCount int
-	scan := s.NewRuleStorageScanner()
-	for scan.Scan() {
-		f, _ := scan.Rule()
-		switch f := f.(type) {
-		case *rules.HostRule:
-			hostRulesCount += len(f.Hostnames)
-		case *rules.NetworkRule:
-			networkRulesCount++
-		}
-	}
+	numRulesEst := s.SizeEstimate() / bytesPerRuleEst
 
 	d = &DNSEngine{
 		rulesStorage: s,
-		ruleIndex:    make(map[string][]int64, hostRulesCount),
+		ruleIndex:    make(map[string][]filterlist.StorageID, numRulesEst),
 		RulesCount:   0,
 		reqPool:      syncutil.NewPool(func() (v *rules.Request) { return &rules.Request{} }),
 		rulesPool:    syncutil.NewSlicePool[*rules.HostRule](1),
 	}
 
-	networkEngine := NewNetworkEngineSkipStorageScan(s)
-
+	netEng := NewNetworkEngineSkipStorageScan(s)
 	scanner := s.NewRuleStorageScanner()
 	for scanner.Scan() {
-		f, idx := scanner.Rule()
+		f, id := scanner.Rule()
 		switch f := f.(type) {
 		case *rules.HostRule:
-			d.addRule(f, idx)
+			d.addRule(f, id)
 		case *rules.NetworkRule:
 			if f.IsHostLevelNetworkRule() {
-				networkEngine.AddRule(f, idx)
+				netEng.AddRule(f, id)
 			}
 		}
 	}
 
-	d.RulesCount += networkEngine.RulesCount
-	d.networkEngine = networkEngine
+	d.RulesCount += netEng.RulesCount
+	d.networkEngine = netEng
 
 	return d
 }
@@ -234,18 +226,18 @@ func (d *DNSEngine) appendFromIndex(
 ) (res []*rules.HostRule) {
 	res = matching
 
-	indexes := d.ruleIndex[hostname]
-	for _, idx := range indexes {
-		res = append(res, d.rulesStorage.RetrieveHostRule(idx))
+	ids := d.ruleIndex[hostname]
+	for _, id := range ids {
+		res = append(res, d.rulesStorage.RetrieveHostRule(id))
 	}
 
 	return res
 }
 
 // addRule adds rule to the index
-func (d *DNSEngine) addRule(hostRule *rules.HostRule, storageIdx int64) {
+func (d *DNSEngine) addRule(hostRule *rules.HostRule, id filterlist.StorageID) {
 	for _, hostname := range hostRule.Hostnames {
-		d.ruleIndex[hostname] = append(d.ruleIndex[hostname], storageIdx)
+		d.ruleIndex[hostname] = append(d.ruleIndex[hostname], id)
 	}
 
 	d.RulesCount++

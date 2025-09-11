@@ -17,6 +17,7 @@ import (
 	"github.com/AdguardTeam/gomitmproxy"
 	"github.com/AdguardTeam/gomitmproxy/mitm"
 	"github.com/AdguardTeam/urlfilter/proxy"
+	"github.com/AdguardTeam/urlfilter/rules"
 	goFlags "github.com/jessevdk/go-flags"
 )
 
@@ -135,11 +136,11 @@ func createServerConfig(options Options) proxy.Config {
 	}
 
 	config := proxy.Config{
-		FiltersPaths:          map[int]string{},
+		FiltersPaths:          map[rules.ListID]string{},
 		CompressContentScript: true,
 	}
 	for i, v := range options.FilterLists {
-		config.FiltersPaths[i] = v
+		config.FiltersPaths[rules.ListID(i)] = v
 	}
 
 	// TODO(e.burkov):  Use netip.AddrPort when gomitmproxy will support it.

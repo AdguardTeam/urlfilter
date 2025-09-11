@@ -113,7 +113,7 @@ func TestRuleStorage_invalid(t *testing.T) {
 		filterlist.NewString(conf),
 		filterlist.NewString(conf),
 	})
-	testutil.AssertErrorMsg(t, "at index 1: id: duplicated value: '\\x01'", err)
+	testutil.AssertErrorMsg(t, `at index 1: id: duplicated value: 1`, err)
 }
 
 func BenchmarkStorage_RetrieveRule(b *testing.B) {
@@ -163,6 +163,6 @@ func BenchmarkStorage_RetrieveRule(b *testing.B) {
 	//	goarch: amd64
 	//	pkg: github.com/AdguardTeam/urlfilter/filterlist
 	//	cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
-	//	BenchmarkStorage_RetrieveRule/cached-16         	81577381	        13.93 ns/op	       0 B/op	       0 allocs/op
-	//	BenchmarkStorage_RetrieveRule/no_cache-16       	 3115383	       370.8 ns/op	      96 B/op	       1 allocs/op
+	//	BenchmarkStorage_RetrieveRule/cached-16         	56578327	        20.93 ns/op	       0 B/op	       0 allocs/op
+	//	BenchmarkStorage_RetrieveRule/no_cache-16       	 4465053	       267.7 ns/op	      96 B/op	       1 allocs/op
 }

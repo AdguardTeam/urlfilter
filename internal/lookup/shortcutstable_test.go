@@ -128,5 +128,5 @@ func BenchmarkShortcutTable_AppendMatching_baseFilter(b *testing.B) {
 	//	goarch: amd64
 	//	pkg: github.com/AdguardTeam/urlfilter/internal/lookup
 	//	cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
-	//	BenchmarkShortcutTable_AppendMatching_baseFilter-16    	  106717	     11271 ns/op	       0 B/op	       0 allocs/op
+	//	BenchmarkShortcutTable_AppendMatching_baseFilter-16    	   98634	     12114 ns/op	       0 B/op	       0 allocs/op
 }
