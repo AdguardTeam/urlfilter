@@ -73,14 +73,11 @@ type Request struct {
 	// SourceURL is the full URL of the source.
 	SourceURL *url.URL
 
-	// URL is the full request URL.
+	// URL is the full request URL.  It must not be nil.
 	URL *url.URL
 
 	// ClientName is the name to match against $client modifiers, if any.
 	ClientName string
-
-	// Hostname is the hostname to filter.
-	Hostname string
 
 	// Domain is the effective top-level domain of the request with an
 	// additional label.
@@ -123,7 +120,6 @@ func NewRequest(u, sourceURL *url.URL, requestType RequestType) (r *Request) {
 	r = &Request{
 		SourceURL:   sourceURL,
 		URL:         u,
-		Hostname:    u.Hostname(),
 		RequestType: requestType,
 	}
 
@@ -131,11 +127,12 @@ func NewRequest(u, sourceURL *url.URL, requestType RequestType) (r *Request) {
 		r.SourceHostname = sourceURL.Hostname()
 	}
 
-	domain := effectiveTLDPlusOne(r.Hostname)
+	hostname := u.Hostname()
+	domain := effectiveTLDPlusOne(hostname)
 	if domain != "" {
 		r.Domain = domain
 	} else {
-		r.Domain = r.Hostname
+		r.Domain = hostname
 	}
 
 	sourceDomain := effectiveTLDPlusOne(r.SourceHostname)
@@ -165,16 +162,15 @@ func NewRequestForURL(u *url.URL) (r *Request) {
 // given URL.  It uses [TypeDocument] as request type.
 func FillRequestForURL(r *Request, u *url.URL) {
 	r.URL = u
-	r.Hostname = u.Hostname()
-
 	r.RequestType = TypeDocument
 	r.ThirdParty = false
 	r.IsHostnameRequest = true
 
-	if domain := effectiveTLDPlusOne(r.Hostname); domain != "" {
+	hostname := u.Hostname()
+	if domain := effectiveTLDPlusOne(hostname); domain != "" {
 		r.Domain = domain
 	} else {
-		r.Domain = r.Hostname
+		r.Domain = hostname
 	}
 }
 

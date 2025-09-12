@@ -310,7 +310,7 @@ func (r *NetworkRule) Match(req *Request) (ok bool) {
 		r.IsOptionEnabled(OptionThirdParty) && !req.ThirdParty,
 		r.IsOptionDisabled(OptionThirdParty) && req.ThirdParty,
 		!r.matchRequestType(req.RequestType),
-		!r.matchRequestDomain(req.Hostname, req.IsHostnameRequest),
+		!r.matchRequestDomain(req.URL.Hostname(), req.IsHostnameRequest),
 		!r.matchSourceDomain(req.SourceHostname),
 		!r.matchDNSType(req.DNSType),
 		!r.matchClientTags(req.SortedClientTags),
@@ -530,7 +530,7 @@ func (r *NetworkRule) matchPattern(req *Request) (matched bool) {
 	}
 
 	if r.shouldMatchHostname(req) {
-		return r.regexp.MatchString(req.Hostname)
+		return r.regexp.MatchString(req.URL.Hostname())
 	}
 
 	b, _ := req.URL.MarshalBinary()

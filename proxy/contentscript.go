@@ -36,7 +36,7 @@ type contentScriptParameters struct {
 func (s *Server) buildInjectionCode(session *Session) string {
 	params := contentScriptURLParameters{
 		Option:            session.Result.GetCosmeticOption(),
-		Hostname:          session.Request.Hostname,
+		Hostname:          session.Request.URL.Hostname(),
 		InjectionHostname: s.InjectionHost,
 		Timestamp:         s.createdAt.Unix(),
 	}

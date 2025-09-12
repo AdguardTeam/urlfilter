@@ -20,7 +20,7 @@ type blockedPageParameters struct {
 // buildBlockedPage builds blocked page content
 func buildBlockedPage(session *Session, f *rules.NetworkRule) string {
 	params := blockedPageParameters{
-		Hostname: session.Request.Hostname,
+		Hostname: session.Request.URL.Hostname(),
 		RuleText: f.Text(),
 	}
 
