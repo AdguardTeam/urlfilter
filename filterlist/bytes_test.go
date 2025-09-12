@@ -20,7 +20,7 @@ func TestBytes_RuleListScanner(t *testing.T) {
 
 	ruleList := filterlist.NewBytes(conf)
 	testutil.CleanupAndRequireSuccess(t, ruleList.Close)
-	assert.Equal(t, testListID, ruleList.GetID())
+	assert.Equal(t, testListID, ruleList.ListID())
 
 	scanner := ruleList.NewScanner()
 	assert.True(t, scanner.Scan())
@@ -30,7 +30,7 @@ func TestBytes_RuleListScanner(t *testing.T) {
 
 	assert.Equal(t, testRuleDomain, f.Text())
 	assert.Equal(t, testListID, f.GetFilterListID())
-	assert.Equal(t, 0, idx)
+	assert.Equal(t, int64(0), idx)
 
 	assert.True(t, scanner.Scan())
 
@@ -80,10 +80,9 @@ func BenchmarkBytes_RetrieveRule(b *testing.B) {
 	assert.NotZero(b, r)
 
 	// Most recent results:
-	//
-	//	goos: darwin
-	//	goarch: arm64
+	//	goos: linux
+	//	goarch: amd64
 	//	pkg: github.com/AdguardTeam/urlfilter/filterlist
-	//	cpu: Apple M1 Pro
-	//	BenchmarkBytes_RetrieveRule-8   	 6178849	       184.0 ns/op	     448 B/op	       4 allocs/op
+	//	cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
+	//	BenchmarkBytes_RetrieveRule-16  	 2301092	       508.1 ns/op	     448 B/op	       4 allocs/op
 }

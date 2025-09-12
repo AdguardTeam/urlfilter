@@ -155,10 +155,8 @@ type NetworkRule struct {
 	// regexp is the regular expression compiled from the pattern.
 	regexp *regexp.Regexp
 
-	// RuleText is the original rule text.
-	//
-	// TODO(a.garipov):  Unexport.
-	RuleText string
+	// text is the original rule text.
+	text string
 
 	// Shortcut is the longest substring of the rule pattern with no special
 	// characters.
@@ -199,16 +197,14 @@ type NetworkRule struct {
 	// See https://github.com/AdguardTeam/AdGuardHome/issues/1081#issuecomment-575142737.
 	restrictedClientTags []string
 
+	// id is a filter list identifier.
+	id ListID
+
 	// enabledOptions are the flags with all enabled rule options.
 	enabledOptions NetworkRuleOption
 
 	// disabledOptions are the flags with all disabled rule options.
 	disabledOptions NetworkRuleOption
-
-	// FilterListID is a filter list identifier.
-	//
-	// TODO(a.garipov):  Unexport.
-	FilterListID int
 
 	// initOnce makes sure that init is only called once.
 	//
@@ -227,7 +223,7 @@ type NetworkRule struct {
 
 	// Whitelist is true if this is an exception rule.
 	//
-	// TODO(a.garipov):  Unexport.
+	// TODO(a.garipov):  Consider unexporting.
 	Whitelist bool
 
 	// isInvalid marks the rule as invalid.  Pattern matching always returns
@@ -239,17 +235,17 @@ type NetworkRule struct {
 }
 
 // NewNetworkRule parses the rule text and returns a filter rule.
-func NewNetworkRule(ruleText string, filterListID int) (r *NetworkRule, err error) {
+func NewNetworkRule(ruleText string, id ListID) (r *NetworkRule, err error) {
 	pattern, options, whitelist, err := parseRuleText(ruleText)
 	if err != nil {
 		return nil, err
 	}
 
 	r = &NetworkRule{
-		RuleText:     ruleText,
-		Whitelist:    whitelist,
-		FilterListID: filterListID,
-		pattern:      pattern,
+		text:      ruleText,
+		Whitelist: whitelist,
+		id:        id,
+		pattern:   pattern,
 	}
 
 	if err = r.loadOptions(options); err != nil {
@@ -292,17 +288,17 @@ var _ Rule = (*NetworkRule)(nil)
 
 // Text implements the [Rule] interface for *NetworkRule.
 func (r *NetworkRule) Text() (s string) {
-	return r.RuleText
+	return r.text
 }
 
 // GetFilterListID implements the [Rule] interface for *NetworkRule.
-func (r *NetworkRule) GetFilterListID() (id int) {
-	return r.FilterListID
+func (r *NetworkRule) GetFilterListID() (id ListID) {
+	return r.id
 }
 
 // String returns original rule text.
 func (r *NetworkRule) String() (s string) {
-	return r.RuleText
+	return r.text
 }
 
 // Match checks if this filtering rule matches the specified request.  req must

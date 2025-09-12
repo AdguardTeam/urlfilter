@@ -10,6 +10,7 @@ import (
 	"github.com/AdguardTeam/golibs/testutil"
 	"github.com/AdguardTeam/urlfilter/filterlist"
 	"github.com/AdguardTeam/urlfilter/internal/ufnet"
+	"github.com/AdguardTeam/urlfilter/rules"
 	"github.com/miekg/dns"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -20,7 +21,7 @@ func TestDNSEnginePriority(t *testing.T) {
 127.0.0.1  example.org
 `
 
-	ruleStorage := newTestRuleStorage(t, 1, rulesText)
+	ruleStorage := newTestRuleStorage(t, testListID, rulesText)
 	dnsEngine := NewDNSEngine(ruleStorage)
 	assert.NotNil(t, dnsEngine)
 
@@ -46,7 +47,7 @@ func TestDNSEngineMatchHostname(t *testing.T) {
 ::1 v4and6.com
 ::2 v4and6.com
 `
-	ruleStorage := newTestRuleStorage(t, 1, rulesText)
+	ruleStorage := newTestRuleStorage(t, testListID, rulesText)
 	dnsEngine := NewDNSEngine(ruleStorage)
 	require.NotNil(t, dnsEngine)
 
@@ -94,7 +95,7 @@ func TestDNSEngineMatchHostname(t *testing.T) {
 
 func TestHostLevelNetworkRuleWithProtocol(t *testing.T) {
 	rulesText := "://example.org"
-	ruleStorage := newTestRuleStorage(t, 1, rulesText)
+	ruleStorage := newTestRuleStorage(t, testListID, rulesText)
 	dnsEngine := NewDNSEngine(ruleStorage)
 	assert.NotNil(t, dnsEngine)
 
@@ -105,14 +106,14 @@ func TestHostLevelNetworkRuleWithProtocol(t *testing.T) {
 
 func TestRegexp(t *testing.T) {
 	text := "/^stats?\\./"
-	ruleStorage := newTestRuleStorage(t, 1, text)
+	ruleStorage := newTestRuleStorage(t, testListID, text)
 	dnsEngine := NewDNSEngine(ruleStorage)
 
 	res, ok := dnsEngine.Match("stats.test.com")
 	assert.True(t, ok && res.NetworkRule.Text() == text)
 
 	text = "@@/^stats?\\./"
-	ruleStorage = newTestRuleStorage(t, 1, "||stats.test.com^\n"+text)
+	ruleStorage = newTestRuleStorage(t, testListID, "||stats.test.com^\n"+text)
 	dnsEngine = NewDNSEngine(ruleStorage)
 
 	res, ok = dnsEngine.Match("stats.test.com")
@@ -122,7 +123,7 @@ func TestRegexp(t *testing.T) {
 func TestMultipleIPPerHost(t *testing.T) {
 	text := `1.1.1.1 example.org
 2.2.2.2 example.org`
-	ruleStorage := newTestRuleStorage(t, 1, text)
+	ruleStorage := newTestRuleStorage(t, testListID, text)
 	dnsEngine := NewDNSEngine(ruleStorage)
 
 	res, ok := dnsEngine.Match("example.org")
@@ -144,7 +145,7 @@ func TestClientTags(t *testing.T) {
 ||host7^$ctag=~pc
 ||host7^$ctag=~pc,badfilter
 `
-	ruleStorage := newTestRuleStorage(t, 1, rulesText)
+	ruleStorage := newTestRuleStorage(t, testListID, rulesText)
 	dnsEngine := NewDNSEngine(ruleStorage)
 	assert.NotNil(t, dnsEngine)
 
@@ -223,7 +224,7 @@ func TestClient(t *testing.T) {
 		"||host9^$client=0.0.0.0",
 		"||host10^$client=::",
 	}
-	ruleStorage := newTestRuleStorage(t, 1, strings.Join(ruleTexts, "\n"))
+	ruleStorage := newTestRuleStorage(t, testListID, strings.Join(ruleTexts, "\n"))
 	dnsEngine := NewDNSEngine(ruleStorage)
 	assert.NotNil(t, dnsEngine)
 
@@ -343,7 +344,7 @@ func TestClient(t *testing.T) {
 
 func TestBadfilterRules(t *testing.T) {
 	rulesText := "||example.org^\n||example.org^$badfilter"
-	ruleStorage := newTestRuleStorage(t, 1, rulesText)
+	ruleStorage := newTestRuleStorage(t, testListID, rulesText)
 	dnsEngine := NewDNSEngine(ruleStorage)
 	assert.NotNil(t, dnsEngine)
 
@@ -365,7 +366,7 @@ func TestDNSEngine_MatchRequest_dnsType(t *testing.T) {
 ||priority^$client=127.0.0.1,dnstype=AAAA
 `
 
-	ruleStorage := newTestRuleStorage(t, 1, rulesText)
+	ruleStorage := newTestRuleStorage(t, testListID, rulesText)
 	dnsEngine := NewDNSEngine(ruleStorage)
 	assert.NotNil(t, dnsEngine)
 
@@ -500,7 +501,7 @@ func TestDNSEngine_MatchRequest_dnsType(t *testing.T) {
 }
 
 func TestSlash(t *testing.T) {
-	ruleStorage := newTestRuleStorage(t, 1, "/$client=127.0.0.1")
+	ruleStorage := newTestRuleStorage(t, testListID, "/$client=127.0.0.1")
 	dnsEngine := NewDNSEngine(ruleStorage)
 	assert.NotNil(t, dnsEngine)
 
@@ -520,65 +521,76 @@ func assertMatchRuleText(t *testing.T, rulesText string, rules *DNSResult, ok bo
 // BenchmarkDNSEngine_heapAlloc is a benchmark used to measure changes in the
 // heap-allocated memory during typical operation of a DNS engine.  It reports
 // the following additional metrics:
-//   - initial_heap_bytes: the size of allocated heap objects before doing
-//     anything.
-//   - heap_after_loading_bytes: the size of allocated heap objects after
-//     compiling rule lists.
-//   - heap_after_matching_bytes: the size of allocated heap objects after
-//     matching a few requests with the engine.
+//   - heap_initial_bytes/op: the average size of allocated heap objects before
+//     doing anything.
+//   - heap_after_compilation_bytes/op: the average size of allocated heap
+//     objects after compiling rule lists.
+//   - heap_after_matching_bytes/op: the average size of allocated heap objects
+//     after matching a few requests with the engine.
 //
 // NOTE:  The precise values of the aforementioned metrics may vary from run to
-// run.  Benchmark with --benchtime no less than 10s and --count no less than 10
-// to get a better picture of the real changes in performance.
+// run.  Benchmark with --benchtime no less than 10s and --count no less than 11
+// to get a better picture of the real changes in performance and discard the
+// first warmup run.
 func BenchmarkDNSEngine_heapAlloc(b *testing.B) {
-	ruleStorage := newRuleStorage(b)
-	testutil.CleanupAndRequireSuccess(b, ruleStorage.Close)
+	s := newRuleStorage(b)
+	testutil.CleanupAndRequireSuccess(b, s.Close)
 
-	testHostnames := loadHostnames(b)
+	hostnames := loadHostnames(b)
+	m := &dnsEngineMeasurement{}
 
 	b.ReportAllocs()
 	for b.Loop() {
-		runtime.GC()
-
-		b.ReportMetric(heapAlloc(b), "initial_heap_bytes")
-
-		dnsEngine := NewDNSEngine(ruleStorage)
-
-		b.ReportMetric(heapAlloc(b), "heap_after_loading_bytes")
-
-		req := &DNSRequest{}
-		res := &DNSResult{}
-
-		var ok bool
-		for _, reqHostname := range testHostnames {
-			req.Hostname = reqHostname
-			res.Reset()
-
-			ok = dnsEngine.MatchRequestInto(req, res)
-		}
-
-		require.True(b, ok)
-
-		b.ReportMetric(heapAlloc(b), "heap_after_matching_bytes")
+		m.run(b, s, hostnames)
 	}
+
+	n := float64(b.N)
+
+	b.ReportMetric(m.initialSum/n, "heap_initial_bytes/op")
+	b.ReportMetric(m.afterCompilationSum/n, "heap_after_compilation_bytes/op")
+	b.ReportMetric(m.afterMatchingSum/n, "heap_after_matching_bytes/op")
 
 	// Most recent results:
 	//	goos: linux
 	//	goarch: amd64
 	//	pkg: github.com/AdguardTeam/urlfilter
 	//	cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
-	//	BenchmarkDNSEngine_heapAlloc-16    	      62	 188650046 ns/op	  23325288 heap_after_loading_bytes	  24206128 heap_after_matching_bytes	  11498392 initial_heap_bytes	54128187 B/op	  874266 allocs/op
+	//	BenchmarkDNSEngine_heapAlloc-16    	      81	 150379368 ns/op	  38384278 heap_after_compilation_bytes/op	  31814863 heap_after_matching_bytes/op	  17578562 heap_initial_bytes/op	35508100 B/op	  507389 allocs/op
 }
 
-// heapAlloc is a helper that returns the current heap-allocated bytes as
-// counted by the runtime.
-func heapAlloc(tb testing.TB) (heap float64) {
+// dnsEngineMeasurement emulates a life cycle of a DNS filtering engine.
+type dnsEngineMeasurement struct {
+	initialSum          float64
+	afterCompilationSum float64
+	afterMatchingSum    float64
+}
+
+// run performs a DNS engine life cycle.  s must not be nil.
+func (m *dnsEngineMeasurement) run(tb testing.TB, s *filterlist.RuleStorage, hostnames []string) {
 	tb.Helper()
 
-	m := &runtime.MemStats{}
-	runtime.ReadMemStats(m)
+	runtime.GC()
 
-	return float64(m.HeapAlloc)
+	m.initialSum += heapAlloc(tb)
+
+	dnsEngine := NewDNSEngine(s)
+
+	m.afterCompilationSum += heapAlloc(tb)
+
+	req := &DNSRequest{}
+	res := &DNSResult{}
+
+	var ok bool
+	for _, reqHostname := range hostnames {
+		req.Hostname = reqHostname
+		res.Reset()
+
+		ok = dnsEngine.MatchRequestInto(req, res)
+	}
+
+	m.afterMatchingSum += heapAlloc(tb)
+
+	require.True(tb, ok)
 }
 
 func BenchmarkDNSEngine_Match(b *testing.B) {
@@ -589,8 +601,12 @@ func BenchmarkDNSEngine_Match(b *testing.B) {
 
 	dnsEngine := NewDNSEngine(ruleStorage)
 
+	// Warmup to fill the pools.
 	var r *DNSResult
 	var match bool
+	for _, reqHostname := range testHostnames {
+		r, match = dnsEngine.Match(reqHostname)
+	}
 
 	b.ReportAllocs()
 	for b.Loop() {
@@ -607,7 +623,7 @@ func BenchmarkDNSEngine_Match(b *testing.B) {
 	//	goarch: amd64
 	//	pkg: github.com/AdguardTeam/urlfilter
 	//	cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
-	//	BenchmarkDNSEngine_Match-16    	     207	  57062240 ns/op	 3237680 B/op	   69208 allocs/op
+	//	BenchmarkDNSEngine_Match-16    	      20	  61072490 ns/op	 3193156 B/op	   68918 allocs/op
 }
 
 func BenchmarkDNSEngine_MatchRequestInto(b *testing.B) {
@@ -621,6 +637,14 @@ func BenchmarkDNSEngine_MatchRequestInto(b *testing.B) {
 	var match bool
 	req := &DNSRequest{}
 	res := &DNSResult{}
+
+	// Warmup to fill the structs and the pools.
+	for _, reqHostname := range testHostnames {
+		req.Hostname = reqHostname
+		res.Reset()
+
+		match = dnsEngine.MatchRequestInto(req, res)
+	}
 
 	b.ReportAllocs()
 	for b.Loop() {
@@ -639,7 +663,7 @@ func BenchmarkDNSEngine_MatchRequestInto(b *testing.B) {
 	//	goarch: amd64
 	//	pkg: github.com/AdguardTeam/urlfilter
 	//	cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
-	//	BenchmarkDNSEngine_MatchRequestInto-16    	     240	  49861837 ns/op	  856973 B/op	   28219 allocs/op
+	//	BenchmarkDNSEngine_MatchRequestInto-16    	      22	  50762008 ns/op	  814592 B/op	   27969 allocs/op
 }
 
 func FuzzDNSEngine_Match(f *testing.F) {
@@ -665,7 +689,7 @@ func FuzzDNSEngine_Match(f *testing.F) {
 	lists := []filterlist.Interface{
 		filterlist.NewString(&filterlist.StringConfig{
 			RulesText: rulesText,
-			ID:        1,
+			ID:        testListID,
 		}),
 	}
 
@@ -684,7 +708,7 @@ func FuzzDNSEngine_Match(f *testing.F) {
 }
 
 // ruleListFromPath returns a rule list loaded from a file.
-func ruleListFromPath(tb testing.TB, path string, id int) (l *filterlist.Bytes) {
+func ruleListFromPath(tb testing.TB, path string, id rules.ListID) (l *filterlist.Bytes) {
 	tb.Helper()
 
 	rulesText, err := os.ReadFile(path)
@@ -706,8 +730,8 @@ const (
 func newRuleStorage(tb testing.TB) (ruleStorage *filterlist.RuleStorage) {
 	tb.Helper()
 
-	filterRuleList := ruleListFromPath(tb, networkFilterPath, 1)
-	hostsRuleList := ruleListFromPath(tb, hostsPath, 2)
+	filterRuleList := ruleListFromPath(tb, networkFilterPath, testListID)
+	hostsRuleList := ruleListFromPath(tb, hostsPath, testListIDOther)
 
 	ruleLists := []filterlist.Interface{
 		filterRuleList,

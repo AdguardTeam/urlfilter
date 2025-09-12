@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/AdguardTeam/golibs/log"
-
 	"github.com/AdguardTeam/urlfilter"
 )
 
@@ -57,7 +55,7 @@ func TestContentScriptTmpl(t *testing.T) {
 		t.Fatalf("could not execute template: %s", err)
 	}
 
-	log.Print(data.String())
+	t.Log(data)
 
 	// TODO: Run a nodejs script that will validate the data
 }

@@ -104,7 +104,7 @@ func TestNewHostRule(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, r)
 
-			assert.Equal(t, testListID, r.FilterListID)
+			assert.Equal(t, testListID, r.GetFilterListID())
 			assert.Equal(t, tc.wantIP, r.IP)
 			assert.Equal(t, tc.wantHosts, r.Hostnames)
 		})
@@ -133,10 +133,7 @@ func TestHostRule_Match(t *testing.T) {
 }
 
 func FuzzHostRule_Match(f *testing.F) {
-	r, err := rules.NewHostRule(
-		"127.0.1.1 example.test",
-		testListID,
-	)
+	r, err := rules.NewHostRule("127.0.1.1 example.test", testListID)
 	require.NoError(f, err)
 
 	for _, seed := range []string{

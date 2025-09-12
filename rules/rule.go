@@ -22,27 +22,27 @@ type Rule interface {
 	// GetFilterListID returns ID of the filter list this rule belongs to.
 	//
 	// TODO(a.garipov):  Rename to ListID.
-	GetFilterListID() (id int)
+	GetFilterListID() (id ListID)
 }
 
 // NewRule creates a new filtering rule from the specified line.  It returns nil
 // if the line is empty or if it is a comment.
-func NewRule(line string, filterListID int) (r Rule, err error) {
+func NewRule(line string, id ListID) (r Rule, err error) {
 	if line = strings.TrimSpace(line); line == "" || isComment(line) {
 		return nil, nil
 	}
 
 	if isCosmetic(line) {
-		return NewCosmeticRule(line, filterListID)
+		return NewCosmeticRule(line, id)
 	}
 
 	// TODO(a.garipov):  Optimize.
-	hr, err := NewHostRule(line, filterListID)
+	hr, err := NewHostRule(line, id)
 	if err == nil {
 		return hr, nil
 	}
 
-	return NewNetworkRule(line, filterListID)
+	return NewNetworkRule(line, id)
 }
 
 // isComment returns true if the line is a comment.

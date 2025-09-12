@@ -63,7 +63,10 @@ func BenchmarkSeqScanTable_AppendMatching(b *testing.B) {
 
 	r := rules.NewRequest(testURLWithDomain, testURLWithDomain, rules.TypeOther)
 
-	gotRules := make([]*rules.NetworkRule, 0, 1)
+	var gotRules []*rules.NetworkRule
+
+	// Warmup to fill the slice.
+	gotRules = tbl.AppendMatching(gotRules[:0], r)
 
 	b.ReportAllocs()
 	for b.Loop() {
@@ -77,7 +80,7 @@ func BenchmarkSeqScanTable_AppendMatching(b *testing.B) {
 	//	goarch: amd64
 	//	pkg: github.com/AdguardTeam/urlfilter/internal/lookup
 	//	cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
-	//	BenchmarkSeqScanTable_AppendMatching-16     	13848735	       850.8 ns/op	       0 B/op	       0 allocs/op
+	//	BenchmarkSeqScanTable_AppendMatching-16     	 1359025	       871.1 ns/op	       0 B/op	       0 allocs/op
 }
 
 func BenchmarkSeqScanTable_AppendMatching_baseFilter(b *testing.B) {
@@ -87,7 +90,10 @@ func BenchmarkSeqScanTable_AppendMatching_baseFilter(b *testing.B) {
 
 	r := rules.NewRequest(testURLBaseFilterDomain, testURLBaseFilterDomain, rules.TypeOther)
 
-	gotRules := make([]*rules.NetworkRule, 0, 1)
+	var gotRules []*rules.NetworkRule
+
+	// Warmup to fill the slice.
+	gotRules = tbl.AppendMatching(gotRules[:0], r)
 
 	b.ReportAllocs()
 	for b.Loop() {
@@ -106,5 +112,5 @@ func BenchmarkSeqScanTable_AppendMatching_baseFilter(b *testing.B) {
 	//	goarch: amd64
 	//	pkg: github.com/AdguardTeam/urlfilter/internal/lookup
 	//	cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
-	//	BenchmarkSeqScanTable_AppendMatching_baseFilter-16     	    4058	   2928125 ns/op	      79 B/op	       0 allocs/op
+	//	BenchmarkSeqScanTable_AppendMatching_baseFilter-16    	     392	   3057949 ns/op	       0 B/op	       0 allocs/op
 }

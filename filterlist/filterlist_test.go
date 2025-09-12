@@ -2,14 +2,15 @@ package filterlist_test
 
 import (
 	"strings"
+
+	"github.com/AdguardTeam/urlfilter/filterlist"
+	"github.com/AdguardTeam/urlfilter/rules"
 )
 
 // Common list IDs for tests.
-//
-// TODO(a.garipov):  Introduce a type, rules.ListID.
 const (
-	testListID      int = 1
-	testListIDOther int = 2
+	testListID      rules.ListID = 1
+	testListIDOther rules.ListID = 2
 )
 
 // Common domains for tests.
@@ -47,16 +48,14 @@ const (
 )
 
 // cosmeticRuleIndex is the index of the cosmetic rule in [testRuleText].
-var cosmeticRuleIndex = strings.Index(testRuleText, testRuleCosmetic)
+var cosmeticRuleIndex = int64(strings.Index(testRuleText, testRuleCosmetic))
 
 // Common StorageIDs for tests.
 //
 // NOTE:  Keep in sync with [testRuleText] and [testRuleTextOther].
-//
-// TODO(a.garipov):  Introduce a type, filterlist.StorageID.
-const (
-	testStrgID1Rule1 = int64(testListID<<32 | 0&0xFFFFFFFF)
-	testStrgID1Rule2 = int64(testListID<<32 | 25&0xFFFFFFFF)
-	testStrgID2Rule1 = int64(testListIDOther<<32 | 0&0xFFFFFFFF)
-	testStrgID2Rule2 = int64(testListIDOther<<32 | 21&0xFFFFFFFF)
+var (
+	testStrgID1Rule1 = filterlist.NewStorageID(testListID, 0)
+	testStrgID1Rule2 = filterlist.NewStorageID(testListID, 25)
+	testStrgID2Rule1 = filterlist.NewStorageID(testListIDOther, 0)
+	testStrgID2Rule2 = filterlist.NewStorageID(testListIDOther, 21)
 )

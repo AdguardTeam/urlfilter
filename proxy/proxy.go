@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/AdguardTeam/urlfilter/filterlist"
-
 	"github.com/AdguardTeam/golibs/log"
 	"github.com/AdguardTeam/gomitmproxy"
 	"github.com/AdguardTeam/urlfilter"
+	"github.com/AdguardTeam/urlfilter/filterlist"
+	"github.com/AdguardTeam/urlfilter/rules"
 )
 
 const (
@@ -26,7 +26,7 @@ type Config struct {
 	ProxyConfig gomitmproxy.Config
 
 	// Paths to the filtering rules
-	FiltersPaths map[int]string
+	FiltersPaths map[rules.ListID]string
 
 	// InjectionHost is used for injecting custom CSS/JS into web pages.
 	//
@@ -59,8 +59,8 @@ func (c *Config) String() string {
 
 	if len(c.FiltersPaths) > 0 {
 		str += fmt.Sprintf("Filter lists: %d\n", len(c.FiltersPaths))
-		for i, v := range c.FiltersPaths {
-			str += fmt.Sprintf("%d: %s\n", i, v)
+		for id, v := range c.FiltersPaths {
+			str += fmt.Sprintf("%d: %q\n", id, v)
 		}
 	}
 
@@ -127,14 +127,14 @@ func buildEngine(config Config) (*urlfilter.Engine, error) {
 			ID:   filterID,
 		})
 		if err != nil {
-			return nil, fmt.Errorf("failed to create rule list %d: %s", filterID, err)
+			return nil, fmt.Errorf("failed to create rule list %d: %w", filterID, err)
 		}
 		lists = append(lists, list)
 	}
 
 	ruleStorage, err := filterlist.NewRuleStorage(lists)
 	if err != nil {
-		return nil, fmt.Errorf("cannot initialize rule storage: %s", err)
+		return nil, fmt.Errorf("cannot initialize rule storage: %w", err)
 	}
 
 	return urlfilter.NewEngine(ruleStorage), nil

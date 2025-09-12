@@ -6,7 +6,6 @@ import (
 
 	"github.com/AdguardTeam/golibs/testutil"
 	"github.com/AdguardTeam/urlfilter/filterlist"
-	"github.com/AdguardTeam/urlfilter/rules"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -23,7 +22,7 @@ func TestFile_RuleListScanner(t *testing.T) {
 	})
 	require.NoError(t, err)
 	testutil.CleanupAndRequireSuccess(t, ruleList.Close)
-	assert.Equal(t, testListID, ruleList.GetID())
+	assert.Equal(t, testListID, ruleList.ListID())
 
 	scanner := ruleList.NewScanner()
 	assert.True(t, scanner.Scan())
@@ -33,7 +32,7 @@ func TestFile_RuleListScanner(t *testing.T) {
 
 	assert.Equal(t, "||example.org", f.Text())
 	assert.Equal(t, testListID, f.GetFilterListID())
-	assert.Equal(t, 0, idx)
+	assert.Equal(t, int64(0), idx)
 
 	assert.True(t, scanner.Scan())
 
@@ -42,7 +41,7 @@ func TestFile_RuleListScanner(t *testing.T) {
 
 	assert.Equal(t, testRuleCosmetic, f.Text())
 	assert.Equal(t, testListID, f.GetFilterListID())
-	assert.Equal(t, 21, idx)
+	assert.Equal(t, int64(21), idx)
 
 	// Finish scanning.
 	assert.False(t, scanner.Scan())
@@ -72,8 +71,9 @@ func BenchmarkFile_RetrieveRule(b *testing.B) {
 	require.NoError(b, fileErr)
 	testutil.CleanupAndRequireSuccess(b, f.Close)
 
-	var r rules.Rule
-	var err error
+	// Warmup to fill the buffer.
+	r, err := f.RetrieveRule(0)
+	require.NoError(b, err)
 
 	b.ReportAllocs()
 	for b.Loop() {
@@ -84,10 +84,9 @@ func BenchmarkFile_RetrieveRule(b *testing.B) {
 	assert.NotZero(b, r)
 
 	// Most recent results:
-	//
-	//	goos: darwin
-	//	goarch: arm64
+	//	goos: linux
+	//	goarch: amd64
 	//	pkg: github.com/AdguardTeam/urlfilter/filterlist
-	//	cpu: Apple M1 Pro
-	//	BenchmarkFile_RetrieveRule-8   	  995864	      1173 ns/op	     448 B/op	       4 allocs/op
+	//	cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
+	//	BenchmarkFile_RetrieveRule-16  	  527451	      2989 ns/op	     448 B/op	       4 allocs/op
 }

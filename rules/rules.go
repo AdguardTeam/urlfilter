@@ -1,4 +1,4 @@
-// Package rules contains implementation of several kinds of blocking rules.
+// Package rules contains implementation of all kinds of blocking rules.
 package rules
 
 import (
@@ -6,6 +6,13 @@ import (
 
 	"golang.org/x/net/publicsuffix"
 )
+
+// ListID is the unique ID of a filtering-rule list.
+//
+// TODO(a.garipov):  See if there are better types for this.  Currently, it is a
+// uint64 to make it possible to use maphash and the similar hashing functions
+// and also for performance reasons.
+type ListID uint64
 
 // isCosmetic returns true if line is a cosmetic filtering rule.
 func isCosmetic(line string) (ok bool) {

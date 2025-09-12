@@ -72,7 +72,7 @@ func newTestEngine(tb testing.TB, rulesText string) (engine *urlfilter.Engine) {
 	lists := []filterlist.Interface{
 		filterlist.NewString(&filterlist.StringConfig{
 			RulesText: rulesText,
-			ID:        1,
+			ID:        testListID,
 		}),
 	}
 

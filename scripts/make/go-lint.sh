@@ -169,7 +169,7 @@ run_linter gocognit --over 10 \
 	./cmd/ \
 	./cosmeticengine_test.go \
 	./dnsengine.go \
-	./dnsengine_test.go \
+	./dnsengine_internal_test.go \
 	./dnsrewrite.go \
 	./engine.go \
 	./engine_test.go \
@@ -178,7 +178,7 @@ run_linter gocognit --over 10 \
 	./internal/lookup/ \
 	./networkengine.go \
 	./urlfilter.go \
-	./urlfilter_test.go \
+	./urlfilter_internal_test.go \
 	;
 
 run_linter ineffassign ./...

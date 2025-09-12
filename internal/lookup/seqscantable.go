@@ -1,6 +1,7 @@
 package lookup
 
 import (
+	"github.com/AdguardTeam/urlfilter/filterlist"
 	"github.com/AdguardTeam/urlfilter/rules"
 )
 
@@ -14,7 +15,7 @@ type SeqScanTable struct {
 var _ Table = (*SeqScanTable)(nil)
 
 // Add implements the [Table] interface for *SeqScanTable.
-func (s *SeqScanTable) Add(f *rules.NetworkRule, _ int64) (ok bool) {
+func (s *SeqScanTable) Add(f *rules.NetworkRule, _ filterlist.StorageID) (ok bool) {
 	if containsRule(s.rules, f) {
 		return false
 	}
@@ -49,7 +50,7 @@ func containsRule(rules []*rules.NetworkRule, r *rules.NetworkRule) (ok bool) {
 	}
 
 	for _, rule := range rules {
-		if rule.RuleText == r.RuleText {
+		if rule.String() == r.String() {
 			return true
 		}
 	}

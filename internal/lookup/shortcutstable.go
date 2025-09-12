@@ -19,8 +19,8 @@ type shortcut string
 
 // shortcutInfo contains the data for a shortcut, including the count of hits.
 type shortcutInfo struct {
-	indexes []int64
-	count   int64
+	ids   []filterlist.StorageID
+	count uint64
 }
 
 // ShortcutsTable is a [Table] that relies on the rule shortcuts to quickly find
@@ -61,7 +61,7 @@ func NewShortcutsTable(rs *filterlist.RuleStorage) (s *ShortcutsTable) {
 var _ Table = (*ShortcutsTable)(nil)
 
 // Add implements the [Table] interface for *ShortcutsTable.
-func (s *ShortcutsTable) Add(f *rules.NetworkRule, storageIdx int64) (ok bool) {
+func (s *ShortcutsTable) Add(f *rules.NetworkRule, id filterlist.StorageID) (ok bool) {
 	shortcutsPtr := s.shortcutsPool.Get()
 	defer s.shortcutsPool.Put(shortcutsPtr)
 
@@ -72,7 +72,7 @@ func (s *ShortcutsTable) Add(f *rules.NetworkRule, storageIdx int64) (ok bool) {
 
 	var minSC shortcut
 	var minSCInfo *shortcutInfo
-	minCount := int64(math.MaxInt64)
+	minCount := uint64(math.MaxUint64)
 	for _, sc := range *shortcutsPtr {
 		scInfo := s.shortcuts[sc]
 
@@ -92,7 +92,7 @@ func (s *ShortcutsTable) Add(f *rules.NetworkRule, storageIdx int64) (ok bool) {
 
 	s.shortcuts[minSC] = minSCInfo
 	minSCInfo.count++
-	minSCInfo.indexes = append(minSCInfo.indexes, storageIdx)
+	minSCInfo.ids = append(minSCInfo.ids, id)
 
 	return true
 }
@@ -119,8 +119,8 @@ func (s *ShortcutsTable) AppendMatching(
 			continue
 		}
 
-		for _, idx := range scInfo.indexes {
-			rule := s.ruleStorage.RetrieveNetworkRule(idx)
+		for _, id := range scInfo.ids {
+			rule := s.ruleStorage.RetrieveNetworkRule(id)
 
 			// Make sure that the same rule isn't returned twice.  This happens
 			// when the URL has a repeating pattern.  The check is performed

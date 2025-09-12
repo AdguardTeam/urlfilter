@@ -4,12 +4,13 @@ import (
 	"net/url"
 
 	"github.com/AdguardTeam/golibs/netutil/urlutil"
+	"github.com/AdguardTeam/urlfilter/rules"
 )
 
-// Common list ID for tests.
-//
-// TODO(a.garipov):  Introduce a type, rules.ListID.
-const testListID int = 1
+// Common ListIDs for tests.
+const (
+	testListID rules.ListID = 1
+)
 
 // Common hostnames for tests.
 const (

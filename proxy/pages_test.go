@@ -19,7 +19,7 @@ func TestBuildBlockedPage(t *testing.T) {
 		}, nil, rules.TypeDocument),
 	}
 
-	f, err := rules.NewNetworkRule("||test.example^", 0)
+	f, err := rules.NewNetworkRule("||test.example^", 1)
 	require.NoError(t, err)
 
 	page := buildBlockedPage(s, f)

@@ -495,11 +495,11 @@ func TestNetworkRule_negatesBadfilter(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			r, err := NewNetworkRule(tc.rule, -1)
+			r, err := NewNetworkRule(tc.rule, testListID)
 			require.NoError(t, err)
 			require.NotNil(t, r)
 
-			b, err := NewNetworkRule(tc.badfilter, -1)
+			b, err := NewNetworkRule(tc.badfilter, testListID)
 			require.NoError(t, err)
 			require.NotNil(t, b)
 

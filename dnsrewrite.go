@@ -7,22 +7,6 @@ import (
 	"github.com/miekg/dns"
 )
 
-// DNSRewritesAll returns all $dnsrewrite network rules.  To get the rules with
-// exception logic applied, use (*DNSResult).DNSRewrites.
-func (res *DNSResult) DNSRewritesAll() (nrules []*rules.NetworkRule) {
-	if res == nil {
-		return nil
-	}
-
-	for _, nr := range res.NetworkRules {
-		if nr.DNSRewrite != nil {
-			nrules = append(nrules, nr)
-		}
-	}
-
-	return nrules
-}
-
 // removeMatchingException changes nrules in-place to remove the elements that
 // match DNS rewrite exception rule exc and returns the resulting slice.  exc
 // must not be nil.
@@ -79,39 +63,4 @@ func matchException(nr, exc *rules.NetworkRule, excImportant bool) (ok bool) {
 	}
 
 	return false
-}
-
-// DNSRewrites returns $dnsrewrite network rules applying exception logic.  For
-// example, rules like:
-//
-//	||example.com^$dnsrewrite=127.0.0.1
-//	||example.com^$dnsrewrite=127.0.0.2
-//	@@||example.com^$dnsrewrite=127.0.0.1
-//
-// Will result in example.com being rewritten to only return 127.0.0.2.
-//
-// To get all DNS rewrite rules without applying any exception logic, use
-// (*DNSResult).DNSRewritesAll.
-func (res *DNSResult) DNSRewrites() (nrules []*rules.NetworkRule) {
-	// This is currently an O(m×n) algorithm, but the m--the number
-	// of $dnsrewrite rules--will probably remain way below 10, and
-	// so will n--the number of exceptions.
-
-	if res == nil {
-		return nil
-	}
-
-	nrules = res.DNSRewritesAll()
-
-	// Use the three-statement form as opposed to the range form, because we
-	// change the slice in-place.
-	for i := 0; i < len(nrules); i++ {
-		nr := nrules[i]
-		if nr.Whitelist {
-			nrules = slices.Delete(nrules, i, i+1)
-			nrules = removeMatchingException(nrules, nr)
-		}
-	}
-
-	return nrules
 }

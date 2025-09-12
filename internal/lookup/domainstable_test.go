@@ -89,7 +89,10 @@ func BenchmarkDomainsTable_AppendMatching(b *testing.B) {
 
 	r := rules.NewRequest(testURLWithSubdomain, testURLWithDomain, rules.TypeOther)
 
-	gotRules := make([]*rules.NetworkRule, 0, 1)
+	var gotRules []*rules.NetworkRule
+
+	// Warmup to fill the slice and the pools.
+	gotRules = tbl.AppendMatching(gotRules[:0], r)
 
 	b.ReportAllocs()
 	for b.Loop() {
@@ -103,7 +106,7 @@ func BenchmarkDomainsTable_AppendMatching(b *testing.B) {
 	//	goarch: amd64
 	//	pkg: github.com/AdguardTeam/urlfilter/internal/lookup
 	//	cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
-	//	BenchmarkDomainsTable_AppendMatching-16     	 6777273	      1510 ns/op	       0 B/op	       0 allocs/op
+	//	BenchmarkDomainsTable_AppendMatching-16     	 1000000	      1093 ns/op	       0 B/op	       0 allocs/op
 }
 
 func BenchmarkDomainsTable_AppendMatching_baseFilter(b *testing.B) {
@@ -113,7 +116,10 @@ func BenchmarkDomainsTable_AppendMatching_baseFilter(b *testing.B) {
 
 	r := rules.NewRequest(testURLBaseFilterDomain, testURLBaseFilterDomain, rules.TypeOther)
 
-	gotRules := make([]*rules.NetworkRule, 0, 1)
+	var gotRules []*rules.NetworkRule
+
+	// Warmup to fill the slice and the pools.
+	gotRules = tbl.AppendMatching(gotRules[:0], r)
 
 	b.ReportAllocs()
 	for b.Loop() {
@@ -129,5 +135,5 @@ func BenchmarkDomainsTable_AppendMatching_baseFilter(b *testing.B) {
 	//	goarch: amd64
 	//	pkg: github.com/AdguardTeam/urlfilter/internal/lookup
 	//	cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
-	//	BenchmarkDomainsTable_AppendMatching_baseFilter-16     	 5423517	      2105 ns/op	       0 B/op	       0 allocs/op
+	//	BenchmarkDomainsTable_AppendMatching_baseFilter-16     	  744973	      1620 ns/op	       0 B/op	       0 allocs/op
 }

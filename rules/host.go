@@ -13,18 +13,20 @@ import (
 // See http://man7.org/linux/man-pages/man5/hosts.5.html.
 // It also supports "just domain" syntax; in that case, the IP will be set to
 // 0.0.0.0.
+//
+// TODO(a.garipov):  Consider using [hostsfile.Record].
 type HostRule struct {
 	// IP is the address of the rule.
 	IP netip.Addr
 
-	// RuleText is the original text of the rule.
-	RuleText string
+	// text is the original text of the rule.
+	text string
 
 	// Hostnames is the slice of hostnames associated with IP.
 	Hostnames []string
 
-	// FilterListID is the identifier of the filter, containing the rule.
-	FilterListID int
+	// id is the identifier of the filter, containing the rule.
+	id ListID
 }
 
 // splitNextByWhitespace splits string by whitespace (' ' or '\t') and returns
@@ -63,10 +65,10 @@ func splitNextByWhitespace(sPtr *string) (r string) {
 }
 
 // NewHostRule parses the rule and creates a new *HostRule.
-func NewHostRule(ruleText string, filterListID int) (h *HostRule, err error) {
+func NewHostRule(ruleText string, id ListID) (h *HostRule, err error) {
 	h = &HostRule{
-		RuleText:     ruleText,
-		FilterListID: filterListID,
+		text: ruleText,
+		id:   id,
 	}
 
 	// Strip comments.
@@ -109,17 +111,17 @@ var _ Rule = (*HostRule)(nil)
 
 // Text implements the [Rule] interface for *HostRule.
 func (f *HostRule) Text() (s string) {
-	return f.RuleText
+	return f.text
 }
 
 // GetFilterListID implements the [Rule] interface for *HostRule.
-func (f *HostRule) GetFilterListID() (id int) {
-	return f.FilterListID
+func (f *HostRule) GetFilterListID() (id ListID) {
+	return f.id
 }
 
 // String returns original rule text.
 func (f *HostRule) String() (s string) {
-	return f.RuleText
+	return f.text
 }
 
 // Match returns true if this filtering rule matches the specified hostname.

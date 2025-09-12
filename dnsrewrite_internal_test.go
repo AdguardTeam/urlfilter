@@ -69,7 +69,7 @@ func TestDNSResult_DNSRewrites(t *testing.T) {
 @@||priority-disable-exc-important^$important,dnsrewrite=127.0.0.1
 `
 
-	ruleStorage := newTestRuleStorage(t, 1, rulesText)
+	ruleStorage := newTestRuleStorage(t, testListID, rulesText)
 	dnsEngine := NewDNSEngine(ruleStorage)
 	assert.NotNil(t, dnsEngine)
 
@@ -110,7 +110,7 @@ func TestDNSResult_DNSRewrites(t *testing.T) {
 		assert.True(t, ok)
 		require.NotNil(t, res.NetworkRule)
 
-		assert.Contains(t, res.NetworkRule.RuleText, "$important")
+		assert.Contains(t, res.NetworkRule.String(), "$important")
 
 		// DNS rewrite matching.
 		dnsr := res.DNSRewrites()
@@ -301,7 +301,7 @@ func TestDNSEngine_MatchRequest_dnsRewrite(t *testing.T) {
 |srv-record^$dnsrewrite=NOERROR;SRV;30 60 8080 srv-record-host
 `
 
-	ruleStorage := newTestRuleStorage(t, 1, rulesText)
+	ruleStorage := newTestRuleStorage(t, testListID, rulesText)
 	dnsEngine := NewDNSEngine(ruleStorage)
 	assert.NotNil(t, dnsEngine)
 
@@ -667,7 +667,7 @@ func TestDNSEngine_MatchRequest_dnsRewrite(t *testing.T) {
 		require.True(t, ok)
 		require.NotNil(t, res.NetworkRule)
 
-		assert.Equal(t, "||blocked-later^", res.NetworkRule.RuleText)
+		assert.Equal(t, "||blocked-later^", res.NetworkRule.String())
 
 		dnsr := res.DNSRewritesAll()
 		require.Len(t, dnsr, 1)
@@ -680,7 +680,7 @@ func TestDNSEngine_MatchRequest_dnsRewrite(t *testing.T) {
 		require.True(t, ok)
 		require.Len(t, res.HostRulesV4, 1)
 
-		assert.Equal(t, "127.0.0.1 etc-hosts-rule", res.HostRulesV4[0].RuleText)
+		assert.Equal(t, "127.0.0.1 etc-hosts-rule", res.HostRulesV4[0].String())
 
 		dnsr := res.DNSRewritesAll()
 		require.Len(t, dnsr, 1)

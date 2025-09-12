@@ -1,17 +1,10 @@
-package urlfilter
+package urlfilter_test
 
 import (
-	"io"
-	"os"
-	"testing"
-
-	"github.com/AdguardTeam/golibs/log"
+	"github.com/AdguardTeam/urlfilter/rules"
 )
 
-func TestMain(m *testing.M) {
-	// TODO(a.garipov): Refactor code and tests to not use the global
-	// mutable logger.
-	log.SetOutput(io.Discard)
-
-	os.Exit(m.Run())
-}
+// Common ListIDs for tests.
+const (
+	testListID rules.ListID = 1
+)

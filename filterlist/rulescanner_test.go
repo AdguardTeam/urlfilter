@@ -23,7 +23,7 @@ func TestRuleScanner_stringReader(t *testing.T) {
 	assert.NotNil(t, f)
 	assert.Equal(t, testRuleDomain, f.Text())
 	assert.Equal(t, testListID, f.GetFilterListID())
-	assert.Equal(t, 0, idx)
+	assert.Equal(t, int64(0), idx)
 
 	assert.True(t, scanner.Scan())
 	f, idx = scanner.Rule()
@@ -76,5 +76,5 @@ func BenchmarkRuleScanner_Scan(b *testing.B) {
 	//	goarch: amd64
 	//	pkg: github.com/AdguardTeam/urlfilter/filterlist
 	//	cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
-	//	BenchmarkRuleScanner_Scan-16       	20089935	        59.03 ns/op	       0 B/op	       0 allocs/op
+	//	BenchmarkRuleScanner_Scan-16       	31260648	        36.32 ns/op	       0 B/op	       0 allocs/op
 }
