@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/AdguardTeam/golibs/netutil"
 	"github.com/AdguardTeam/golibs/netutil/urlutil"
 	"golang.org/x/net/publicsuffix"
 )
@@ -116,19 +117,19 @@ type Request struct {
 //
 // TODO(d.kolyshev):  Limit the URL length by 4 KiB. It appears that there
 // can be URLs longer than a megabyte, and it makes no sense to go through
-// the whole URL.
+// the whole URL.  u must not be nil.
 func NewRequest(u, sourceURL *url.URL, requestType RequestType) (r *Request) {
 	r = &Request{
-		SourceURL:   sourceURL,
-		URL:         u,
+		SourceURL:   netutil.CloneURL(sourceURL),
+		URL:         netutil.CloneURL(u),
 		RequestType: requestType,
 	}
 
-	if sourceURL != nil {
-		r.SourceHostname = sourceURL.Hostname()
+	if r.SourceURL != nil {
+		r.SourceHostname = r.SourceURL.Hostname()
 	}
 
-	hostname := u.Hostname()
+	hostname := r.URL.Hostname()
 	domain := effectiveTLDPlusOne(hostname)
 	if domain != "" {
 		r.Domain = domain
@@ -158,7 +159,6 @@ func NewRequestForHostname(hostname string) (r *Request) {
 		URL: &url.URL{
 			Scheme: urlutil.SchemeHTTP,
 		},
-		RequestType: TypeDocument,
 	}
 
 	FillRequestForHostname(r, hostname)
@@ -169,39 +169,11 @@ func NewRequestForHostname(hostname string) (r *Request) {
 // FillRequestForHostname fills the given instance of request r for matching the
 // hostname.  r must not be nil.
 func FillRequestForHostname(r *Request, hostname string) {
-	if r.URL != nil {
-		r.URL.Host = hostname
-	}
-
+	r.URL.Host = hostname
 	r.RequestType = TypeDocument
 	r.ThirdParty = false
 	r.IsHostnameRequest = true
 
-	if domain := effectiveTLDPlusOne(hostname); domain != "" {
-		r.Domain = domain
-	} else {
-		r.Domain = hostname
-	}
-}
-
-// NewRequestForURL creates a new instance of [Request] for matching the URL's
-// hostname.  It uses [TypeDocument] as a request type.
-func NewRequestForURL(u *url.URL) (r *Request) {
-	r = &Request{}
-	FillRequestForURL(r, u)
-
-	return r
-}
-
-// FillRequestForURL fills the given instance of request r for matching the
-// given URL.  It uses [TypeDocument] as request type.  r and u must not be nil.
-func FillRequestForURL(r *Request, u *url.URL) {
-	r.URL = u
-	r.RequestType = TypeDocument
-	r.ThirdParty = false
-	r.IsHostnameRequest = true
-
-	hostname := u.Hostname()
 	if domain := effectiveTLDPlusOne(hostname); domain != "" {
 		r.Domain = domain
 	} else {

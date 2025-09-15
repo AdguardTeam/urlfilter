@@ -79,28 +79,28 @@ func TestMatchImportantRule(t *testing.T) {
 	ruleStorage := newTestRuleStorage(t, testListID, rulesText)
 	engine := NewNetworkEngine(ruleStorage)
 
-	r := rules.NewRequest(testURL, nil, rules.TypeOther)
-	rule, ok := engine.Match(r)
+	req := rules.NewRequest(testURL, nil, rules.TypeOther)
+	rule, ok := engine.Match(req)
 	assert.True(t, ok)
 
 	require.NotNil(t, rule)
 	assert.Equal(t, r2, rule.Text())
 
-	r = rules.NewRequest(&url.URL{
+	req = rules.NewRequest(&url.URL{
 		Scheme: urlutil.SchemeHTTP,
 		Host:   "test1.example.org",
 	}, nil, rules.TypeOther)
-	rule, ok = engine.Match(r)
+	rule, ok = engine.Match(req)
 	assert.True(t, ok)
 
 	require.NotNil(t, rule)
 	assert.Equal(t, r2, rule.Text())
 
-	r = rules.NewRequest(&url.URL{
+	req = rules.NewRequest(&url.URL{
 		Scheme: urlutil.SchemeHTTP,
 		Host:   "test2.example.org",
 	}, nil, rules.TypeOther)
-	rule, ok = engine.Match(r)
+	rule, ok = engine.Match(req)
 	assert.True(t, ok)
 
 	require.NotNil(t, rule)
@@ -289,10 +289,7 @@ func FuzzNetworkEngine_Match(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, host string) {
 		assert.NotPanics(t, func() {
-			req := rules.NewRequestForURL(&url.URL{
-				Scheme: urlutil.SchemeHTTP,
-				Host:   host,
-			})
+			req := rules.NewRequestForHostname(host)
 			_, _ = engine.Match(req)
 		})
 	})

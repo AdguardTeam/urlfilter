@@ -1,10 +1,8 @@
 package rules
 
 import (
-	"net/url"
 	"testing"
 
-	"github.com/AdguardTeam/golibs/netutil/urlutil"
 	"github.com/AdguardTeam/golibs/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -279,10 +277,7 @@ func TestNetworkRule_cTagRules(t *testing.T) {
 
 		assert.Equal(t, []string{"pc"}, r.permittedClientTags)
 
-		req := NewRequestForURL(&url.URL{
-			Scheme: urlutil.SchemeHTTP,
-			Host:   "test.example",
-		})
+		req := NewRequestForHostname("test.example")
 		req.SortedClientTags = []string{"pc"}
 		assert.True(t, r.Match(req))
 
@@ -297,10 +292,7 @@ func TestNetworkRule_cTagRules(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, []string{"pc", "phone"}, r.permittedClientTags)
 
-		req := NewRequestForURL(&url.URL{
-			Scheme: urlutil.SchemeHTTP,
-			Host:   "test.example",
-		})
+		req := NewRequestForHostname("test.example")
 		req.SortedClientTags = []string{"phone", "other"}
 		assert.True(t, r.Match(req))
 
@@ -316,10 +308,7 @@ func TestNetworkRule_cTagRules(t *testing.T) {
 		assert.Equal(t, []string{"pc"}, r.permittedClientTags)
 		assert.Equal(t, []string{"phone"}, r.restrictedClientTags)
 
-		req := NewRequestForURL(&url.URL{
-			Scheme: urlutil.SchemeHTTP,
-			Host:   "test.example",
-		})
+		req := NewRequestForHostname("test.example")
 		req.SortedClientTags = []string{"phone", "pc"}
 		assert.False(t, r.Match(req))
 

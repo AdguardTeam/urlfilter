@@ -202,17 +202,11 @@ func TestNetworkRule_Match_simpleBasicRules(t *testing.T) {
 
 	// Subdomains / domains.
 	r, err = rules.NewNetworkRule("||github.com^", testListID)
-	req = rules.NewRequestForURL(&url.URL{
-		Scheme: urlutil.SchemeHTTP,
-		Host:   "dualstack.log.github.com-east-1.elb.amazonaws.com",
-	})
+	req = rules.NewRequestForHostname("dualstack.log.github.com-east-1.elb.amazonaws.com")
 	require.NoError(t, err)
 	assert.False(t, r.Match(req))
 
-	req = rules.NewRequestForURL(&url.URL{
-		Scheme: urlutil.SchemeHTTP,
-		Host:   "dualstack.log.github.com1-east-1.elb.amazonaws.com",
-	})
+	req = rules.NewRequestForHostname("dualstack.log.github.com1-east-1.elb.amazonaws.com")
 	require.NoError(t, err)
 	assert.False(t, r.Match(req))
 
@@ -606,7 +600,7 @@ func TestNetworkRule_Match_client(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, r)
 
-	req := rules.NewRequestForURL(testURL)
+	req := rules.NewRequestForHostname(testHostname)
 	req.ClientIP = netip.MustParseAddr("127.0.0.1")
 	assert.True(t, r.Match(req))
 
@@ -818,43 +812,29 @@ func TestNetworkRule_Match_ip(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, r.IsHostLevelNetworkRule())
 
-	req := rules.NewRequestForURL(&url.URL{
-		Scheme: urlutil.SchemeHTTP,
-		Host:   "104.154.1.1",
-	})
+	req := rules.NewRequestForHostname("104.154.1.1")
 	assert.True(t, r.Match(req))
 
-	req = rules.NewRequestForURL(&url.URL{
-		Scheme: urlutil.SchemeHTTP,
-		Host:   "1.104.154.1",
-	})
+	req = rules.NewRequestForHostname("1.104.154.1")
 	assert.False(t, r.Match(req))
+}
 
-	r, err = rules.NewNetworkRule("/sub.", testListID)
+func TestNetworkRule_Match_subdomain(t *testing.T) {
+	t.Parallel()
+
+	r, err := rules.NewNetworkRule("/sub.", testListID)
 	require.NoError(t, err)
 
-	req = rules.NewRequestForURL(&url.URL{
-		Scheme: urlutil.SchemeHTTP,
-		Host:   "sub.example.org",
-	})
+	req := rules.NewRequestForHostname("sub.example.org")
 	assert.True(t, r.Match(req))
 
-	req = rules.NewRequestForURL(&url.URL{
-		Scheme: urlutil.SchemeHTTP,
-		Host:   "sub.host.org",
-	})
+	req = rules.NewRequestForHostname("sub.host.org")
 	assert.True(t, r.Match(req))
 
-	req = rules.NewRequestForURL(&url.URL{
-		Scheme: urlutil.SchemeHTTP,
-		Host:   "sub2.host.org",
-	})
+	req = rules.NewRequestForHostname("sub2.host.org")
 	assert.False(t, r.Match(req))
 
-	req = rules.NewRequestForURL(&url.URL{
-		Scheme: urlutil.SchemeHTTP,
-		Host:   "2sub.host.org",
-	})
+	req = rules.NewRequestForHostname("2sub.host.org")
 	assert.False(t, r.Match(req))
 }
 
@@ -875,7 +855,7 @@ func compareRulesPriority(tb testing.TB, left, right string, expected bool) {
 func TestNetworkRule_Match_dnsType(t *testing.T) {
 	t.Parallel()
 
-	req := rules.NewRequestForURL(testURL)
+	req := rules.NewRequestForHostname(testHostname)
 	req.DNSType = dns.TypeAAAA
 
 	r, err := rules.NewNetworkRule("||test.example^$dnstype=TXT|AAAA", testListID)
@@ -909,7 +889,7 @@ func BenchmarkNetworkRule_Match(b *testing.B) {
 	r, err := rules.NewNetworkRule("||test.example^", testListID)
 	require.NoError(b, err)
 
-	req := rules.NewRequestForURL(testURL)
+	req := rules.NewRequestForHostname(testHostname)
 
 	// Warmup to make sure the init has run.
 	ok := r.Match(req)
@@ -946,10 +926,7 @@ func FuzzNetworkRule_Match(f *testing.F) {
 	}
 
 	f.Fuzz(func(t *testing.T, domain string) {
-		req := rules.NewRequestForURL(&url.URL{
-			Scheme: urlutil.SchemeHTTP,
-			Host:   domain,
-		})
+		req := rules.NewRequestForHostname(domain)
 
 		assert.NotPanics(t, func() {
 			_ = r.Match(req)

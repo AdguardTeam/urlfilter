@@ -2,10 +2,8 @@ package rules_test
 
 import (
 	"fmt"
-	"net/url"
 	"testing"
 
-	"github.com/AdguardTeam/golibs/netutil/urlutil"
 	"github.com/AdguardTeam/golibs/testutil"
 	"github.com/AdguardTeam/urlfilter/rules"
 	"github.com/stretchr/testify/assert"
@@ -75,10 +73,7 @@ func TestNetworkRule_Match_dnsRewrite(t *testing.T) {
 		in:   "||test.example^$dnsrewrite=noerror;;",
 	}}
 
-	req := rules.NewRequestForURL(&url.URL{
-		Scheme: urlutil.SchemeHTTP,
-		Host:   "test.example",
-	})
+	req := rules.NewRequestForHostname("test.example")
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -99,10 +94,7 @@ func TestNetworkRule_Match_dnsRewriteReverse(t *testing.T) {
 	r, err := rules.NewNetworkRule(s, testListID)
 	require.NoError(t, err)
 
-	req := rules.NewRequestForURL(&url.URL{
-		Scheme: urlutil.SchemeHTTP,
-		Host:   "1.2.3.4.in-addr.arpa",
-	})
+	req := rules.NewRequestForHostname("1.2.3.4.in-addr.arpa")
 	assert.True(t, r.Match(req))
 }
 
