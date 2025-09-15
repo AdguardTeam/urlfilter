@@ -37,7 +37,10 @@ type ShortcutsTable struct {
 	// Storage for the network filtering rules.
 	ruleStorage *filterlist.RuleStorage
 
-	// shortcutsPool contains slices of shortcuts for reuse..
+	// bytesPool contains bytes for reuse.
+	bytesPool *syncutil.Pool[[]byte]
+
+	// shortcutsPool contains slices of shortcuts for reuse.
 	shortcutsPool *syncutil.Pool[[]shortcut]
 
 	// shortcuts is the index of a shortcut to its data.
@@ -48,12 +51,16 @@ type ShortcutsTable struct {
 // based on an analysis of the AdGuard DNS filtering-rule list.
 const shortcutsInARuleEst = 16
 
+// maxURLLength is the maximum length of a URL.
+const maxURLLength = 4 * 1024
+
 // NewShortcutsTable creates a new instance of *ShortcutsTable.
 func NewShortcutsTable(rs *filterlist.RuleStorage) (s *ShortcutsTable) {
 	return &ShortcutsTable{
 		ruleStorage:   rs,
-		shortcuts:     map[shortcut]*shortcutInfo{},
+		bytesPool:     syncutil.NewSlicePool[byte](maxURLLength),
 		shortcutsPool: syncutil.NewSlicePool[shortcut](shortcutsInARuleEst),
+		shortcuts:     map[shortcut]*shortcutInfo{},
 	}
 }
 
@@ -100,13 +107,19 @@ func (s *ShortcutsTable) Add(f *rules.NetworkRule, id filterlist.StorageID) (ok 
 // AppendMatching implements the [Table] interface for *ShortcutsTable.
 func (s *ShortcutsTable) AppendMatching(
 	matching []*rules.NetworkRule,
-	r *rules.Request,
+	req *rules.Request,
 ) (res []*rules.NetworkRule) {
 	res = matching
 
-	u, _ := r.URL.MarshalBinary()
-	urlLowerCased := bytes.ToLower(u)
+	buf := s.bytesPool.Get()
+	defer s.bytesPool.Put(buf)
 
+	b := *buf
+	b, _ = req.URL.AppendBinary(b[0:0])
+	urlLowerCased := bytes.ToLower(b)
+
+	// Some runes have different length when lowercased, so we need to check
+	// the length of the URL after lowercasing.
 	l := len(urlLowerCased)
 	if l < shortcutLength {
 		return res
@@ -128,7 +141,7 @@ func (s *ShortcutsTable) AppendMatching(
 			// performance issues.
 			//
 			// TODO(a.garipov):  Consider using a pooled set.
-			if rule == nil || slices.Contains(res, rule) || !rule.Match(r) {
+			if rule == nil || slices.Contains(res, rule) || !rule.Match(req) {
 				continue
 			}
 
