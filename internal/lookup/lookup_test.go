@@ -82,7 +82,7 @@ const (
 var testURLBaseFilterDomain = &url.URL{
 	Scheme: urlutil.SchemeHTTPS,
 	Host:   "googleads.g.doubleclick.net",
-	Path:   "ads/preferences",
+	Path:   "/ads/preferences/",
 }
 
 // baseFilterData is the data from AdGuard Base Filter.
