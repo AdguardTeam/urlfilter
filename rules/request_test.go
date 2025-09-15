@@ -131,12 +131,12 @@ func TestRequestType_Count(t *testing.T) {
 	}
 }
 
-func TestFillRequestForURL(t *testing.T) {
+func TestFillRequestForHostname(t *testing.T) {
 	t.Parallel()
 
 	req := rules.NewRequest(testURL, nil, rules.TypeOther)
 
-	rules.FillRequestForURL(req, testURL)
+	rules.FillRequestForHostname(req, testHostname)
 	assert.Equal(t, &rules.Request{
 		ClientIP:          netip.Addr{},
 		ClientName:        "",
@@ -153,12 +153,12 @@ func TestFillRequestForURL(t *testing.T) {
 	}, req)
 }
 
-func BenchmarkFillRequestForURL(b *testing.B) {
-	req := &rules.Request{}
+func BenchmarkFillRequestForHostname(b *testing.B) {
+	req := rules.NewRequestForHostname(testHostname)
 
 	b.ReportAllocs()
 	for b.Loop() {
-		rules.FillRequestForURL(req, testURL)
+		rules.FillRequestForHostname(req, testHostname)
 	}
 
 	assert.Equal(b, &rules.Request{
@@ -182,5 +182,5 @@ func BenchmarkFillRequestForURL(b *testing.B) {
 	//	goarch: arm64
 	//	pkg: github.com/AdguardTeam/urlfilter/rules
 	//	cpu: Apple M1 Pro
-	//	BenchmarkFillRequestForURL-8   	16819832	        71.05 ns/op	       0 B/op	       0 allocs/op
+	//	BenchmarkFillRequestForHostname-8   	14376121	        82.27 ns/op	       0 B/op	       0 allocs/op
 }

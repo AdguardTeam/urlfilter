@@ -2,9 +2,7 @@ package urlfilter
 
 import (
 	"net/netip"
-	"net/url"
 
-	"github.com/AdguardTeam/golibs/netutil/urlutil"
 	"github.com/AdguardTeam/golibs/syncutil"
 	"github.com/AdguardTeam/urlfilter/filterlist"
 	"github.com/AdguardTeam/urlfilter/rules"
@@ -135,11 +133,7 @@ func (d *DNSEngine) getRequestFromPool(dReq *DNSRequest) (req *rules.Request) {
 	req.ClientName = dReq.ClientName
 	req.DNSType = dReq.DNSType
 
-	// TODO(d.kolyshev): Use pool for URLs.
-	rules.FillRequestForURL(req, &url.URL{
-		Scheme: urlutil.SchemeHTTP,
-		Host:   dReq.Hostname,
-	})
+	rules.FillRequestForHostname(req, dReq.Hostname)
 
 	return req
 }
