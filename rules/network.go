@@ -302,11 +302,11 @@ func (r *NetworkRule) String() (s string) {
 	return r.text
 }
 
-// maxURLLength is the maximum length of a URL.
-const maxURLLength = 4 * 1024
+// urlPoolLen is a length of the URLs pool.
+const urlPoolLen = 1024
 
 // urlBytesPool is a pool of byte slices used to store URLs.
-var urlBytesPool = syncutil.NewSlicePool[byte](maxURLLength)
+var urlBytesPool = syncutil.NewSlicePool[byte](urlPoolLen)
 
 // Match checks if this filtering rule matches the specified request.  req must
 // not be nil.

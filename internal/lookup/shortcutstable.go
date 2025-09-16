@@ -37,8 +37,8 @@ type ShortcutsTable struct {
 	// Storage for the network filtering rules.
 	ruleStorage *filterlist.RuleStorage
 
-	// bytesPool contains bytes for reuse.
-	bytesPool *syncutil.Pool[[]byte]
+	// urlBytesPool contains bytes for reuse.
+	urlBytesPool *syncutil.Pool[[]byte]
 
 	// shortcutsPool contains slices of shortcuts for reuse.
 	shortcutsPool *syncutil.Pool[[]shortcut]
@@ -51,14 +51,14 @@ type ShortcutsTable struct {
 // based on an analysis of the AdGuard DNS filtering-rule list.
 const shortcutsInARuleEst = 16
 
-// maxURLLength is the maximum length of a URL.
-const maxURLLength = 4 * 1024
+// urlPoolLen is a length of the URLs pool.
+const urlPoolLen = 1024
 
 // NewShortcutsTable creates a new instance of *ShortcutsTable.
 func NewShortcutsTable(rs *filterlist.RuleStorage) (s *ShortcutsTable) {
 	return &ShortcutsTable{
 		ruleStorage:   rs,
-		bytesPool:     syncutil.NewSlicePool[byte](maxURLLength),
+		urlBytesPool:  syncutil.NewSlicePool[byte](urlPoolLen),
 		shortcutsPool: syncutil.NewSlicePool[shortcut](shortcutsInARuleEst),
 		shortcuts:     map[shortcut]*shortcutInfo{},
 	}
@@ -111,8 +111,8 @@ func (s *ShortcutsTable) AppendMatching(
 ) (res []*rules.NetworkRule) {
 	res = matching
 
-	buf := s.bytesPool.Get()
-	defer s.bytesPool.Put(buf)
+	buf := s.urlBytesPool.Get()
+	defer s.urlBytesPool.Put(buf)
 
 	b := *buf
 	b, _ = req.URL.AppendBinary(b[0:0])
