@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"bytes"
 	"fmt"
 	"math/bits"
 	"net/netip"
@@ -10,6 +11,7 @@ import (
 	"sync"
 
 	"github.com/AdguardTeam/golibs/netutil"
+	"github.com/AdguardTeam/golibs/syncutil"
 )
 
 // Parts of rules.
@@ -300,12 +302,24 @@ func (r *NetworkRule) String() (s string) {
 	return r.text
 }
 
+// maxURLLength is the maximum length of a URL.
+const maxURLLength = 4 * 1024
+
+// urlBytesPool is a pool of byte slices used to store URLs.
+var urlBytesPool = syncutil.NewSlicePool[byte](maxURLLength)
+
 // Match checks if this filtering rule matches the specified request.  req must
 // not be nil.
 func (r *NetworkRule) Match(req *Request) (ok bool) {
+	buf := urlBytesPool.Get()
+	defer urlBytesPool.Put(buf)
+
+	url := *buf
+	url, _ = req.URL.AppendBinary(url[0:0])
+
 	switch {
 	case
-		!r.matchShortcut(req),
+		!r.matchShortcut(url),
 		r.IsOptionEnabled(OptionThirdParty) && !req.ThirdParty,
 		r.IsOptionDisabled(OptionThirdParty) && req.ThirdParty,
 		!r.matchRequestType(req.RequestType),
@@ -314,7 +328,7 @@ func (r *NetworkRule) Match(req *Request) (ok bool) {
 		!r.matchDNSType(req.DNSType),
 		!r.matchClientTags(req.SortedClientTags),
 		!r.matchClient(req.ClientName, req.ClientIP),
-		!r.matchPattern(req):
+		!r.matchPattern(req, url):
 		return false
 	}
 
@@ -517,9 +531,9 @@ func (r *NetworkRule) preparePattern() {
 	r.isInvalid = err != nil
 }
 
-// matchPattern uses the regex pattern to match the request URL.  req must not
-// be nil.
-func (r *NetworkRule) matchPattern(req *Request) (matched bool) {
+// matchPattern uses the regex pattern to match the given URL.  req must not be
+// nil.
+func (r *NetworkRule) matchPattern(req *Request, url []byte) (matched bool) {
 	r.initOnce.Do(r.preparePattern)
 
 	if r.isInvalid {
@@ -532,9 +546,7 @@ func (r *NetworkRule) matchPattern(req *Request) (matched bool) {
 		return r.regexp.MatchString(req.URL.Hostname())
 	}
 
-	// TODO(d.kolyshev): !! Use pools and AppendBinary?
-
-	return r.regexp.MatchString(req.URL.String())
+	return r.regexp.Match(url)
 }
 
 // shouldMatchHostname checks if we should match hostname and not the URL.  This
@@ -574,11 +586,9 @@ func (r *NetworkRule) shouldMatchHostname(req *Request) (ok bool) {
 	return true
 }
 
-// matchShortcut simply checks if shortcut is a substring of the URL.
-func (r *NetworkRule) matchShortcut(req *Request) (ok bool) {
-	// TODO(d.kolyshev): !! Use pools and AppendBinary, make Shortcut []byte?
-
-	return strings.Contains(strings.ToLower(req.URL.String()), r.Shortcut)
+// matchShortcut simply checks if shortcut is a substring of the given URL.
+func (r *NetworkRule) matchShortcut(url []byte) (ok bool) {
+	return bytes.Contains(bytes.ToLower(url), []byte(r.Shortcut))
 }
 
 // matchRequestDomain checks if the filtering rule is allowed to match this
