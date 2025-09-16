@@ -118,15 +118,15 @@ func (s *ShortcutsTable) AppendMatching(
 	b, _ = req.URL.AppendBinary(b[0:0])
 	urlLowerCased := bytes.ToLower(b)
 
-	// Some runes have different length when lowercased, so we need to check
-	// the length of the URL after lowercasing.
-	l := len(urlLowerCased)
+	l := len(b)
 	if l < shortcutLength {
 		return res
 	}
 
 	for i := range l - shortcutLength {
-		sc := shortcut(urlLowerCased[i : i+shortcutLength])
+		// Some runes have different length when lowercased, so we need to
+		// lowercase late.
+		sc := shortcut(bytes.ToLower(urlLowerCased[i : i+shortcutLength]))
 		scInfo := s.shortcuts[sc]
 		if scInfo == nil {
 			continue
