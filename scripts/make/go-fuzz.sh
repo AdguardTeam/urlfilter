@@ -148,3 +148,15 @@ readonly go count_flags shuffle_flags timeout_flags fuzztime_flags
 	--fuzz='FuzzNetworkRule_Match' \
 	./rules/ \
 	;
+
+"$go" test \
+	"$count_flags" \
+	"$shuffle_flags" \
+	"$race_flags" \
+	"$timeout_flags" \
+	"$x_flags" \
+	"$v_flags" \
+	"$fuzztime_flags" \
+	--fuzz='FuzzIsDomainName' \
+	./internal/ufnet/ \
+	;

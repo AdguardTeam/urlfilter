@@ -1,7 +1,11 @@
 // Package ufnet contains utilities for domain and hostname parsing/validation.
 package ufnet
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/AdguardTeam/golibs/netutil"
+)
 
 // ExtractHostname quickly retrieves hostname from the given URL.
 //
@@ -46,103 +50,110 @@ func ExtractHostname(url string) (hostname string) {
 	return url[firstIdx:nextIdx]
 }
 
-// IsDomainName - check if input string is a valid domain name
-// Syntax: [label.]... label.label
+// IsDomainName checks if the given string is a valid domain name.  Valid domain
+// name has the following syntax: [label.]... label.label.  Each label is 1 to
+// 63 characters long, and may contain:
+//   - ASCII letters a-z and A-Z,
+//   - digits 0-9,
+//   - hyphen ('-').
 //
-// Each label is 1 to 63 characters long, and may contain:
-//
-//	. ASCII letters a-z and A-Z
-//	. digits 0-9
-//	. hyphen ('-')
-//
-// . labels cannot start or end with hyphens (RFC 952)
-// . max length of ascii hostname including dots is 253 characters
-// . TLD is >=2 characters
-// . TLD is [a-zA-Z]+ or "xn--[a-zA-Z0-9]+"
+// Labels cannot start or end with hyphens (RFC 952).  Max length of ASCII
+// hostname including dots is 253 characters.  TLD is greater or equal to 2
+// characters.  TLD has "[a-zA-Z]+" or "xn--[a-zA-Z0-9]+" format.
 //
 // TODO(s.chzhen):  Consider using netutil.IsValidHostname.
-//
-//nolint:gocyclo
+// TODO(d.kolyshev):  Consider moving to golibs.
 func IsDomainName(name string) (ok bool) {
-	if len(name) > 253 {
+	if len(name) > netutil.MaxDomainNameLen {
 		return false
 	}
 
-	st := 0
-	nLabel := 0
-	nLevel := 1
-	var prevChar byte
-	charOnly := true
-	xn := 0
-
-	for _, c := range []byte(name) {
-		switch st {
-		case 0:
-			fallthrough
-		case 1:
-			if !((c >= 'a' && c <= 'z') ||
-				(c >= 'A' && c <= 'Z')) {
-				charOnly = false
-
-				if !(c >= '0' && c <= '9') {
-					return false
-				}
-			} else if c == 'x' || c == 'X' {
-				xn = 1
-			}
-			st = 2
-			nLabel = 1
-
-		case 2:
-			if c == '.' {
-				if prevChar == '-' {
-					return false
-				}
-
-				nLevel++
-				st = 0
-				charOnly = true
-				xn = 0
-
-				continue
-			}
-
-			if nLabel == 63 {
-				return false
-			}
-
-			if !((c >= 'a' && c <= 'z') ||
-				(c >= 'A' && c <= 'Z')) {
-				charOnly = false
-				if !((c >= '0' && c <= '9') ||
-					c == '-') {
-
-					return false
-				}
-			}
-
-			if xn > 0 {
-				if xn < len("xn--") {
-					if c == "xn--"[xn] {
-						xn++
-					} else {
-						xn = 0
-					}
-				} else {
-					xn++
-				}
-			}
-
-			prevChar = c
-			nLabel++
+	label, tail, found := strings.Cut(name, ".")
+	for ; found; label, tail, found = strings.Cut(tail, ".") {
+		if !isValidLabel(label) {
+			return false
 		}
 	}
 
-	if st != 2 ||
-		nLabel == 1 ||
-		(!charOnly && xn < len("xn--wwww")) {
+	return isValidTLDLabel(label)
+}
 
+const (
+	// xnPrefix is the prefix of an IDNA label.
+	xnPrefix = "xn--"
+
+	// minXNLabelLen is the minimum length of an IDNA label.
+	minXNLabelLen = 8
+)
+
+// isValidLabel checks if the given label is valid.  Labels must be at least 1
+// character long and contain only ASCII letters, digits, and hyphens.  Labels
+// cannot start or end with a hyphen.
+func isValidLabel(label string) (ok bool) {
+	if label == "" {
 		return false
+	}
+
+	l := len(label)
+	if l > netutil.MaxDomainLabelLen {
+		return false
+	}
+
+	if strings.HasPrefix(label, xnPrefix) {
+		if l < minXNLabelLen {
+			return false
+		}
+	}
+
+	return hasValidChars(label)
+}
+
+// isValidTLDLabel checks if the given label is a valid TLD.  TLDs must be a
+// valid label and must be at least 2 characters long and start and end with a
+// letter.
+func isValidTLDLabel(label string) (ok bool) {
+	if !isValidLabel(label) {
+		return false
+	}
+
+	l := len(label)
+	if l < 2 {
+		return false
+	}
+
+	if !isLetter(label[0]) || !isLetter(label[l-1]) {
+		return false
+	}
+
+	return true
+}
+
+// isLetter checks if the given character is an ASCII letter.
+func isLetter(c byte) (ok bool) {
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+}
+
+// isDigit checks if the given character is an ASCII digit.
+func isDigit(c byte) (ok bool) {
+	return c >= '0' && c <= '9'
+}
+
+// hasValidChars checks if the given label contains only valid characters.
+func hasValidChars(label string) (ok bool) {
+	for i := range label {
+		c := label[i]
+
+		if isLetter(c) || isDigit(c) {
+			continue
+		}
+
+		if c != '-' {
+			return false
+		}
+
+		if i == 0 || i == len(label)-1 {
+			return false
+		}
 	}
 
 	return true

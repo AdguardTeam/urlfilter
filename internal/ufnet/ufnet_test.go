@@ -4,6 +4,7 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/AdguardTeam/golibs/netutil"
 	"github.com/AdguardTeam/urlfilter/internal/ufnet"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -144,33 +145,178 @@ func FuzzExtractHostname(f *testing.F) {
 	})
 }
 
+// longLabel is a long hostname label for testing purposes.  It is 63 characters
+// long.
+const longLabel = "123456789012345678901234567890123456789012345678901234567890123"
+
+// domainNameTestCases contains test cases for [ufnet.IsDomainName], used for testing,
+// fuzzing, and benchmarking.
+var domainNameTestCases = []struct {
+	want assert.BoolAssertionFunc
+	in   string
+	name string
+}{{
+	want: assert.True,
+	in:   "dcc",
+	name: "no_dot",
+}, {
+	want: assert.True,
+	in:   "1.cc",
+	name: "valid_digit",
+}, {
+	want: assert.True,
+	in:   "1.2.cc",
+	name: "valid_subdomain_digit",
+}, {
+	want: assert.True,
+	in:   "a.b.cc",
+	name: "valid_subdomain_short",
+}, {
+	want: assert.True,
+	in:   "abc.abc.abc",
+	name: "valid_subdomain",
+}, {
+	want: assert.True,
+	in:   "a-bc.ab--c.abc",
+	name: "valid_subdomain_hyphen",
+}, {
+	want: assert.True,
+	in:   "abc.xn--p1ai",
+	name: "valid_xn",
+}, {
+	want: assert.True,
+	in:   "xn--p1ai.xn--p1ai",
+	name: "valid_xn_subdomain",
+}, {
+	want: assert.True,
+	in:   "cc",
+	name: "valid_tld",
+}, {
+	want: assert.True,
+	in:   longLabel + ".cc",
+	name: "valid_long_label",
+}, {
+	want: assert.True,
+	in:   "xn--p1ai",
+	name: "valid_tld_xn",
+}, {
+	want: assert.False,
+	in:   "#cc",
+	name: "invalid_hash",
+}, {
+	want: assert.False,
+	in:   "a.cc#",
+	name: "invalid_hash_end",
+}, {
+	want: assert.False,
+	in:   "abc.xn--",
+	name: "invalid_xn",
+}, {
+	want: assert.False,
+	in:   "abc.xn--asd",
+	name: "invalid_xn_long",
+}, {
+	want: assert.False,
+	in:   ".a.cc",
+	name: "invalid_dot_start",
+}, {
+	want: assert.False,
+	in:   "a.cc.",
+	name: "invalid_dot_end",
+}, {
+	want: assert.False,
+	in:   "-a.cc",
+	name: "invalid_hyphen_start",
+}, {
+	want: assert.False,
+	in:   "a-.cc",
+	name: "invalid_hyphen",
+}, {
+	want: assert.False,
+	in:   "a.1cc",
+	name: "invalid_tld_digit_start",
+}, {
+	want: assert.False,
+	in:   "a.cc1",
+	name: "invalid_tld_digit_end",
+}, {
+	want: assert.False,
+	in:   "a.c",
+	name: "invalid_tld_short",
+}, {
+	want: assert.False,
+	in:   longLabel + "4.cc",
+	name: "invalid_long_label",
+}}
+
 func TestIsDomainName(t *testing.T) {
-	assert.True(t, ufnet.IsDomainName("1.cc"))
-	assert.True(t, ufnet.IsDomainName("1.2.cc"))
-	assert.True(t, ufnet.IsDomainName("a.b.cc"))
-	assert.True(t, ufnet.IsDomainName("abc.abc.abc"))
-	assert.True(t, ufnet.IsDomainName("a-bc.ab--c.abc"))
-	assert.True(t, ufnet.IsDomainName("abc.xn--p1ai"))
-	assert.True(t, ufnet.IsDomainName("xn--p1ai.xn--p1ai"))
-	assert.True(t, ufnet.IsDomainName("cc"))
-	assert.True(t, ufnet.IsDomainName("xn--p1ai"))
+	t.Parallel()
 
-	assert.False(t, ufnet.IsDomainName("#cc"))
-	assert.False(t, ufnet.IsDomainName("a.cc#"))
-	assert.False(t, ufnet.IsDomainName("abc.xn--"))
-	assert.False(t, ufnet.IsDomainName("abc.xn--asd"))
+	for _, tc := range domainNameTestCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-	assert.False(t, ufnet.IsDomainName(".a.cc"))
-	assert.False(t, ufnet.IsDomainName("a.cc."))
+			tc.want(t, ufnet.IsDomainName(tc.in))
+		})
+	}
+}
 
-	assert.False(t, ufnet.IsDomainName("-a.cc"))
-	assert.False(t, ufnet.IsDomainName("a-.cc"))
+func FuzzIsDomainName(f *testing.F) {
+	f.Skip("Skip because current implementation is performance oriented")
 
-	assert.False(t, ufnet.IsDomainName("a.1cc"))
-	assert.False(t, ufnet.IsDomainName("a.cc1"))
-	assert.False(t, ufnet.IsDomainName("a.c"))
+	for _, tc := range domainNameTestCases {
+		f.Add(tc.in)
+	}
 
-	const longLabel = "123456789012345678901234567890123456789012345678901234567890123"
-	assert.True(t, ufnet.IsDomainName(longLabel+".cc"))
-	assert.False(t, ufnet.IsDomainName(longLabel+"4.cc"))
+	f.Fuzz(func(t *testing.T, input string) {
+		got := ufnet.IsDomainName(input)
+		want := netutil.IsValidHostname(input)
+
+		require.Equalf(t, want, got, "input: %q", input)
+	})
+}
+
+func BenchmarkIsDomainName(b *testing.B) {
+	for _, tc := range domainNameTestCases {
+		b.Run(tc.name, func(b *testing.B) {
+			var ok bool
+
+			b.ReportAllocs()
+			for b.Loop() {
+				ok = ufnet.IsDomainName(tc.in)
+			}
+
+			tc.want(b, ok)
+		})
+	}
+
+	// Most recent results:
+	//
+	//	goos: darwin
+	//	goarch: arm64
+	//	pkg: github.com/AdguardTeam/urlfilter/internal/ufnet
+	//	cpu: Apple M1 Pro
+	//	BenchmarkIsDomainName/no_dot-8         	121407466	         9.842 ns/op       0 B/op	       0 allocs/op
+	//	BenchmarkIsDomainName/valid_digit-8    	65260395	        18.24 ns/op	       0 B/op	       0 allocs/op
+	//	BenchmarkIsDomainName/valid_subdomain_digit-8         	48524222	        24.92 ns/op	       0 B/op	       0 allocs/op
+	//	BenchmarkIsDomainName/valid_subdomain_short-8         	49158753	        25.90 ns/op	       0 B/op	       0 allocs/op
+	//	BenchmarkIsDomainName/valid_subdomain-8               	44281735	        27.68 ns/op	       0 B/op	       0 allocs/op
+	//	BenchmarkIsDomainName/valid_subdomain_hyphen-8        	38160909	        31.93 ns/op	       0 B/op	       0 allocs/op
+	//	BenchmarkIsDomainName/valid_xn-8                      	46931372	        25.56 ns/op	       0 B/op	       0 allocs/op
+	//	BenchmarkIsDomainName/valid_xn_subdomain-8            	40568235	        29.63 ns/op	       0 B/op	       0 allocs/op
+	//	BenchmarkIsDomainName/valid_tld-8                     	125186061	         9.547 ns/op       0 B/op	       0 allocs/op
+	//	BenchmarkIsDomainName/valid_long_label-8              	19667925	        60.89 ns/op	       0 B/op	       0 allocs/op
+	//	BenchmarkIsDomainName/valid_tld_xn-8                  	78613132	        15.06 ns/op	       0 B/op	       0 allocs/op
+	//	BenchmarkIsDomainName/invalid_hash-8                  	140548479	         8.527 ns/op       0 B/op	       0 allocs/op
+	//	BenchmarkIsDomainName/invalid_hash_end-8              	62452834	        18.95 ns/op	       0 B/op	       0 allocs/op
+	//	BenchmarkIsDomainName/invalid_xn-8                    	71505004	        16.66 ns/op	       0 B/op	       0 allocs/op
+	//	BenchmarkIsDomainName/invalid_xn_long-8               	66671295	        17.31 ns/op	       0 B/op	       0 allocs/op
+	//	BenchmarkIsDomainName/invalid_dot_start-8             	224679463	         5.338 ns/op       0 B/op	       0 allocs/op
+	//	BenchmarkIsDomainName/invalid_dot_end-8               	53001288	        22.80 ns/op	       0 B/op	       0 allocs/op
+	//	BenchmarkIsDomainName/invalid_hyphen_start-8          	166026781	         7.224 ns/op       0 B/op	       0 allocs/op
+	//	BenchmarkIsDomainName/invalid_hyphen-8                	166105177	         7.227 ns/op       0 B/op	       0 allocs/op
+	//	BenchmarkIsDomainName/invalid_tld_digit_start-8       	63589354	        19.21 ns/op	       0 B/op	       0 allocs/op
+	//	BenchmarkIsDomainName/invalid_tld_digit_end-8         	63253327	        19.16 ns/op	       0 B/op	       0 allocs/op
+	//	BenchmarkIsDomainName/invalid_tld_short-8             	72480548	        16.49 ns/op	       0 B/op	       0 allocs/op
+	//	BenchmarkIsDomainName/invalid_long_label-8            	181953475	         6.590 ns/op       0 B/op	       0 allocs/op
 }
