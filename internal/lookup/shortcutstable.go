@@ -15,7 +15,7 @@ import (
 const shortcutLength = 5
 
 // shortcut is a single shortcut.
-type shortcut string
+type shortcut [shortcutLength]byte
 
 // shortcutInfo contains the data for a shortcut, including the count of hits.
 type shortcutInfo struct {
@@ -165,7 +165,8 @@ func appendRuleShortcuts(scs []shortcut, r *rules.NetworkRule) (res []shortcut) 
 
 	res = scs
 	for i := range len(r.Shortcut) - shortcutLength {
-		res = append(res, shortcut(r.Shortcut[i:i+shortcutLength]))
+		s := r.Shortcut[i : i+shortcutLength]
+		res = append(res, shortcut([]byte(s)))
 	}
 
 	return res
