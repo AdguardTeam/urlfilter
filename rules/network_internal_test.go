@@ -320,48 +320,50 @@ func TestNetworkRule_cTagRules(t *testing.T) {
 	})
 }
 
+// parseClientsTestCases is a list of test cases for parseClients tests and
+// benchmarks.
+var parseClientsTestCases = []struct {
+	wantClients    *clients
+	wantRestricted *clients
+	input          string
+}{{
+	wantClients:    newClients("127.0.0.1"),
+	wantRestricted: nil,
+	input:          "127.0.0.1",
+}, {
+	wantClients:    newClients("127.0.0.1", "127.0.0.2"),
+	wantRestricted: nil,
+	input:          "127.0.0.1|127.0.0.2",
+}, {
+	wantClients:    newClients("127.0.0.1"),
+	wantRestricted: newClients("127.0.0.2"),
+	input:          "127.0.0.1|~127.0.0.2",
+}, {
+	wantClients:    newClients("Frank's laptop"),
+	wantRestricted: nil,
+	input:          "'Frank\\'s laptop'",
+}, {
+	wantClients:    nil,
+	wantRestricted: newClients("Frank's phone"),
+	input:          "~\"Frank's phone\"",
+}, {
+	wantClients:    newClients("Frank's laptop"),
+	wantRestricted: newClients("Frank's phone"),
+	input:          "~\"Frank's phone\"|'Frank\\'s laptop'",
+}, {
+	wantClients:    nil,
+	wantRestricted: newClients("Mary's, John's, and Boris's laptops"),
+	input:          "~'Mary\\'s\\, John\\'s\\, and Boris\\'s laptops'",
+}, {
+	wantClients:    newClients("Kids"),
+	wantRestricted: newClients("Dad", "Mom"),
+	input:          "~Mom|~Dad|\"Kids\"",
+}}
+
 func TestParseClients(t *testing.T) {
 	t.Parallel()
 
-	testCases := []struct {
-		wantClients    *clients
-		wantRestricted *clients
-		input          string
-	}{{
-		wantClients:    newClients("127.0.0.1"),
-		wantRestricted: nil,
-		input:          "127.0.0.1",
-	}, {
-		wantClients:    newClients("127.0.0.1", "127.0.0.2"),
-		wantRestricted: nil,
-		input:          "127.0.0.1|127.0.0.2",
-	}, {
-		wantClients:    newClients("127.0.0.1"),
-		wantRestricted: newClients("127.0.0.2"),
-		input:          "127.0.0.1|~127.0.0.2",
-	}, {
-		wantClients:    newClients("Frank's laptop"),
-		wantRestricted: nil,
-		input:          "'Frank\\'s laptop'",
-	}, {
-		wantClients:    nil,
-		wantRestricted: newClients("Frank's phone"),
-		input:          "~\"Frank's phone\"",
-	}, {
-		wantClients:    newClients("Frank's laptop"),
-		wantRestricted: newClients("Frank's phone"),
-		input:          "~\"Frank's phone\"|'Frank\\'s laptop'",
-	}, {
-		wantClients:    nil,
-		wantRestricted: newClients("Mary's, John's, and Boris's laptops"),
-		input:          "~'Mary\\'s\\, John\\'s\\, and Boris\\'s laptops'",
-	}, {
-		wantClients:    newClients("Kids"),
-		wantRestricted: newClients("Dad", "Mom"),
-		input:          "~Mom|~Dad|\"Kids\"",
-	}}
-
-	for _, tc := range testCases {
+	for _, tc := range parseClientsTestCases {
 		t.Run(tc.input, func(t *testing.T) {
 			t.Parallel()
 
@@ -372,6 +374,39 @@ func TestParseClients(t *testing.T) {
 			assert.Equal(t, tc.wantRestricted, r)
 		})
 	}
+}
+
+func BenchmarkParseClients(b *testing.B) {
+	for _, tc := range parseClientsTestCases {
+		b.Run(tc.input, func(b *testing.B) {
+			var p, r *clients
+			var err error
+
+			b.ReportAllocs()
+			for b.Loop() {
+				p, r, err = parseClients(tc.input, '|')
+			}
+
+			require.NoError(b, err)
+
+			assert.Equal(b, tc.wantClients, p)
+			assert.Equal(b, tc.wantRestricted, r)
+		})
+	}
+
+	// Most recent results:
+	//	goos: darwin
+	//	goarch: arm64
+	//	pkg: github.com/AdguardTeam/urlfilter/rules
+	//	cpu: Apple M1 Pro
+	//	BenchmarkParseClients/127.0.0.1-8         	 4580858	       253.3 ns/op	     120 B/op	       5 allocs/op
+	//	BenchmarkParseClients/127.0.0.1|127.0.0.2-8         	 2390991	       504.8 ns/op	     240 B/op	       9 allocs/op
+	//	BenchmarkParseClients/127.0.0.1|~127.0.0.2-8        	 2302878	       513.7 ns/op	     256 B/op	      10 allocs/op
+	//	BenchmarkParseClients/'Frank\'s_laptop'-8           	 3690001	       317.9 ns/op	     152 B/op	       7 allocs/op
+	//	BenchmarkParseClients/~"Frank's_phone"-8            	 4984556	       241.2 ns/op	     104 B/op	       5 allocs/op
+	//	BenchmarkParseClients/~"Frank's_phone"|'Frank\'s_laptop'-8         	 2201140	       545.8 ns/op	     272 B/op	      12 allocs/op
+	//	BenchmarkParseClients/~'Mary\'s\,_John\'s\,_and_Boris\'s_laptops'-8         	 1981671	       605.3 ns/op	     296 B/op	       9 allocs/op
+	//	BenchmarkParseClients/~Mom|~Dad|"Kids"-8                                    	 2588818	       469.9 ns/op	     296 B/op	      11 allocs/op
 }
 
 func TestParseClients_invalid(t *testing.T) {

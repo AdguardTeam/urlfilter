@@ -42,16 +42,13 @@ func (c *clients) equal(other *clients) (ok bool) {
 	}
 }
 
-// finalize sorts hosts and subnets for more performant further usage.  It does
-// nothing if c is nil.
+// finalize sorts hosts and subnets for more performant further usage.  c must
+// not be nil.
 //
-// TODO(e.burkov):  Since this function is not exported, it's possible to
-// require for c to be non-nil.
+// TODO(d.kolyshev):  Remove and use binary search for adding new clients.
 func (c *clients) finalize() {
-	if c != nil {
-		slices.Sort(c.hosts)
-		slices.SortFunc(c.nets, comparePrefix)
-	}
+	slices.Sort(c.hosts)
+	slices.SortFunc(c.nets, comparePrefix)
 }
 
 // add adds a new client to the set.  c must be not be nil, and must be sorted
@@ -59,6 +56,7 @@ func (c *clients) finalize() {
 func (c *clients) add(client string) {
 	if netutil.IsValidIPString(client) {
 		ip := netip.MustParseAddr(client)
+
 		c.nets = append(c.nets, netip.PrefixFrom(ip, ip.BitLen()))
 
 		return

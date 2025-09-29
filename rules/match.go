@@ -73,69 +73,99 @@ type MatchingResult struct {
 // NewMatchingResult returns a new properly initialized *MatchingResult.  rules
 // are the rules matching the request URL.  sourceRules are the rules matching
 // the referrer.  Items of rules and sourceRules must not be nil.
-func NewMatchingResult(rules, sourceRules []*NetworkRule) (result *MatchingResult) {
-	rules = removeBadfilterRules(rules)
-	rules = removeDNSRewriteRules(rules)
+func NewMatchingResult(rules, sourceRules []*NetworkRule) (res *MatchingResult) {
+	res = &MatchingResult{}
 
 	sourceRules = removeBadfilterRules(sourceRules)
 	sourceRules = removeDNSRewriteRules(sourceRules)
 
-	result = &MatchingResult{}
-
 	// Firstly, find document-level whitelist rules.
-	for _, rule := range sourceRules {
-		if rule.isDocumentWhitelistRule() {
-			if result.DocumentRule == nil || rule.IsHigherPriority(result.DocumentRule) {
-				result.DocumentRule = rule
-			}
-		}
-
-		if rule.IsOptionEnabled(OptionStealth) {
-			result.StealthRule = rule
-		}
-	}
+	res.fillFromSourceRules(sourceRules)
 
 	// Secondly, check if blocking rules (generic or all of them) are allowed.
 	// Generic and basic rules are allowed by default.
 	genericAllowed := true
 	basicAllowed := true
-	if result.DocumentRule != nil {
-		if result.DocumentRule.IsOptionEnabled(OptionUrlblock) {
+	if res.DocumentRule != nil {
+		if res.DocumentRule.IsOptionEnabled(OptionUrlblock) {
 			basicAllowed = false
-		} else if result.DocumentRule.IsOptionEnabled(OptionGenericblock) {
+		} else if res.DocumentRule.IsOptionEnabled(OptionGenericblock) {
 			genericAllowed = false
 		}
 	}
 
-	// Iterate through the list of rules and fill the MatchingResult struct.
-	for _, rule := range rules {
-		switch {
-		case rule.IsOptionEnabled(OptionCookie):
-			result.CookieRules = append(result.CookieRules, rule)
-		case rule.IsOptionEnabled(OptionReplace):
-			result.ReplaceRules = append(result.ReplaceRules, rule)
-		case rule.IsOptionEnabled(OptionCsp):
-			result.CspRules = append(result.CspRules, rule)
-		case rule.IsOptionEnabled(OptionStealth):
-			result.StealthRule = rule
-		default:
-			// Check blocking rules against $genericblock / $urlblock.
-			if !rule.Whitelist {
-				if !basicAllowed {
-					continue
-				}
-				if !genericAllowed && rule.IsGeneric() {
-					continue
-				}
-			}
+	rules = removeBadfilterRules(rules)
+	rules = removeDNSRewriteRules(rules)
 
-			if result.BasicRule == nil || rule.IsHigherPriority(result.BasicRule) {
-				result.BasicRule = rule
-			}
+	// Iterate through the list of rules and fill the MatchingResult struct.
+	res.fillFromRules(rules, basicAllowed, genericAllowed)
+
+	return res
+}
+
+// fillFromSourceRules processes sourceRules and fills the result struct.  Items
+// of sourceRules must not be nil.
+func (m *MatchingResult) fillFromSourceRules(sourceRules []*NetworkRule) {
+	for _, rule := range sourceRules {
+		if rule.isDocumentWhitelistRule() &&
+			(m.DocumentRule == nil || rule.IsHigherPriority(m.DocumentRule)) {
+			m.DocumentRule = rule
+		}
+
+		if rule.IsOptionEnabled(OptionStealth) {
+			m.StealthRule = rule
+		}
+	}
+}
+
+// fillFromRules iterates given rules and fills the result struct.  Items of
+// rules must not be nil.
+func (m *MatchingResult) fillFromRules(rules []*NetworkRule, basicAllowed, genericAllowed bool) {
+	for _, rule := range rules {
+		m.fillFromRule(rule, basicAllowed, genericAllowed)
+	}
+}
+
+// fillFromRule sets the consequent fields of the result struct for the given
+// rule.  rule must not be nil.
+func (m *MatchingResult) fillFromRule(rule *NetworkRule, basicAllowed, genericAllowed bool) {
+	if m.appendModRule(rule) {
+		return
+	}
+
+	// Check blocking rules against $genericblock / $urlblock.
+	if !rule.Whitelist {
+		if !basicAllowed {
+			return
+		}
+
+		if !genericAllowed && rule.IsGeneric() {
+			return
 		}
 	}
 
-	return result
+	if m.BasicRule == nil || rule.IsHigherPriority(m.BasicRule) {
+		m.BasicRule = rule
+	}
+}
+
+// appendModRule appends the given rule to the result struct if it has a
+// suitable modifier option.  Returns true if the rule was appended.
+func (m *MatchingResult) appendModRule(rule *NetworkRule) (ok bool) {
+	switch {
+	case rule.IsOptionEnabled(OptionCookie):
+		m.CookieRules = append(m.CookieRules, rule)
+	case rule.IsOptionEnabled(OptionReplace):
+		m.ReplaceRules = append(m.ReplaceRules, rule)
+	case rule.IsOptionEnabled(OptionCsp):
+		m.CspRules = append(m.CspRules, rule)
+	case rule.IsOptionEnabled(OptionStealth):
+		m.StealthRule = rule
+	default:
+		return false
+	}
+
+	return true
 }
 
 // GetDNSBasicRule returns a rule that should be applied to the DNS request.

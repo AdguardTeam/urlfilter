@@ -162,7 +162,7 @@ run_linter gocyclo --over 10 \
 	;
 
 # TODO(e.burkov): Enable for all.
-run_linter gocognit --over 35 ./rules/
+run_linter gocognit --over 18 ./rules/
 run_linter gocognit --over 10 \
 	./cmd/ \
 	./cosmeticengine_test.go \

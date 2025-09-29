@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/AdguardTeam/golibs/mathutil"
 	"github.com/AdguardTeam/golibs/netutil"
 )
 
@@ -377,34 +378,19 @@ func (r *NetworkRule) IsGeneric() (ok bool) {
 	return len(r.permittedDomains) == 0
 }
 
-// IsHigherPriority checks if the rule has higher priority that the specified
+// IsHigherPriority checks if the rule has higher priority than the specified
 // rule.  The priority rules are:
 //  1. whitelist + $important;
 //  2. $important;
 //  3. whitelist;
 //  4. basic rules.
-//
-// TODO(a.garipov):  Refactor.
 func (r *NetworkRule) IsHigherPriority(other *NetworkRule) (ok bool) {
-	important := r.IsOptionEnabled(OptionImportant)
-	rImportant := other.IsOptionEnabled(OptionImportant)
-
-	if (r.Whitelist && important) && (!other.Whitelist || !rImportant) {
-		return true
+	// Check by $important criteria.
+	if hasPriority, done := r.isHigherPriorityImportant(other); done {
+		return hasPriority
 	}
 
-	if (other.Whitelist && rImportant) && (!r.Whitelist || !important) {
-		return false
-	}
-
-	if important && !rImportant {
-		return true
-	}
-
-	if rImportant && !important {
-		return false
-	}
-
+	// Check by whitelist criteria.
 	if r.Whitelist && !other.Whitelist {
 		return true
 	}
@@ -413,55 +399,75 @@ func (r *NetworkRule) IsHigherPriority(other *NetworkRule) (ok bool) {
 		return false
 	}
 
-	redirect := r.IsOptionEnabled(OptionRedirect)
-	otherRedirect := other.IsOptionEnabled(OptionRedirect)
-	if redirect && !otherRedirect {
+	// Compare basic rules.
+	if r.IsOptionEnabled(OptionRedirect) && !other.IsOptionEnabled(OptionRedirect) {
 		// $redirect rules have "slightly" higher priority than regular basic
 		// rules.
 		return true
 	}
 
-	generic := r.IsGeneric()
-	otherGeneric := other.IsGeneric()
-	if !generic && otherGeneric {
+	if !r.IsGeneric() && other.IsGeneric() {
 		// Specific rules have priority over generic rules.
 		return true
 	}
 
-	// More specific rules (i.e. with more modifiers) have higher priority.
-	count := r.enabledOptions.Count() + r.disabledOptions.Count() +
-		r.permittedRequestTypes.Count() + r.restrictedRequestTypes.Count()
+	return r.isHigherPrioritySpec(other)
+}
 
-	// TODO(a.garipov):  Use mathutil.BoolToNumber.
-	if len(r.permittedDomains) != 0 || len(r.restrictedDomains) != 0 {
-		count++
+// isHigherPriorityImportant compares rules with the $important modifier.
+// Returns true if r has higher priority than the other.  done is true if the
+// comparison is finished.
+func (r *NetworkRule) isHigherPriorityImportant(other *NetworkRule) (ok, done bool) {
+	important := r.IsOptionEnabled(OptionImportant)
+	otherImportant := other.IsOptionEnabled(OptionImportant)
+
+	switch {
+	case important && r.Whitelist && !other.Whitelist:
+		return true, true
+	case otherImportant && other.Whitelist && !r.Whitelist:
+		return false, true
+	case important && !otherImportant:
+		return true, true
+	case otherImportant && !important:
+		return false, true
+	default:
+		return false, false
 	}
-	if len(r.permittedDNSTypes) != 0 || len(r.restrictedDNSTypes) != 0 {
-		count++
-	}
-	if len(r.permittedClientTags) != 0 || len(r.restrictedClientTags) != 0 {
-		count++
-	}
+}
+
+// isHigherPrioritySpec compares the number of the rule's dedicated specifiers.
+// More specific rules (i.e. with more modifiers) have higher priority.  Returns
+// true if r has higher priority than the other.
+func (r *NetworkRule) isHigherPrioritySpec(other *NetworkRule) (ok bool) {
+	prio := r.calcRuleSpecs()
+
 	if r.permittedClients.len() != 0 || r.restrictedClients.len() != 0 {
-		count++
+		prio++
 	}
+
 	if len(r.denyAllowDomains) != 0 {
-		count++
+		prio++
 	}
 
-	otherCount := other.enabledOptions.Count() + other.disabledOptions.Count() +
-		other.permittedRequestTypes.Count() + other.restrictedRequestTypes.Count()
-	if len(other.permittedDomains) != 0 || len(other.restrictedDomains) != 0 {
-		otherCount++
-	}
-	if len(other.permittedDNSTypes) != 0 || len(other.restrictedDNSTypes) != 0 {
-		otherCount++
-	}
-	if len(other.permittedClientTags) != 0 || len(other.restrictedClientTags) != 0 {
-		otherCount++
-	}
+	return prio > other.calcRuleSpecs()
+}
 
-	return count > otherCount
+// calcRuleSpecs returns the number of the rule's dedicated specifiers.  The
+// number of the rule's specifiers is used to determine the rule's priority.
+func (r *NetworkRule) calcRuleSpecs() (prio int) {
+	return r.enabledOptions.Count() +
+		r.disabledOptions.Count() +
+		r.permittedRequestTypes.Count() +
+		r.restrictedRequestTypes.Count() +
+		mathutil.BoolToNumber[int](
+			len(r.permittedDomains) != 0 || len(r.restrictedDomains) != 0,
+		) +
+		mathutil.BoolToNumber[int](
+			len(r.permittedDNSTypes) != 0 || len(r.restrictedDNSTypes) != 0,
+		) +
+		mathutil.BoolToNumber[int](
+			len(r.permittedClientTags) != 0 || len(r.restrictedClientTags) != 0,
+		)
 }
 
 // negatesBadfilter only makes sense when r has a `badfilter` modifier.  It

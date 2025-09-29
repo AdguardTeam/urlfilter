@@ -3,41 +3,144 @@ package rules_test
 import (
 	"testing"
 
+	"github.com/AdguardTeam/golibs/errors"
 	"github.com/AdguardTeam/urlfilter/rules"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
+// Test rules sources.
+const (
+	ruleSrcBlock     = "||" + testHostname + "^"
+	ruleSrcWhitelist = "@@" + ruleSrcBlock
+)
+
+// Test rules.
+var (
+	blockingRule          = mustNewTestRule(ruleSrcBlock)
+	whitelistRule         = mustNewTestRule(ruleSrcWhitelist)
+	whitelistDocumentRule = mustNewTestRule(ruleSrcWhitelist + "$document")
+
+	badFltRule                  = mustNewTestRule(ruleSrcBlock + "$badfilter")
+	badFltWhitelistRule         = mustNewTestRule(ruleSrcWhitelist + "$badfilter")
+	badFltWhitelistDocumentRule = mustNewTestRule(ruleSrcWhitelist + "$document,badfilter")
+)
+
+// matchingResultTestCases is a list of test cases for NewMatchingResult.
+var matchingResultTestCases = []struct {
+	wantBasicResult  *rules.NetworkRule
+	wantBasicRule    *rules.NetworkRule
+	wantDocumentRule *rules.NetworkRule
+	name             string
+	rules            []*rules.NetworkRule
+	sourceRules      []*rules.NetworkRule
+}{{
+	wantBasicResult:  blockingRule,
+	wantBasicRule:    blockingRule,
+	wantDocumentRule: nil,
+	name:             "basic",
+	rules: []*rules.NetworkRule{
+		blockingRule,
+	},
+	sourceRules: []*rules.NetworkRule{},
+}, {
+	wantBasicResult:  whitelistRule,
+	wantBasicRule:    whitelistRule,
+	wantDocumentRule: nil,
+	name:             "whitelist",
+	rules: []*rules.NetworkRule{
+		blockingRule,
+		whitelistRule,
+	},
+	sourceRules: []*rules.NetworkRule{},
+}, {
+	wantBasicResult:  whitelistDocumentRule,
+	wantBasicRule:    nil,
+	wantDocumentRule: whitelistDocumentRule,
+	name:             "source_whitelist",
+	rules: []*rules.NetworkRule{
+		blockingRule,
+	},
+	sourceRules: []*rules.NetworkRule{
+		whitelistDocumentRule,
+	},
+}, {
+	wantBasicResult:  nil,
+	wantBasicRule:    nil,
+	wantDocumentRule: nil,
+	name:             "badfilter",
+	rules: []*rules.NetworkRule{
+		blockingRule,
+		badFltRule,
+	},
+	sourceRules: []*rules.NetworkRule{},
+}, {
+	wantBasicResult:  blockingRule,
+	wantBasicRule:    blockingRule,
+	wantDocumentRule: nil,
+	name:             "badfilter_whitelist",
+	rules: []*rules.NetworkRule{
+		blockingRule,
+		whitelistRule,
+		badFltWhitelistRule,
+	},
+	sourceRules: []*rules.NetworkRule{},
+}, {
+	wantBasicResult:  blockingRule,
+	wantBasicRule:    blockingRule,
+	wantDocumentRule: nil,
+	name:             "badfilter_source_whitelist",
+	rules: []*rules.NetworkRule{
+		blockingRule,
+	},
+	sourceRules: []*rules.NetworkRule{
+		whitelistDocumentRule,
+		badFltWhitelistDocumentRule,
+	},
+}}
+
 func TestNewMatchingResult(t *testing.T) {
 	t.Parallel()
 
-	rs := newTestNetworkRules(t, []string{"||example.org^"})
-	sourceRules := []*rules.NetworkRule{}
+	for _, tc := range matchingResultTestCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-	result := rules.NewMatchingResult(rs, sourceRules)
-	require.NotNil(t, result.BasicRule)
-	require.NotNil(t, result.GetBasicResult())
+			result := rules.NewMatchingResult(tc.rules, tc.sourceRules)
+			require.NotNil(t, result)
 
-	assert.Equal(t, "||example.org^", result.GetBasicResult().String())
+			assert.Equal(t, tc.wantBasicRule, result.BasicRule)
+			assert.Equal(t, tc.wantDocumentRule, result.DocumentRule)
+			assert.Equal(t, tc.wantBasicResult, result.GetBasicResult())
+		})
+	}
 }
 
-func TestNewMatchingResultWhitelist(t *testing.T) {
-	t.Parallel()
+func BenchmarkNewMatchingResult(b *testing.B) {
+	for _, tc := range matchingResultTestCases {
+		b.Run(tc.name, func(b *testing.B) {
+			var result *rules.MatchingResult
 
-	rs := newTestNetworkRules(t, []string{
-		"||example.org^",
-	})
-	sourceRules := newTestNetworkRules(t, []string{
-		"@@||example.com^$document",
-	})
+			b.ReportAllocs()
+			for b.Loop() {
+				result = rules.NewMatchingResult(tc.rules, tc.sourceRules)
+			}
 
-	result := rules.NewMatchingResult(rs, sourceRules)
-	assert.Nil(t, result.BasicRule)
-	assert.NotNil(t, result.DocumentRule)
+			require.NotNil(b, result)
+		})
+	}
 
-	require.NotNil(t, result.GetBasicResult())
-
-	assert.Equal(t, "@@||example.com^$document", result.GetBasicResult().String())
+	// Most recent results:
+	//	goos: darwin
+	//	goarch: arm64
+	//	pkg: github.com/AdguardTeam/urlfilter/rules
+	//	cpu: Apple M1 Pro
+	//	BenchmarkNewMatchingResult/basic-8         	24137907	        42.62 ns/op	      96 B/op	       1 allocs/op
+	//	BenchmarkNewMatchingResult/whitelist-8     	21755403	        53.91 ns/op	      96 B/op	       1 allocs/op
+	//	BenchmarkNewMatchingResult/source_whitelist-8         	27316132	        43.73 ns/op	      96 B/op	       1 allocs/op
+	//	BenchmarkNewMatchingResult/badfilter-8                	18695810	        63.11 ns/op	      96 B/op	       1 allocs/op
+	//	BenchmarkNewMatchingResult/badfilter_whitelist-8      	12009487	        94.78 ns/op	     104 B/op	       2 allocs/op
+	//	BenchmarkNewMatchingResult/badfilter_source_whitelist-8         	17999988	        65.96 ns/op	      96 B/op	       1 allocs/op
 }
 
 func TestMatchingResult_GetCosmeticOption(t *testing.T) {
@@ -93,58 +196,6 @@ func TestMatchingResult_GetCosmeticOption(t *testing.T) {
 			assert.Equal(t, tc.want, tc.matchingResult.GetCosmeticOption())
 		})
 	}
-}
-
-func TestNewMatchingResult_badFilter(t *testing.T) {
-	t.Parallel()
-
-	rs := newTestNetworkRules(t, []string{
-		"||example.org^",
-		"||example.org^$badfilter",
-	})
-	sourceRules := []*rules.NetworkRule{}
-
-	result := rules.NewMatchingResult(rs, sourceRules)
-	assert.Nil(t, result.BasicRule)
-	assert.Nil(t, result.DocumentRule)
-}
-
-func TestNewMatchingResult_badFilterWhitelist(t *testing.T) {
-	t.Parallel()
-
-	rs := newTestNetworkRules(t, []string{
-		"||example.org^",
-		"@@||example.org^",
-		"@@||example.org^$badfilter",
-	})
-	sourceRules := []*rules.NetworkRule{}
-
-	result := rules.NewMatchingResult(rs, sourceRules)
-	assert.NotNil(t, result.BasicRule)
-	assert.Nil(t, result.DocumentRule)
-
-	require.NotNil(t, result.GetBasicResult())
-
-	assert.Equal(t, "||example.org^", result.GetBasicResult().String())
-}
-
-func TestNewMatchingResult_badFilterSourceRules(t *testing.T) {
-	t.Parallel()
-
-	rs := newTestNetworkRules(t, []string{
-		"||example.org^",
-	})
-	sourceRules := newTestNetworkRules(t, []string{
-		"@@||example.org^$document",
-		"@@||example.org^$document,badfilter",
-	})
-	result := rules.NewMatchingResult(rs, sourceRules)
-	assert.NotNil(t, result.BasicRule)
-	assert.Nil(t, result.DocumentRule)
-
-	require.NotNil(t, result.GetBasicResult())
-
-	assert.Equal(t, "||example.org^", result.GetBasicResult().String())
 }
 
 // TODO(ameshkov):  Add more tests!
@@ -219,4 +270,9 @@ func newTestNetworkRule(tb testing.TB, srcText string) (r *rules.NetworkRule) {
 	require.NoError(tb, err)
 
 	return r
+}
+
+// mustNewTestRule returns a network rule created from given source text.
+func mustNewTestRule(srcText string) (r *rules.NetworkRule) {
+	return errors.Must(rules.NewNetworkRule(srcText, testListID))
 }
