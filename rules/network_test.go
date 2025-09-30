@@ -910,6 +910,31 @@ func BenchmarkNetworkRule_Match(b *testing.B) {
 	//	BenchmarkNetworkRule_Match-16    	 1793748	       670.3 ns/op	       0 B/op	       0 allocs/op
 }
 
+// TODO(d.kolyshev): Improve this benchmark.
+func BenchmarkNetworkRule_IsHigherPriority(b *testing.B) {
+	l, err := rules.NewNetworkRule("||example.org$ctag=123,client=123,dnstype=AAAA", testListID)
+	require.NoError(b, err)
+
+	r, err := rules.NewNetworkRule("||example.org$client=123,dnstype=AAAA", testListID)
+	require.NoError(b, err)
+
+	var ok bool
+
+	b.ReportAllocs()
+	for b.Loop() {
+		ok = l.IsHigherPriority(r)
+	}
+
+	require.True(b, ok)
+
+	// Most recent results:
+	//	goos: darwin
+	//	goarch: arm64
+	//	pkg: github.com/AdguardTeam/urlfilter/rules
+	//	cpu: Apple M1 Pro
+	//	BenchmarkNetworkRule_IsHigherPriority-8   	134632681	         8.891 ns/op	       0 B/op	       0 allocs/op
+}
+
 func FuzzNetworkRule_Match(f *testing.F) {
 	r, err := rules.NewNetworkRule("||test.example^", testListID)
 	require.NoError(f, err)

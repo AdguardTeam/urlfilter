@@ -172,7 +172,7 @@ func isValidCTag(s string) (ok bool) {
 // are sorted.
 func parseCTags(value, sep string) (permittedCTags, restrictedCTags []string, err error) {
 	if value == "" {
-		return nil, nil, errors.Error("value is empty")
+		return nil, nil, errors.ErrEmptyValue
 	}
 
 	list := strings.Split(value, sep)
@@ -239,62 +239,100 @@ func parseCTags(value, sep string) (permittedCTags, restrictedCTags []string, er
 //	~'Mary\'s\, John\'s\, and Boris\'s laptops'
 //	~Mom|~Dad|"Kids"
 //
-// TODO(a.garipov):  Refactor.
+// TODO(d.kolyshev):  Use permitted and restricted as structs, not pointers.
 func parseClients(value string, sep byte) (permitted, restricted *clients, err error) {
 	if value == "" {
-		return nil, nil, errors.Error("value is empty")
+		return nil, nil, errors.ErrEmptyValue
 	}
 
-	// First of all, split by the specified separator
-	list := splitWithEscapeCharacter(value, sep, '\\', false)
-	for _, s := range list {
-		isRestricted := false
-		client := s
-
-		// 1. Check if this is a restricted or permitted client
-		if strings.HasPrefix(client, "~") {
-			isRestricted = true
-			client = client[1:]
-		}
-
-		// 2. Check if quoted
-		quoteChar := uint8(0)
-		if len(client) >= 2 &&
-			(client[0] == '\'' || client[0] == '"') &&
-			client[0] == client[len(client)-1] {
-			quoteChar = client[0]
-		}
-
-		// 3. If quoted, remove quotes
-		if quoteChar > 0 {
-			client = client[1 : len(client)-1]
-		}
-
-		// 4. Unescape commas and quotes
-		client = strings.ReplaceAll(client, "\\,", ",")
-		if quoteChar > 0 {
-			client = strings.ReplaceAll(client, "\\"+string(quoteChar), string(quoteChar))
-		}
-
-		if client == "" {
-			return nil, nil, fmt.Errorf("invalid $client value %q", value)
-		}
-
-		if isRestricted {
-			if restricted == nil {
-				restricted = &clients{}
-			}
-			restricted.add(client)
-		} else {
-			if permitted == nil {
-				permitted = &clients{}
-			}
-			permitted.add(client)
+	for _, client := range splitWithEscapeCharacter(value, sep, '\\', false) {
+		permitted, restricted, err = appendClient(client, permitted, restricted)
+		if err != nil {
+			return nil, nil, fmt.Errorf("invalid $client value: %w", err)
 		}
 	}
 
-	permitted.finalize()
-	restricted.finalize()
+	if permitted != nil {
+		permitted.finalize()
+	}
+
+	if restricted != nil {
+		restricted.finalize()
+	}
 
 	return permitted, restricted, nil
+}
+
+// appendClient adds a client to the specified set.  Creates the set if needed.
+func appendClient(
+	client string,
+	permittedOrig *clients,
+	restrictedOrig *clients,
+) (permitted, restricted *clients, err error) {
+	permitted = permittedOrig
+	restricted = restrictedOrig
+
+	isRestricted := false
+	client, isRestricted, err = parseClient(client)
+	if err != nil {
+		// Don't wrap the error since it's informative enough as is.
+		return permitted, restricted, err
+	}
+
+	if isRestricted {
+		if restricted == nil {
+			restricted = newClients()
+		}
+		restricted.add(client)
+	} else {
+		if permitted == nil {
+			permitted = newClients()
+		}
+		permitted.add(client)
+	}
+
+	return permitted, restricted, nil
+}
+
+// parseClient parses a single client string.
+func parseClient(input string) (client string, isRestricted bool, err error) {
+	client = input
+
+	// 1. Check if this is a restricted or permitted client.
+	if strings.HasPrefix(client, "~") {
+		isRestricted = true
+		client = client[1:]
+	}
+
+	// 2. Check if quoted.
+	quoteChar := isQuoted(client)
+
+	// 3. If quoted, remove quotes.
+	if quoteChar > 0 {
+		client = client[1 : len(client)-1]
+	}
+
+	// 4. Unescape commas and quotes.
+	client = strings.ReplaceAll(client, "\\,", ",")
+	if quoteChar > 0 {
+		quoteStr := string(quoteChar)
+		client = strings.ReplaceAll(client, "\\"+quoteStr, quoteStr)
+	}
+
+	if client == "" {
+		return "", false, fmt.Errorf("invalid value %q", input)
+	}
+
+	return client, isRestricted, nil
+}
+
+// isQuoted returns the quote character if the input is quoted, or 0 otherwise.
+func isQuoted(input string) (quoteChar uint8) {
+	if len(input) >= 2 &&
+		(input[0] == '\'' || input[0] == '"') &&
+		input[0] == input[len(input)-1] {
+		quoteChar = input[0]
+	}
+
+	return quoteChar
 }

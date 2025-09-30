@@ -61,7 +61,6 @@ func BenchmarkEffectiveTLDPlusOne(b *testing.B) {
 	}
 
 	// Most recent results:
-	//
 	//	goos: darwin
 	//	goarch: arm64
 	//	pkg: github.com/AdguardTeam/urlfilter/rules
