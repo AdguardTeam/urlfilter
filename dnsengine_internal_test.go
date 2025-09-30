@@ -97,11 +97,11 @@ func TestHostLevelNetworkRuleWithProtocol(t *testing.T) {
 	rulesText := "://example.org"
 	ruleStorage := newTestRuleStorage(t, testListID, rulesText)
 	dnsEngine := NewDNSEngine(ruleStorage)
-	assert.NotNil(t, dnsEngine)
+	require.NotNil(t, dnsEngine)
 
 	r, ok := dnsEngine.Match("example.org")
 	assert.True(t, ok)
-	assert.True(t, r.NetworkRule != nil)
+	assert.NotNil(t, r.NetworkRule)
 }
 
 func TestRegexp(t *testing.T) {
@@ -110,14 +110,15 @@ func TestRegexp(t *testing.T) {
 	dnsEngine := NewDNSEngine(ruleStorage)
 
 	res, ok := dnsEngine.Match("stats.test.com")
-	assert.True(t, ok && res.NetworkRule.Text() == text)
+	assertMatchRuleText(t, text, res, ok)
 
 	text = "@@/^stats?\\./"
 	ruleStorage = newTestRuleStorage(t, testListID, "||stats.test.com^\n"+text)
 	dnsEngine = NewDNSEngine(ruleStorage)
 
 	res, ok = dnsEngine.Match("stats.test.com")
-	assert.True(t, ok && res.NetworkRule.Text() == text && res.NetworkRule.Whitelist)
+	assertMatchRuleText(t, text, res, ok)
+	assert.True(t, res.NetworkRule.Whitelist)
 }
 
 func TestMultipleIPPerHost(t *testing.T) {
@@ -127,10 +128,11 @@ func TestMultipleIPPerHost(t *testing.T) {
 	dnsEngine := NewDNSEngine(ruleStorage)
 
 	res, ok := dnsEngine.Match("example.org")
-	require.True(t, ok)
-	require.Equal(t, 2, len(res.HostRulesV4))
+	assert.True(t, ok)
+	assert.Equal(t, 2, len(res.HostRulesV4))
 }
 
+// TODO(d.kolyshev):  Refactor as table tests.
 func TestClientTags(t *testing.T) {
 	rulesText := `||host1^$ctag=pc|printer
 ||host1^
@@ -147,65 +149,53 @@ func TestClientTags(t *testing.T) {
 `
 	ruleStorage := newTestRuleStorage(t, testListID, rulesText)
 	dnsEngine := NewDNSEngine(ruleStorage)
-	assert.NotNil(t, dnsEngine)
+	require.NotNil(t, dnsEngine)
 
-	// global rule
+	// global rule.
 	res, ok := dnsEngine.MatchRequest(&DNSRequest{Hostname: "host1", SortedClientTags: []string{"phone"}})
-	assert.True(t, ok)
-	assert.NotNil(t, res.NetworkRule)
-	assert.Equal(t, "||host1^", res.NetworkRule.Text())
+	assertMatchRuleText(t, "||host1^", res, ok)
 
-	// $ctag rule overrides global rule
+	// $ctag rule overrides global rule.
 	res, ok = dnsEngine.MatchRequest(&DNSRequest{Hostname: "host1", SortedClientTags: []string{"pc"}})
-	assert.True(t, ok)
-	assert.NotNil(t, res.NetworkRule)
-	assert.Equal(t, "||host1^$ctag=pc|printer", res.NetworkRule.Text())
+	assertMatchRuleText(t, "||host1^$ctag=pc|printer", res, ok)
 
-	// 1 tag matches
+	// 1 tag matches.
 	res, ok = dnsEngine.MatchRequest(&DNSRequest{Hostname: "host2", SortedClientTags: []string{"phone", "printer"}})
-	assert.True(t, ok)
-	assert.NotNil(t, res.NetworkRule)
-	assert.Equal(t, "||host2^$ctag=pc|printer", res.NetworkRule.Text())
+	assertMatchRuleText(t, "||host2^$ctag=pc|printer", res, ok)
 
-	// tags don't match
+	// tags don't match.
 	_, ok = dnsEngine.MatchRequest(&DNSRequest{Hostname: "host2", SortedClientTags: []string{"phone"}})
 	assert.False(t, ok)
 
-	// tags don't match
+	// tags don't match.
 	_, ok = dnsEngine.MatchRequest(&DNSRequest{Hostname: "host2", SortedClientTags: []string{}})
 	assert.False(t, ok)
 
-	// 1 tag matches (exclusion)
+	// 1 tag matches (exclusion).
 	res, ok = dnsEngine.MatchRequest(&DNSRequest{Hostname: "host3", SortedClientTags: []string{"phone", "printer"}})
-	assert.True(t, ok)
-	assert.NotNil(t, res.NetworkRule)
-	assert.Equal(t, "||host3^$ctag=~pc|~router", res.NetworkRule.Text())
+	assertMatchRuleText(t, "||host3^$ctag=~pc|~router", res, ok)
 
-	// 1 tag matches (exclusion)
+	// 1 tag matches (exclusion).
 	res, ok = dnsEngine.MatchRequest(&DNSRequest{Hostname: "host4", SortedClientTags: []string{"phone", "router"}})
-	assert.True(t, ok)
-	assert.NotNil(t, res.NetworkRule)
-	assert.Equal(t, "||host4^$ctag=~pc|router", res.NetworkRule.Text())
+	assertMatchRuleText(t, "||host4^$ctag=~pc|router", res, ok)
 
-	// tags don't match (exclusion)
+	// tags don't match (exclusion).
 	_, ok = dnsEngine.MatchRequest(&DNSRequest{Hostname: "host3", SortedClientTags: []string{"pc"}})
 	assert.False(t, ok)
 
-	// tags don't match (exclusion)
+	// tags don't match (exclusion).
 	_, ok = dnsEngine.MatchRequest(&DNSRequest{Hostname: "host4", SortedClientTags: []string{"pc", "router"}})
 	assert.False(t, ok)
 
-	// tags match but it's a $badfilter
+	// tags match but it's a $badfilter.
 	_, ok = dnsEngine.MatchRequest(&DNSRequest{Hostname: "host5", SortedClientTags: []string{"pc"}})
 	assert.False(t, ok)
 
-	// tags match and $badfilter rule disables global rule
+	// tags match and $badfilter rule disables global rule.
 	res, ok = dnsEngine.MatchRequest(&DNSRequest{Hostname: "host6", SortedClientTags: []string{"pc"}})
-	assert.True(t, ok)
-	assert.NotNil(t, res.NetworkRule)
-	assert.Equal(t, "||host6^$ctag=pc|printer", res.NetworkRule.Text())
+	assertMatchRuleText(t, "||host6^$ctag=pc|printer", res, ok)
 
-	// tags match (exclusion) but it's a $badfilter
+	// tags match (exclusion) but it's a $badfilter.
 	_, ok = dnsEngine.MatchRequest(&DNSRequest{Hostname: "host7", SortedClientTags: []string{"phone"}})
 	assert.False(t, ok)
 }
@@ -226,7 +216,7 @@ func TestClient(t *testing.T) {
 	}
 	ruleStorage := newTestRuleStorage(t, testListID, strings.Join(ruleTexts, "\n"))
 	dnsEngine := NewDNSEngine(ruleStorage)
-	assert.NotNil(t, dnsEngine)
+	require.NotNil(t, dnsEngine)
 
 	testCases := []struct {
 		req     *DNSRequest
@@ -346,11 +336,15 @@ func TestBadfilterRules(t *testing.T) {
 	rulesText := "||example.org^\n||example.org^$badfilter"
 	ruleStorage := newTestRuleStorage(t, testListID, rulesText)
 	dnsEngine := NewDNSEngine(ruleStorage)
-	assert.NotNil(t, dnsEngine)
+	require.NotNil(t, dnsEngine)
 
 	r, ok := dnsEngine.Match("example.org")
+	require.NotNil(t, r)
+
 	assert.False(t, ok)
-	assert.True(t, r.NetworkRule == nil && r.HostRulesV4 == nil && r.HostRulesV6 == nil)
+	assert.Nil(t, r.NetworkRule)
+	assert.Nil(t, r.HostRulesV4)
+	assert.Nil(t, r.HostRulesV6)
 }
 
 func TestDNSEngine_MatchRequest_dnsType(t *testing.T) {
@@ -368,7 +362,7 @@ func TestDNSEngine_MatchRequest_dnsType(t *testing.T) {
 
 	ruleStorage := newTestRuleStorage(t, testListID, rulesText)
 	dnsEngine := NewDNSEngine(ruleStorage)
-	assert.NotNil(t, dnsEngine)
+	require.NotNil(t, dnsEngine)
 
 	t.Run("simple", func(t *testing.T) {
 		r := &DNSRequest{Hostname: "simple", DNSType: dns.TypeAAAA}
@@ -503,18 +497,28 @@ func TestDNSEngine_MatchRequest_dnsType(t *testing.T) {
 func TestSlash(t *testing.T) {
 	ruleStorage := newTestRuleStorage(t, testListID, "/$client=127.0.0.1")
 	dnsEngine := NewDNSEngine(ruleStorage)
-	assert.NotNil(t, dnsEngine)
+	require.NotNil(t, dnsEngine)
 
 	r, ok := dnsEngine.Match("example.org")
+	require.NotNil(t, r)
+
 	assert.False(t, ok)
-	assert.True(t, r.NetworkRule == nil && r.HostRulesV4 == nil && r.HostRulesV6 == nil)
+	assert.Nil(t, r.NetworkRule)
+	assert.Nil(t, r.HostRulesV4)
+	assert.Nil(t, r.HostRulesV6)
 }
 
-func assertMatchRuleText(t *testing.T, rulesText string, rules *DNSResult, ok bool) {
-	assert.True(t, ok)
+// assertMatchRuleText asserts that given result matches the expected ruleText.
+func assertMatchRuleText(tb testing.TB, ruleText string, res *DNSResult, ok bool) {
+	tb.Helper()
+
+	assert.True(tb, ok)
+
 	if ok {
-		assert.NotNil(t, rules.NetworkRule)
-		assert.Equal(t, rulesText, rules.NetworkRule.Text())
+		require.NotNil(tb, res)
+		require.NotNil(tb, res.NetworkRule)
+
+		assert.Equal(tb, ruleText, res.NetworkRule.Text())
 	}
 }
 
