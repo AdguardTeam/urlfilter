@@ -11,17 +11,22 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// Common domains for tests.
+const testDomain = "test.example"
+
 func TestBuildBlockedPage(t *testing.T) {
+	t.Parallel()
+
 	s := &Session{
 		Request: rules.NewRequest(&url.URL{
 			Scheme: urlutil.SchemeHTTPS,
-			Host:   "test.example",
+			Host:   testDomain,
 		}, nil, rules.TypeDocument),
 	}
 
-	f, err := rules.NewNetworkRule("||test.example^", 1)
+	r, err := rules.NewNetworkRule("||"+testDomain+"^", 1)
 	require.NoError(t, err)
 
-	page := buildBlockedPage(s, f)
-	assert.Contains(t, page, "test.example")
+	page := buildBlockedPage(s, r)
+	assert.Contains(t, page, testDomain)
 }

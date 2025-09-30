@@ -23,6 +23,9 @@ const (
 	testHostnameOther = "other.example"
 )
 
+// Common rule for tests.
+const testRule = "||" + testHostname + "^"
+
 // Common URLs for tests.
 var (
 	testURL = &url.URL{
