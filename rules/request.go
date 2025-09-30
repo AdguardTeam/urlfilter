@@ -5,6 +5,7 @@ import (
 	"net/netip"
 	"net/url"
 	"strings"
+	"unicode"
 
 	"github.com/AdguardTeam/golibs/netutil"
 	"github.com/AdguardTeam/golibs/netutil/urlutil"
@@ -95,6 +96,12 @@ type Request struct {
 	// SortedClientTags is the list of tags to match against $ctag modifiers.
 	SortedClientTags []string
 
+	// urlData is the bytes of this request URL.
+	urlData []byte
+
+	// urlDataLower is the bytes of this request URL in lowercase.
+	urlDataLower []byte
+
 	// RequestType is the type of the filtering request.
 	RequestType RequestType
 
@@ -113,11 +120,7 @@ type Request struct {
 	IsHostnameRequest bool
 }
 
-// NewRequest returns a properly initialized *Request.
-//
-// TODO(d.kolyshev):  Limit the URL length by 4 KiB. It appears that there
-// can be URLs longer than a megabyte, and it makes no sense to go through
-// the whole URL.  u must not be nil.
+// NewRequest returns a properly initialized *Request.  u must not be nil.
 func NewRequest(u, sourceURL *url.URL, requestType RequestType) (r *Request) {
 	r = &Request{
 		SourceURL:   netutil.CloneURL(sourceURL),
@@ -170,6 +173,10 @@ func NewRequestForHostname(hostname string) (r *Request) {
 // hostname.  r must not be nil.
 func FillRequestForHostname(r *Request, hostname string) {
 	r.URL.Host = hostname
+
+	r.urlData = r.urlData[:0]
+	r.urlDataLower = r.urlDataLower[:0]
+
 	r.RequestType = TypeDocument
 	r.ThirdParty = false
 	r.IsHostnameRequest = true
@@ -179,6 +186,30 @@ func FillRequestForHostname(r *Request, hostname string) {
 	} else {
 		r.Domain = hostname
 	}
+}
+
+// AppendURLData fills this request URL data fields, then appends the data to
+// the given slice.  If lower is true, the data is appended in lowercase.
+//
+// TODO(d.kolyshev):  Limit the URL length by 4 KiB. It appears that there
+// can be URLs longer than a megabyte, and it makes no sense to go through
+// the whole URL.
+func (r *Request) AppendURLData(orig []byte, lower bool) (data []byte) {
+	if len(r.urlData) == 0 {
+		r.urlData, _ = r.URL.AppendBinary(r.urlData[:0])
+	}
+
+	if !lower {
+		return append(orig, r.urlData...)
+	}
+
+	if len(r.urlDataLower) == 0 {
+		for _, b := range r.urlData {
+			r.urlDataLower = append(r.urlDataLower, byte(unicode.ToLower(rune(b))))
+		}
+	}
+
+	return append(orig, r.urlDataLower...)
 }
 
 // effectiveTLDPlusOne is a faster version of [publicsuffix.EffectiveTLDPlusOne]

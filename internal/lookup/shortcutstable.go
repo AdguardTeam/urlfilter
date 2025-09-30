@@ -1,7 +1,6 @@
 package lookup
 
 import (
-	"bytes"
 	"math"
 	"slices"
 	"strings"
@@ -15,7 +14,7 @@ import (
 const shortcutLength = 5
 
 // shortcut is a single shortcut.
-type shortcut [shortcutLength]byte
+type shortcut string
 
 // shortcutInfo contains the data for a shortcut, including the count of hits.
 type shortcutInfo struct {
@@ -111,23 +110,18 @@ func (s *ShortcutsTable) AppendMatching(
 ) (res []*rules.NetworkRule) {
 	res = matching
 
-	buf := s.urlBytesPool.Get()
-	defer s.urlBytesPool.Put(buf)
+	bufPtr := s.urlBytesPool.Get()
+	defer s.urlBytesPool.Put(bufPtr)
 
-	b := *buf
-	b, _ = req.URL.AppendBinary(b[0:0])
-	urlLowerCased := bytes.ToLower(b)
+	*bufPtr = req.AppendURLData((*bufPtr)[:0], true)
 
-	l := len(b)
+	l := len(*bufPtr)
 	if l < shortcutLength {
 		return res
 	}
 
 	for i := range l - shortcutLength {
-		// Some runes have different length when lowercased, so we need to
-		// lowercase late.
-		sc := shortcut(bytes.ToLower(urlLowerCased[i : i+shortcutLength]))
-		scInfo := s.shortcuts[sc]
+		scInfo := s.shortcuts[shortcut((*bufPtr)[i:i+shortcutLength])]
 		if scInfo == nil {
 			continue
 		}
@@ -166,7 +160,7 @@ func appendRuleShortcuts(scs []shortcut, r *rules.NetworkRule) (res []shortcut) 
 	res = scs
 	for i := range len(r.Shortcut) - shortcutLength {
 		s := r.Shortcut[i : i+shortcutLength]
-		res = append(res, shortcut([]byte(s)))
+		res = append(res, shortcut(s))
 	}
 
 	return res
