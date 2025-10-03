@@ -663,37 +663,125 @@ func TestNetworkRule_Match_client(t *testing.T) {
 func TestNetworkRule_IsHigherPriority(t *testing.T) {
 	t.Parallel()
 
-	// whitelist+$important --> every other
-	compareRulesPriority(t, "@@||example.org$important", "@@||example.org$important", false)
-	compareRulesPriority(t, "@@||example.org$important", "||example.org$important", true)
-	compareRulesPriority(t, "@@||example.org$important", "@@||example.org", true)
-	compareRulesPriority(t, "@@||example.org$important", "||example.org", true)
+	testCases := []struct {
+		want  assert.BoolAssertionFunc
+		left  string
+		right string
+	}{{
+		want:  assert.False,
+		left:  "@@||example.org$important",
+		right: "@@||example.org$important",
+	}, {
+		want:  assert.True,
+		left:  "@@||example.org$important",
+		right: "||example.org$important",
+	}, {
+		want:  assert.True,
+		left:  "@@||example.org$important",
+		right: "@@||example.org",
+	}, {
+		want:  assert.True,
+		left:  "@@||example.org$important",
+		right: "||example.org",
+	}, {
+		want:  assert.False,
+		left:  "||example.org$important",
+		right: "@@||example.org$important",
+	}, {
+		want:  assert.False,
+		left:  "||example.org$important",
+		right: "||example.org$important",
+	}, {
+		want:  assert.True,
+		left:  "||example.org$important",
+		right: "@@||example.org",
+	}, {
+		want:  assert.True,
+		left:  "||example.org$important",
+		right: "||example.org",
+	}, {
+		want:  assert.False,
+		left:  "@@||example.org",
+		right: "@@||example.org$important",
+	}, {
+		want:  assert.False,
+		left:  "@@||example.org",
+		right: "||example.org$important",
+	}, {
+		want:  assert.False,
+		left:  "@@||example.org",
+		right: "@@||example.org",
+	}, {
+		want:  assert.True,
+		left:  "@@||example.org",
+		right: "||example.org",
+	}, {
+		want:  assert.False,
+		left:  "||example.org",
+		right: "@@||example.org$important",
+	}, {
+		want:  assert.False,
+		left:  "||example.org",
+		right: "||example.org$important",
+	}, {
+		want:  assert.False,
+		left:  "||example.org",
+		right: "@@||example.org",
+	}, {
+		want:  assert.False,
+		left:  "||example.org",
+		right: "||example.org",
+	}, {
+		want:  assert.True,
+		left:  "||example.org$domain=example.org",
+		right: "||example.org$script,stylesheet",
+	}, {
+		want:  assert.True,
+		left:  "||example.org$script,stylesheet",
+		right: "||example.org$script",
+	}, {
+		want:  assert.True,
+		left:  "||example.org$script,denyallow=com",
+		right: "||example.org$client=123",
+	}, {
+		want:  assert.False,
+		left:  "||example.org$client=123",
+		right: "||example.org$script,denyallow=com",
+	}, {
+		want:  assert.True,
+		left:  "||example.org$ctag=123,client=123",
+		right: "||example.org$script",
+	}, {
+		want:  assert.True,
+		left:  "||example.org$ctag=123,client=123,dnstype=AAAA",
+		right: "||example.org$client=123,dnstype=AAAA",
+	}, {
+		want:  assert.True,
+		left:  "||example.org$denyallow=com",
+		right: "||example.org",
+	}, {
+		want:  assert.True,
+		left:  "||example.org$client=123,denyallow=com",
+		right: "||example.org$script",
+	}, {
+		want:  assert.False,
+		left:  "||example.org$script",
+		right: "||example.org$client=123,denyallow=com",
+	}}
 
-	// $important -> whitelist
-	compareRulesPriority(t, "||example.org$important", "@@||example.org$important", false)
-	compareRulesPriority(t, "||example.org$important", "||example.org$important", false)
-	compareRulesPriority(t, "||example.org$important", "@@||example.org", true)
-	compareRulesPriority(t, "||example.org$important", "||example.org", true)
+	for _, tc := range testCases {
+		t.Run(tc.left+"-"+tc.right, func(t *testing.T) {
+			t.Parallel()
 
-	// whitelist -> basic
-	compareRulesPriority(t, "@@||example.org", "@@||example.org$important", false)
-	compareRulesPriority(t, "@@||example.org", "||example.org$important", false)
-	compareRulesPriority(t, "@@||example.org", "@@||example.org", false)
-	compareRulesPriority(t, "@@||example.org", "||example.org", true)
+			l, err := rules.NewNetworkRule(tc.left, testListID)
+			require.NoError(t, err)
 
-	compareRulesPriority(t, "||example.org", "@@||example.org$important", false)
-	compareRulesPriority(t, "||example.org", "||example.org$important", false)
-	compareRulesPriority(t, "||example.org", "@@||example.org", false)
-	compareRulesPriority(t, "||example.org", "||example.org", false)
+			r, err := rules.NewNetworkRule(tc.right, testListID)
+			require.NoError(t, err)
 
-	// specific -> generic
-	compareRulesPriority(t, "||example.org$domain=example.org", "||example.org$script,stylesheet", true)
-
-	// more modifiers -> less modifiers
-	compareRulesPriority(t, "||example.org$script,stylesheet", "||example.org$script", true)
-	compareRulesPriority(t, "||example.org$ctag=123,client=123", "||example.org$script", true)
-	compareRulesPriority(t, "||example.org$ctag=123,client=123,dnstype=AAAA", "||example.org$client=123,dnstype=AAAA", true)
-	compareRulesPriority(t, "||example.org$denyallow=com", "||example.org", true)
+			tc.want(t, l.IsHigherPriority(r))
+		})
+	}
 }
 
 func TestNetworkRule_Match_source(t *testing.T) {
@@ -836,20 +924,6 @@ func TestNetworkRule_Match_subdomain(t *testing.T) {
 
 	req = rules.NewRequestForHostname("2sub.host.org")
 	assert.False(t, r.Match(req))
-}
-
-// compareRulesPriority is a helper function to compare the priority of the two
-// given rules.
-func compareRulesPriority(tb testing.TB, left, right string, expected bool) {
-	tb.Helper()
-
-	l, err := rules.NewNetworkRule(left, testListID)
-	require.NoError(tb, err)
-
-	r, err := rules.NewNetworkRule(right, testListID)
-	require.NoError(tb, err)
-
-	assert.Equal(tb, expected, l.IsHigherPriority(r))
 }
 
 func TestNetworkRule_Match_dnsType(t *testing.T) {
