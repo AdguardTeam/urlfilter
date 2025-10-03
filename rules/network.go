@@ -439,17 +439,7 @@ func (r *NetworkRule) isHigherPriorityImportant(other *NetworkRule) (ok, done bo
 // More specific rules (i.e. with more modifiers) have higher priority.  Returns
 // true if r has higher priority than the other.
 func (r *NetworkRule) isHigherPrioritySpec(other *NetworkRule) (ok bool) {
-	prio := r.calcRuleSpecs()
-
-	if r.permittedClients.len() != 0 || r.restrictedClients.len() != 0 {
-		prio++
-	}
-
-	if len(r.denyAllowDomains) != 0 {
-		prio++
-	}
-
-	return prio > other.calcRuleSpecs()
+	return r.calcRuleSpecs() > other.calcRuleSpecs()
 }
 
 // calcRuleSpecs returns the number of the rule's dedicated specifiers.  The
@@ -459,15 +449,17 @@ func (r *NetworkRule) calcRuleSpecs() (prio int) {
 		r.disabledOptions.Count() +
 		r.permittedRequestTypes.Count() +
 		r.restrictedRequestTypes.Count() +
-		mathutil.BoolToNumber[int](
-			len(r.permittedDomains) != 0 || len(r.restrictedDomains) != 0,
-		) +
+		mathutil.BoolToNumber[int](len(r.permittedDomains) != 0 || len(r.restrictedDomains) != 0) +
 		mathutil.BoolToNumber[int](
 			len(r.permittedDNSTypes) != 0 || len(r.restrictedDNSTypes) != 0,
 		) +
 		mathutil.BoolToNumber[int](
 			len(r.permittedClientTags) != 0 || len(r.restrictedClientTags) != 0,
-		)
+		) +
+		mathutil.BoolToNumber[int](
+			r.permittedClients.len() != 0 || r.restrictedClients.len() != 0,
+		) +
+		mathutil.BoolToNumber[int](len(r.denyAllowDomains) != 0)
 }
 
 // negatesBadfilter only makes sense when r has a `badfilter` modifier.  It
