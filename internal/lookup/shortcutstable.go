@@ -50,15 +50,11 @@ type ShortcutsTable struct {
 // based on an analysis of the AdGuard DNS filtering-rule list.
 const shortcutsInARuleEst = 16
 
-// urlPoolLen is a length of the URLs in the pool.  The estimate is based on the
-// URL length.
-const urlPoolLen = 4096
-
 // NewShortcutsTable creates a new instance of *ShortcutsTable.
 func NewShortcutsTable(rs *filterlist.RuleStorage) (s *ShortcutsTable) {
 	return &ShortcutsTable{
 		ruleStorage:   rs,
-		urlBytesPool:  syncutil.NewSlicePool[byte](urlPoolLen),
+		urlBytesPool:  syncutil.NewSlicePool[byte](rules.MaxURLLength),
 		shortcutsPool: syncutil.NewSlicePool[shortcut](shortcutsInARuleEst),
 		shortcuts:     map[shortcut]*shortcutInfo{},
 	}

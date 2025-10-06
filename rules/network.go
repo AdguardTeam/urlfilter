@@ -303,12 +303,8 @@ func (r *NetworkRule) String() (s string) {
 	return r.text
 }
 
-// urlPoolLen is a length of the URLs in the pool.  The estimate is based on the
-// URL length.
-const urlPoolLen = 4096
-
 // urlBytesPool is a pool of byte slices used to store URLs.
-var urlBytesPool = syncutil.NewSlicePool[byte](urlPoolLen)
+var urlBytesPool = syncutil.NewSlicePool[byte](MaxURLLength)
 
 // Match checks if this filtering rule matches the specified request.  req must
 // not be nil.

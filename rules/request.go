@@ -188,6 +188,15 @@ func FillRequestForHostname(r *Request, hostname string) {
 	}
 }
 
+// MaxURLLength limits the URL length by 4 KiB.  It appears that there can be
+// URLs longer than a megabyte, and it makes no sense to go through the whole
+// URL.
+//
+// TODO(a.garipov):  Reinspect.
+//
+// TODO(a.garipov):  Use [datasize.B]?
+const MaxURLLength = 4 * 1024
+
 // AppendURLData fills this request URL data fields, then appends the data to
 // the given slice.  If lower is true, the data is appended in lowercase.
 //
@@ -197,6 +206,10 @@ func FillRequestForHostname(r *Request, hostname string) {
 func (r *Request) AppendURLData(orig []byte, lower bool) (data []byte) {
 	if len(r.urlData) == 0 {
 		r.urlData, _ = r.URL.AppendBinary(r.urlData[:0])
+	}
+
+	if len(r.urlData) > MaxURLLength {
+		r.urlData = r.urlData[:MaxURLLength]
 	}
 
 	if !lower {
