@@ -295,11 +295,6 @@ func FuzzNetworkEngine_Match(f *testing.F) {
 	})
 }
 
-func isSupportedURL(url string) bool {
-	return url != "" && (strings.HasPrefix(url, "http") ||
-		strings.HasPrefix(url, "ws"))
-}
-
 // newTestNetworkEngine returns a new NetworkEngine initialized with the rules
 // from filterPath.
 func newTestNetworkEngine(tb testing.TB) (engine *NetworkEngine) {
@@ -359,7 +354,7 @@ func loadRequests(tb testing.TB) (requests []testRequest) {
 		if line != "" {
 			var req testRequest
 			err = json.Unmarshal([]byte(line), &req)
-			if err == nil && isSupportedURL(req.URL.String()) && isSupportedURL(req.FrameURL.String()) {
+			if err == nil && isSupportedURL(&req.URL.URL) && isSupportedURL(&req.FrameURL.URL) {
 				req.Line = line
 				req.LineNumber = lineNumber
 				requests = append(requests, req)
@@ -435,4 +430,13 @@ func unzip(src, dest string) (err error) {
 	}
 
 	return nil
+}
+
+// isSupportedURL returns true if the given url is a supported for tests.
+func isSupportedURL(u *url.URL) bool {
+	if u == nil {
+		return false
+	}
+
+	return u.Scheme == urlutil.SchemeHTTP || u.Scheme == "ws"
 }

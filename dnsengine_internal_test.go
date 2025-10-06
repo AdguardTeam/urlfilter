@@ -9,7 +9,6 @@ import (
 
 	"github.com/AdguardTeam/golibs/testutil"
 	"github.com/AdguardTeam/urlfilter/filterlist"
-	"github.com/AdguardTeam/urlfilter/internal/ufnet"
 	"github.com/AdguardTeam/urlfilter/rules"
 	"github.com/miekg/dns"
 	"github.com/stretchr/testify/assert"
@@ -749,11 +748,11 @@ func newRuleStorage(tb testing.TB) (ruleStorage *filterlist.RuleStorage) {
 }
 
 // loadHostnames returns a slice of test hostnames.
-func loadHostnames(t *testing.B) (hostnames []string) {
-	t.Helper()
+func loadHostnames(tb testing.TB) (hostnames []string) {
+	tb.Helper()
 
-	for _, req := range loadRequests(t) {
-		h := ufnet.ExtractHostname(req.URL.String())
+	for _, req := range loadRequests(tb) {
+		h := req.URL.Hostname()
 		if h != "" {
 			hostnames = append(hostnames, h)
 		}
