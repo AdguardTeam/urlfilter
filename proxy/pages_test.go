@@ -1,21 +1,20 @@
 package proxy
 
 import (
-	"strings"
 	"testing"
 
+	"github.com/AdguardTeam/urlfilter/internal/uftest"
 	"github.com/AdguardTeam/urlfilter/rules"
-
 	"github.com/stretchr/testify/assert"
 )
 
 func TestBuildBlockedPage(t *testing.T) {
 	s := &Session{
-		Request: rules.NewRequest("https://example.org/", "", rules.TypeDocument),
+		Request: rules.NewRequest(uftest.URLStrHost, "", rules.TypeDocument),
 	}
-	f, err := rules.NewNetworkRule("||example.org^", 1)
-	assert.Nil(t, err)
 
-	page := buildBlockedPage(s, f)
-	assert.True(t, strings.Index(page, "example.org") > 0)
+	r := uftest.NewNetworkRule(t, uftest.RuleHost)
+
+	page := buildBlockedPage(s, r)
+	assert.Contains(t, page, uftest.Host)
 }

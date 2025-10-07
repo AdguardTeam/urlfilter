@@ -5,9 +5,9 @@ import (
 	"testing"
 
 	"github.com/AdguardTeam/golibs/testutil"
+	"github.com/AdguardTeam/urlfilter/internal/uftest"
 	"github.com/AdguardTeam/urlfilter/rules"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestNetworkRule_Match_dnsRewrite(t *testing.T) {
@@ -79,9 +79,7 @@ func TestNetworkRule_Match_dnsRewrite(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			r, err := rules.NewNetworkRule(tc.in, testListID)
-			require.NoError(t, err)
-
+			r := uftest.NewNetworkRule(t, tc.in)
 			assert.True(t, r.Match(req))
 		})
 	}
@@ -91,8 +89,7 @@ func TestNetworkRule_Match_dnsRewriteReverse(t *testing.T) {
 	t.Parallel()
 
 	s := "||1.2.3.4.in-addr.arpa^$dnsrewrite=noerror;ptr;example.net"
-	r, err := rules.NewNetworkRule(s, testListID)
-	require.NoError(t, err)
+	r := uftest.NewNetworkRule(t, s)
 
 	req := rules.NewRequestForHostname("1.2.3.4.in-addr.arpa")
 	assert.True(t, r.Match(req))
@@ -226,7 +223,7 @@ func TestNewNetworkRule_dnsRewriteParseErrors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			_, err := rules.NewNetworkRule(tc.in, testListID)
+			_, err := rules.NewNetworkRule(tc.in, uftest.ListID1)
 			testutil.AssertErrorMsg(t, tc.wantErrMsg, err)
 		})
 	}
@@ -302,7 +299,7 @@ func TestNewNetworkRule_dnsRewriteRCode(t *testing.T) {
 			t.Parallel()
 
 			rule := fmt.Sprintf("||test.example^$dnsrewrite=%s", tc.rcode)
-			_, err := rules.NewNetworkRule(rule, testListID)
+			_, err := rules.NewNetworkRule(rule, uftest.ListID1)
 			testutil.AssertErrorMsg(t, tc.wantErrMsg, err)
 		})
 	}

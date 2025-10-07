@@ -140,6 +140,8 @@ func createServerConfig(options Options) proxy.Config {
 		CompressContentScript: true,
 	}
 	for i, v := range options.FilterLists {
+		// #nosec G115 -- Assume that there aren't four billion filtering-rule
+		// lists.
 		config.FiltersPaths[rules.ListID(i)] = v
 	}
 

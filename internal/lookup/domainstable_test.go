@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/AdguardTeam/urlfilter/internal/lookup"
+	"github.com/AdguardTeam/urlfilter/internal/uftest"
 	"github.com/AdguardTeam/urlfilter/rules"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -56,18 +57,18 @@ func TestDomainsTable_AppendMatching(t *testing.T) {
 		wantRuleText: "",
 	}, {
 		name:         "no_src",
-		urlStr:       testURLStrWithSubdomain,
+		urlStr:       uftest.URLStrHostSub,
 		srcURLStr:    "",
 		wantRuleText: "",
 	}, {
 		name:         "match_domain",
-		urlStr:       testURLStrWithSubdomain,
-		srcURLStr:    testURLStrWithDomain,
+		urlStr:       uftest.URLStrHostSub,
+		srcURLStr:    uftest.URLStrHost,
 		wantRuleText: testRuleWithDomain,
 	}, {
 		name:         "match_subdomain",
-		urlStr:       testURLStrWithSubdomain,
-		srcURLStr:    testURLStrWithSubdomain,
+		urlStr:       uftest.URLStrHostSub,
+		srcURLStr:    uftest.URLStrHostSub,
 		wantRuleText: testRuleWithDomain,
 	}}
 
@@ -86,7 +87,7 @@ func BenchmarkDomainsTable_AppendMatching(b *testing.B) {
 	tbl := lookup.NewDomainsTable(s)
 	loadTable(b, tbl, s)
 
-	r := rules.NewRequest(testURLStrWithSubdomain, testURLStrWithDomain, rules.TypeOther)
+	r := rules.NewRequest(uftest.URLStrHostSub, uftest.URLStrHost, rules.TypeOther)
 
 	var gotRules []*rules.NetworkRule
 
@@ -135,4 +136,25 @@ func BenchmarkDomainsTable_AppendMatching_baseFilter(b *testing.B) {
 	//	pkg: github.com/AdguardTeam/urlfilter/internal/lookup
 	//	cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
 	//	BenchmarkDomainsTable_AppendMatching_baseFilter-16     	  744973	      1620 ns/op	       0 B/op	       0 allocs/op
+}
+
+func BenchmarkDomainsTable_init_baseFilter(b *testing.B) {
+	s := newStorage(b, string(baseFilterData))
+	tbl := lookup.NewDomainsTable(s)
+
+	// Warmup to fill the slice and the pools.
+	loadTable(b, tbl, s)
+
+	require.True(b, b.Run("add", func(b *testing.B) {
+		b.ReportAllocs()
+		for b.Loop() {
+			tbl.Reset()
+			loadTable(b, tbl, s)
+		}
+	}))
+
+	// TODO(a.garipov):  Benchmark against decoding of a binary format.
+
+	// Most recent results:
+	//	BenchmarkDomainsTable_init_baseFilter/add-16  	      15	  72466138 ns/op	59782924 B/op	  763906 allocs/op
 }

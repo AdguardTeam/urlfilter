@@ -6,6 +6,7 @@ import (
 	"github.com/AdguardTeam/golibs/testutil"
 	"github.com/AdguardTeam/urlfilter"
 	"github.com/AdguardTeam/urlfilter/filterlist"
+	"github.com/AdguardTeam/urlfilter/internal/uftest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -108,7 +109,7 @@ example.org#@#banner_generic_disabled`
 	lists := []filterlist.Interface{
 		filterlist.NewString(&filterlist.StringConfig{
 			RulesText: rulesText,
-			ID:        testListID,
+			ID:        uftest.ListID1,
 		}),
 	}
 

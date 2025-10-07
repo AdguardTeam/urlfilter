@@ -6,6 +6,7 @@ import (
 
 	"github.com/AdguardTeam/golibs/testutil"
 	"github.com/AdguardTeam/urlfilter/filterlist"
+	"github.com/AdguardTeam/urlfilter/internal/uftest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -18,11 +19,11 @@ func TestFile_RuleListScanner(t *testing.T) {
 
 	ruleList, err := filterlist.NewFile(&filterlist.FileConfig{
 		Path: testFileRuleList,
-		ID:   testListID,
+		ID:   uftest.ListID1,
 	})
 	require.NoError(t, err)
 	testutil.CleanupAndRequireSuccess(t, ruleList.Close)
-	assert.Equal(t, testListID, ruleList.ListID())
+	assert.Equal(t, uftest.ListID1, ruleList.ListID())
 
 	scanner := ruleList.NewScanner()
 	assert.True(t, scanner.Scan())
@@ -31,7 +32,7 @@ func TestFile_RuleListScanner(t *testing.T) {
 	require.NotNil(t, f)
 
 	assert.Equal(t, "||example.org", f.Text())
-	assert.Equal(t, testListID, f.GetFilterListID())
+	assert.Equal(t, uftest.ListID1, f.GetFilterListID())
 	assert.Equal(t, int64(0), idx)
 
 	assert.True(t, scanner.Scan())
@@ -40,7 +41,7 @@ func TestFile_RuleListScanner(t *testing.T) {
 	require.NotNil(t, f)
 
 	assert.Equal(t, testRuleCosmetic, f.Text())
-	assert.Equal(t, testListID, f.GetFilterListID())
+	assert.Equal(t, uftest.ListID1, f.GetFilterListID())
 	assert.Equal(t, int64(21), idx)
 
 	// Finish scanning.
@@ -51,20 +52,20 @@ func TestFile_RuleListScanner(t *testing.T) {
 	require.NotNil(t, f)
 
 	assert.Equal(t, "||example.org", f.Text())
-	assert.Equal(t, testListID, f.GetFilterListID())
+	assert.Equal(t, uftest.ListID1, f.GetFilterListID())
 
 	f, err = ruleList.RetrieveRule(21)
 	require.NoError(t, err)
 	require.NotNil(t, f)
 
 	assert.Equal(t, testRuleCosmetic, f.Text())
-	assert.Equal(t, testListID, f.GetFilterListID())
+	assert.Equal(t, uftest.ListID1, f.GetFilterListID())
 }
 
 func BenchmarkFile_RetrieveRule(b *testing.B) {
 	conf := &filterlist.FileConfig{
 		Path: testFileRuleList,
-		ID:   testListID,
+		ID:   uftest.ListID1,
 	}
 
 	f, fileErr := filterlist.NewFile(conf)

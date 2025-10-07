@@ -10,9 +10,9 @@ import (
 
 func TestRemoveDNSRewriteRules(t *testing.T) {
 	rs := []*NetworkRule{
-		errors.Must(NewNetworkRule("host1", testListID)),
-		errors.Must(NewNetworkRule("host2", testListID)),
-		errors.Must(NewNetworkRule("host3", testListID)),
+		newNetworkRule(t, "host1"),
+		newNetworkRule(t, "host2"),
+		newNetworkRule(t, "host3"),
 	}
 
 	got := removeDNSRewriteRules(rs)

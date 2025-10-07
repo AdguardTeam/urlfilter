@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/AdguardTeam/urlfilter/internal/lookup"
+	"github.com/AdguardTeam/urlfilter/internal/uftest"
 	"github.com/AdguardTeam/urlfilter/rules"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -37,11 +38,11 @@ func TestSeqScanTable_AppendMatching(t *testing.T) {
 		wantRuleText string
 	}{{
 		name:         "no_match",
-		urlStr:       testURLStrNoMatch,
+		urlStr:       uftest.URLStrHostOther,
 		wantRuleText: "",
 	}, {
 		name:         "match",
-		urlStr:       testURLStrWithDomain,
+		urlStr:       uftest.URLStrHost,
 		wantRuleText: testRule,
 	}}
 
@@ -60,7 +61,7 @@ func BenchmarkSeqScanTable_AppendMatching(b *testing.B) {
 	tbl := &lookup.SeqScanTable{}
 	loadTable(b, tbl, s)
 
-	r := rules.NewRequest(testURLStrWithDomain, testURLStrWithDomain, rules.TypeOther)
+	r := rules.NewRequest(uftest.URLStrHost, uftest.URLStrHost, rules.TypeOther)
 
 	var gotRules []*rules.NetworkRule
 
@@ -112,4 +113,25 @@ func BenchmarkSeqScanTable_AppendMatching_baseFilter(b *testing.B) {
 	//	pkg: github.com/AdguardTeam/urlfilter/internal/lookup
 	//	cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
 	//	BenchmarkSeqScanTable_AppendMatching_baseFilter-16    	     392	   3057949 ns/op	       0 B/op	       0 allocs/op
+}
+
+func BenchmarkSeqScanTable_init_baseFilter(b *testing.B) {
+	s := newStorage(b, string(baseFilterData))
+	tbl := &lookup.SeqScanTable{}
+
+	// Warmup to fill the slice and the pools.
+	loadTable(b, tbl, s)
+
+	require.True(b, b.Run("add", func(b *testing.B) {
+		b.ReportAllocs()
+		for b.Loop() {
+			tbl.Reset()
+			loadTable(b, tbl, s)
+		}
+	}))
+
+	// TODO(a.garipov):  Benchmark against decoding of a binary format.
+
+	// Most recent results:
+	//	BenchmarkSeqScanTable_init_baseFilter/add-16  	       1	11827496076 ns/op	59355352 B/op	  752847 allocs/op
 }

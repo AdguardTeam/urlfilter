@@ -8,6 +8,7 @@ import (
 
 	"github.com/AdguardTeam/golibs/netutil/urlutil"
 	"github.com/AdguardTeam/golibs/testutil"
+	"github.com/AdguardTeam/urlfilter/internal/uftest"
 	"github.com/AdguardTeam/urlfilter/rules"
 	"github.com/miekg/dns"
 	"github.com/stretchr/testify/assert"
@@ -125,10 +126,7 @@ func TestNetworkRule_options(t *testing.T) {
 			}
 			ruleText += "||example.org$" + tc.name
 
-			r, err := rules.NewNetworkRule(ruleText, testListID)
-			require.NoError(t, err)
-			require.NotNil(t, r)
-
+			r := uftest.NewNetworkRule(t, ruleText)
 			if tc.wantEnabled {
 				assert.True(t, r.IsOptionEnabled(tc.option))
 				assert.False(t, r.IsOptionDisabled(tc.option))
@@ -177,10 +175,7 @@ func TestNetworkRule_disabledOptions(t *testing.T) {
 
 	const ruleText = "@@||example.org$document,~extension"
 
-	r, err := rules.NewNetworkRule(ruleText, testListID)
-	require.NoError(t, err)
-	require.NotNil(t, r)
-
+	r := uftest.NewNetworkRule(t, ruleText)
 	assert.False(t, r.IsOptionEnabled(rules.OptionExtension))
 	assert.False(t, r.IsOptionDisabled(rules.OptionExtension))
 }
@@ -189,57 +184,51 @@ func TestNetworkRule_Match_simpleBasicRules(t *testing.T) {
 	t.Parallel()
 
 	// Simple matching rule.
-	r, err := rules.NewNetworkRule("||test.example^", testListID)
-	req := rules.NewRequest(testURLStr, "", rules.TypeOther)
-	require.NoError(t, err)
+	r := uftest.NewNetworkRule(t, uftest.RuleHost)
+	req := rules.NewRequest(uftest.URLStrHost, "", rules.TypeOther)
 	assert.True(t, r.Match(req))
 
-	r, err = rules.NewNetworkRule("||test.example/*", testListID)
-	req = rules.NewRequest(testURLStr, "", rules.TypeOther)
-	require.NoError(t, err)
+	r = uftest.NewNetworkRule(t, "||"+uftest.Host+"/*")
+	req = rules.NewRequest(uftest.URLStrHost, "", rules.TypeOther)
 	assert.True(t, r.Match(req))
 
 	// Subdomains / domains.
-	r, err = rules.NewNetworkRule("||github.com^", testListID)
+	r = uftest.NewNetworkRule(t, "||github.com^")
 	req = rules.NewRequestForHostname("dualstack.log.github.com-east-1.elb.amazonaws.com")
-	require.NoError(t, err)
 	assert.False(t, r.Match(req))
 
 	req = rules.NewRequestForHostname("dualstack.log.github.com1-east-1.elb.amazonaws.com")
-	require.NoError(t, err)
 	assert.False(t, r.Match(req))
 
 	// Simple regex rule.
-	r, err = rules.NewNetworkRule("/test\\.example/", testListID)
-	req = rules.NewRequest(testURLStr, "", rules.TypeOther)
-	require.NoError(t, err)
+	r = uftest.NewNetworkRule(t, `/host\.example/`)
+	req = rules.NewRequest(uftest.URLStrHost, "", rules.TypeOther)
 	assert.True(t, r.Match(req))
 
 	// Simple pattern rule.
-	r, err = rules.NewNetworkRule("_prebid_", testListID)
+	r = uftest.NewNetworkRule(t, "_prebid_")
 	req = rules.NewRequest(
 		"https://ap.lijit.com/rtb/bid?src=prebid_prebid_1.35.0",
 		"https://www.drudgereport.com/",
 		rules.TypeXmlhttprequest,
 	)
-	require.NoError(t, err)
 	assert.True(t, r.Match(req))
 }
 
 func TestNetworkRule_invalidModifiers(t *testing.T) {
 	t.Parallel()
 
-	r, err := rules.NewNetworkRule("||example.org^$unknown", testListID)
+	r, err := rules.NewNetworkRule("||example.org^$unknown", uftest.ListID1)
 	assert.Error(t, err)
 	assert.Nil(t, r)
 
 	// Whitelist-only modifier.
-	r, err = rules.NewNetworkRule("||example.org^$elemhide", testListID)
+	r, err = rules.NewNetworkRule("||example.org^$elemhide", uftest.ListID1)
 	assert.Error(t, err)
 	assert.Nil(t, r)
 
 	// Blacklist-only modifier.
-	r, err = rules.NewNetworkRule("@@||example.org^$popup", testListID)
+	r, err = rules.NewNetworkRule("@@||example.org^$popup", uftest.ListID1)
 	assert.Error(t, err)
 	assert.Nil(t, r)
 }
@@ -247,51 +236,43 @@ func TestNetworkRule_invalidModifiers(t *testing.T) {
 func TestNetworkRule_Match_case(t *testing.T) {
 	t.Parallel()
 
-	r, err := rules.NewNetworkRule("||test.example^$match-case", testListID)
-	req := rules.NewRequest(testURLStr, "", rules.TypeOther)
-	require.NoError(t, err)
+	r := uftest.NewNetworkRule(t, uftest.RuleHost+"$match-case")
+	req := rules.NewRequest(uftest.URLStrHost, "", rules.TypeOther)
 	assert.True(t, r.Match(req))
 
 	req = rules.NewRequest("https://EXAMPLE.org/", "", rules.TypeOther)
-	require.NoError(t, err)
 	assert.False(t, r.Match(req))
 }
 
 func TestNetworkRule_Match_thirdParty(t *testing.T) {
 	t.Parallel()
 
-	r, err := rules.NewNetworkRule("||test.example^$third-party", testListID)
+	r := uftest.NewNetworkRule(t, uftest.RuleHost+"$third-party")
 
 	// First-party 1.
-	req := rules.NewRequest(testURLStr, "", rules.TypeOther)
-	require.NoError(t, err)
+	req := rules.NewRequest(uftest.URLStrHost, "", rules.TypeOther)
 	assert.False(t, r.Match(req))
 
 	// First-party 2.
-	req = rules.NewRequest(testURLSubStr, testURLStr, rules.TypeOther)
-	require.NoError(t, err)
+	req = rules.NewRequest(uftest.URLStrHostSub, uftest.URLStrHost, rules.TypeOther)
 	assert.False(t, r.Match(req))
 
 	// Third-party.
-	req = rules.NewRequest(testURLStr, testURLOtherStr, rules.TypeOther)
-	require.NoError(t, err)
+	req = rules.NewRequest(uftest.URLStrHost, uftest.URLStrHostOther, rules.TypeOther)
 	assert.True(t, r.Match(req))
 
-	r, err = rules.NewNetworkRule("||test.example^$first-party", testListID)
+	r = uftest.NewNetworkRule(t, uftest.RuleHost+"$first-party")
 
 	// First-party 1.
-	req = rules.NewRequest(testURLStr, "", rules.TypeOther)
-	require.NoError(t, err)
+	req = rules.NewRequest(uftest.URLStrHost, "", rules.TypeOther)
 	assert.True(t, r.Match(req))
 
 	// First-party.
-	req = rules.NewRequest(testURLSubStr, testURLStr, rules.TypeOther)
-	require.NoError(t, err)
+	req = rules.NewRequest(uftest.URLStrHostSub, uftest.URLStrHost, rules.TypeOther)
 	assert.True(t, r.Match(req))
 
 	// Third-party.
-	req = rules.NewRequest(testURLStr, testURLOtherStr, rules.TypeOther)
-	require.NoError(t, err)
+	req = rules.NewRequest(uftest.URLStrHost, uftest.URLStrHostOther, rules.TypeOther)
 	assert.False(t, r.Match(req))
 }
 
@@ -299,41 +280,33 @@ func TestNetworkRule_Match_contentType(t *testing.T) {
 	t.Parallel()
 
 	// $script.
-	r, err := rules.NewNetworkRule("||test.example^$script", testListID)
-	req := rules.NewRequest(testURLStr, "", rules.TypeScript)
-	require.NoError(t, err)
+	r := uftest.NewNetworkRule(t, uftest.RuleHost+"$script")
+	req := rules.NewRequest(uftest.URLStrHost, "", rules.TypeScript)
 	assert.True(t, r.Match(req))
 
-	req = rules.NewRequest(testURLStr, "", rules.TypeDocument)
-	require.NoError(t, err)
+	req = rules.NewRequest(uftest.URLStrHost, "", rules.TypeDocument)
 	assert.False(t, r.Match(req))
 
 	// $script and $stylesheet.
-	r, err = rules.NewNetworkRule("||test.example^$script,stylesheet", testListID)
-	req = rules.NewRequest(testURLStr, "", rules.TypeScript)
-	require.NoError(t, err)
+	r = uftest.NewNetworkRule(t, uftest.RuleHost+"$script,stylesheet")
+	req = rules.NewRequest(uftest.URLStrHost, "", rules.TypeScript)
 	assert.True(t, r.Match(req))
 
-	req = rules.NewRequest(testURLStr, "", rules.TypeStylesheet)
-	require.NoError(t, err)
+	req = rules.NewRequest(uftest.URLStrHost, "", rules.TypeStylesheet)
 	assert.True(t, r.Match(req))
 
-	req = rules.NewRequest(testURLStr, "", rules.TypeDocument)
-	require.NoError(t, err)
+	req = rules.NewRequest(uftest.URLStrHost, "", rules.TypeDocument)
 	assert.False(t, r.Match(req))
 
 	// Everything except $script and $stylesheet.
-	r, err = rules.NewNetworkRule("@@||test.example^$~script,~stylesheet", testListID)
-	req = rules.NewRequest(testURLStr, "", rules.TypeScript)
-	require.NoError(t, err)
+	r = uftest.NewNetworkRule(t, "@@"+uftest.RuleHost+"$~script,~stylesheet")
+	req = rules.NewRequest(uftest.URLStrHost, "", rules.TypeScript)
 	assert.False(t, r.Match(req))
 
-	req = rules.NewRequest(testURLStr, "", rules.TypeStylesheet)
-	require.NoError(t, err)
+	req = rules.NewRequest(uftest.URLStrHost, "", rules.TypeStylesheet)
 	assert.False(t, r.Match(req))
 
-	req = rules.NewRequest(testURLStr, "", rules.TypeDocument)
-	require.NoError(t, err)
+	req = rules.NewRequest(uftest.URLStrHost, "", rules.TypeDocument)
 	assert.True(t, r.Match(req))
 }
 
@@ -341,54 +314,41 @@ func TestNetworkRule_Match_domainRestrictions(t *testing.T) {
 	t.Parallel()
 
 	// Just one permitted domain.
-	r, err := rules.NewNetworkRule("||test.example^$domain=test.example", testListID)
-	req := rules.NewRequest(testURLStr, "", rules.TypeScript)
-	require.NoError(t, err)
+	r := uftest.NewNetworkRule(t, uftest.RuleHost+"$domain="+uftest.Host)
+	req := rules.NewRequest(uftest.URLStrHost, "", rules.TypeScript)
 	assert.False(t, r.Match(req))
 
-	req = rules.NewRequest(testURLStr, testURLStr, rules.TypeScript)
-	require.NoError(t, err)
+	req = rules.NewRequest(uftest.URLStrHost, uftest.URLStrHost, rules.TypeScript)
 	assert.True(t, r.Match(req))
 
-	req = rules.NewRequest(testURLStr, testURLSubStr, rules.TypeScript)
-	require.NoError(t, err)
+	req = rules.NewRequest(uftest.URLStrHost, uftest.URLStrHostSub, rules.TypeScript)
 	assert.True(t, r.Match(req))
 
 	// One permitted, subdomain restricted.
-	r, err = rules.NewNetworkRule(
-		"||test.example^$domain=test.example|~sub.test.example",
-		testListID,
-	)
-	req = rules.NewRequest(testURLStr, "", rules.TypeScript)
-	require.NoError(t, err)
+	r = uftest.NewNetworkRule(t, uftest.RuleHost+"$domain="+uftest.Host+"|~"+uftest.HostSub)
+	req = rules.NewRequest(uftest.URLStrHost, "", rules.TypeScript)
 	assert.False(t, r.Match(req))
 
-	req = rules.NewRequest(testURLStr, testURLStr, rules.TypeScript)
-	require.NoError(t, err)
+	req = rules.NewRequest(uftest.URLStrHost, uftest.URLStrHost, rules.TypeScript)
 	assert.True(t, r.Match(req))
 
-	req = rules.NewRequest(testURLStr, testURLSubStr, rules.TypeScript)
-	require.NoError(t, err)
+	req = rules.NewRequest(uftest.URLStrHost, uftest.URLStrHostSub, rules.TypeScript)
 	assert.False(t, r.Match(req))
 
 	// One restricted.
-	r, err = rules.NewNetworkRule("||test.example^$domain=~test.example", testListID)
-	req = rules.NewRequest(testURLStr, "", rules.TypeScript)
-	require.NoError(t, err)
+	r = uftest.NewNetworkRule(t, uftest.RuleHost+"$domain=~"+uftest.Host)
+	req = rules.NewRequest(uftest.URLStrHost, "", rules.TypeScript)
 	assert.True(t, r.Match(req))
 
-	req = rules.NewRequest(testURLStr, testURLStr, rules.TypeScript)
-	require.NoError(t, err)
+	req = rules.NewRequest(uftest.URLStrHost, uftest.URLStrHost, rules.TypeScript)
 	assert.False(t, r.Match(req))
 
-	req = rules.NewRequest(testURLStr, testURLSubStr, rules.TypeScript)
-	require.NoError(t, err)
+	req = rules.NewRequest(uftest.URLStrHost, uftest.URLStrHostSub, rules.TypeScript)
 	assert.False(t, r.Match(req))
 
 	// Wide restricted.
-	r, err = rules.NewNetworkRule("$domain=test.example", testListID)
-	req = rules.NewRequest(testURLOtherStr, testURLStr, rules.TypeScript)
-	require.NoError(t, err)
+	r = uftest.NewNetworkRule(t, "$domain="+uftest.Host)
+	req = rules.NewRequest(uftest.URLStrHostOther, uftest.URLStrHost, rules.TypeScript)
 	assert.True(t, r.Match(req))
 }
 
@@ -408,8 +368,8 @@ func TestNetworkRule_Match_denyallow(t *testing.T) {
 		requestURL:         nil,
 		sourceURL:          nil,
 		testName:           "denyallow_invalid_inversion",
-		ruleText:           "*^$denyallow=~test.example",
-		wantErrMsg:         `invalid $denyallow value: "~test.example"`,
+		ruleText:           "*^$denyallow=~" + uftest.Host,
+		wantErrMsg:         `invalid $denyallow value: "~` + uftest.Host + `"`,
 		requestForHostname: false,
 	}, {
 		want:               assert.False,
@@ -432,7 +392,7 @@ func TestNetworkRule_Match_denyallow(t *testing.T) {
 		requestURL:         testURL,
 		sourceURL:          nil,
 		testName:           "denyallow_found",
-		ruleText:           "*^$denyallow=test.example",
+		ruleText:           "*^$denyallow=" + uftest.Host,
 		wantErrMsg:         "",
 		requestForHostname: false,
 	}, {
@@ -440,7 +400,7 @@ func TestNetworkRule_Match_denyallow(t *testing.T) {
 		requestURL:         testURLSub,
 		sourceURL:          nil,
 		testName:           "denyallow_found_subdomain",
-		ruleText:           "*^$denyallow=test.example",
+		ruleText:           "*^$denyallow=" + uftest.Host,
 		wantErrMsg:         "",
 		requestForHostname: false,
 	}, {
@@ -448,7 +408,7 @@ func TestNetworkRule_Match_denyallow(t *testing.T) {
 		requestURL:         testURLOther,
 		sourceURL:          nil,
 		testName:           "denyallow_not_found",
-		ruleText:           "*^$denyallow=test.example",
+		ruleText:           "*^$denyallow=" + uftest.Host,
 		wantErrMsg:         "",
 		requestForHostname: false,
 	}, {
@@ -456,7 +416,7 @@ func TestNetworkRule_Match_denyallow(t *testing.T) {
 		requestURL:         testURL,
 		sourceURL:          nil,
 		testName:           "denyallow_found_multiple_domains",
-		ruleText:           "*^$denyallow=test.example|example.net",
+		ruleText:           "*^$denyallow=" + uftest.Host + "|" + uftest.HostOther,
 		wantErrMsg:         "",
 		requestForHostname: false,
 	}, {
@@ -464,7 +424,7 @@ func TestNetworkRule_Match_denyallow(t *testing.T) {
 		requestURL:         testURLOther,
 		sourceURL:          testURL,
 		testName:           "denyallow_and_domain_blocking",
-		ruleText:           "*^$domain=test.example,denyallow=essentialdomain.net",
+		ruleText:           "*^$domain=" + uftest.Host + ",denyallow=essentialdomain.net",
 		wantErrMsg:         "",
 		requestForHostname: false,
 	}, {
@@ -475,7 +435,7 @@ func TestNetworkRule_Match_denyallow(t *testing.T) {
 		},
 		sourceURL:          testURL,
 		testName:           "denyallow_and_domain_not_blocking",
-		ruleText:           "*^$domain=test.example,denyallow=essentialdomain.net",
+		ruleText:           "*^$domain=" + uftest.Host + ",denyallow=essentialdomain.net",
 		wantErrMsg:         "",
 		requestForHostname: false,
 	}, {
@@ -495,7 +455,7 @@ func TestNetworkRule_Match_denyallow(t *testing.T) {
 		t.Run(tc.testName, func(t *testing.T) {
 			t.Parallel()
 
-			r, err := rules.NewNetworkRule(tc.ruleText, testListID)
+			r, err := rules.NewNetworkRule(tc.ruleText, uftest.ListID1)
 			testutil.AssertErrorMsg(t, tc.wantErrMsg, err)
 			if tc.wantErrMsg != "" {
 				return
@@ -523,8 +483,7 @@ func TestNetworkRule_Match_denyallow(t *testing.T) {
 func TestNetworkRule_Match_wildcardTLDRestrictions(t *testing.T) {
 	t.Parallel()
 
-	r, err := rules.NewNetworkRule("||example.org^$domain=example.*", testListID)
-	require.NoError(t, err)
+	r := uftest.NewNetworkRule(t, "||example.org^$domain=example.*")
 
 	testCases := []struct {
 		want      assert.BoolAssertionFunc
@@ -595,30 +554,26 @@ func TestNetworkRule_Match_wildcardTLDRestrictions(t *testing.T) {
 func TestNetworkRule_invalidDomainRestrictions(t *testing.T) {
 	t.Parallel()
 
-	_, err := rules.NewNetworkRule("||example.org^$domain=", testListID)
+	_, err := rules.NewNetworkRule("||example.org^$domain=", uftest.ListID1)
 	assert.Error(t, err)
 
-	_, err = rules.NewNetworkRule("||example.org^$domain=|example.com", testListID)
+	_, err = rules.NewNetworkRule("||example.org^$domain=|example.com", uftest.ListID1)
 	assert.Error(t, err)
 }
 
 func TestNetworkRule_Match_client(t *testing.T) {
 	t.Parallel()
 
-	r, err := rules.NewNetworkRule("||test.example^$client=127.0.0.1", testListID)
-	require.NoError(t, err)
-	assert.NotNil(t, r)
+	r := uftest.NewNetworkRule(t, uftest.RuleHost+"$client=127.0.0.1")
 
-	req := rules.NewRequestForHostname(testHostname)
+	req := rules.NewRequestForHostname(uftest.Host)
 	req.ClientIP = netip.MustParseAddr("127.0.0.1")
 	assert.True(t, r.Match(req))
 
 	req.ClientIP = netip.MustParseAddr("127.0.0.2")
 	assert.False(t, r.Match(req))
 
-	r, err = rules.NewNetworkRule("||test.example^$client=127.0.0.0/8", testListID)
-	require.NoError(t, err)
-	assert.NotNil(t, r)
+	r = uftest.NewNetworkRule(t, uftest.RuleHost+"$client=127.0.0.0/8")
 
 	req.ClientIP = netip.MustParseAddr("127.1.1.1")
 	assert.True(t, r.Match(req))
@@ -626,9 +581,7 @@ func TestNetworkRule_Match_client(t *testing.T) {
 	req.ClientIP = netip.MustParseAddr("126.0.0.0")
 	assert.False(t, r.Match(req))
 
-	r, err = rules.NewNetworkRule("||test.example^$client=2001::0:00c0:ffee", testListID)
-	require.NoError(t, err)
-	assert.NotNil(t, r)
+	r = uftest.NewNetworkRule(t, uftest.RuleHost+"$client=2001::0:00c0:ffee")
 
 	req.ClientIP = netip.MustParseAddr("2001::c0:ffee")
 	assert.True(t, r.Match(req))
@@ -636,9 +589,7 @@ func TestNetworkRule_Match_client(t *testing.T) {
 	req.ClientIP = netip.MustParseAddr("2001::c0:ffef")
 	assert.False(t, r.Match(req))
 
-	r, err = rules.NewNetworkRule("||test.example^$client=2001::0:00c0:ffee/112", testListID)
-	require.NoError(t, err)
-	assert.NotNil(t, r)
+	r = uftest.NewNetworkRule(t, uftest.RuleHost+"$client=2001::0:00c0:ffee/112")
 
 	req.ClientIP = netip.MustParseAddr("2001::0:c0:0")
 	assert.True(t, r.Match(req))
@@ -646,9 +597,7 @@ func TestNetworkRule_Match_client(t *testing.T) {
 	req.ClientIP = netip.MustParseAddr("2001::c1:ffee")
 	assert.False(t, r.Match(req))
 
-	r, err = rules.NewNetworkRule("||test.example^$client=~'Frank\\'s laptop'", testListID)
-	require.NoError(t, err)
-	assert.NotNil(t, r)
+	r = uftest.NewNetworkRule(t, uftest.RuleHost+`$client=~'Frank's laptop'`)
 
 	req.ClientName = "Frank's laptop"
 	assert.False(t, r.Match(req))
@@ -656,9 +605,7 @@ func TestNetworkRule_Match_client(t *testing.T) {
 	req.ClientName = "Frank's phone"
 	assert.True(t, r.Match(req))
 
-	r, err = rules.NewNetworkRule("||test.example^$client=name", testListID)
-	require.NoError(t, err)
-	assert.NotNil(t, r)
+	r = uftest.NewNetworkRule(t, uftest.RuleHost+"$client=name")
 
 	req.ClientIP = netip.MustParseAddr("127.0.0.1")
 	req.ClientName = "name"
@@ -782,12 +729,8 @@ func TestNetworkRule_IsHigherPriority(t *testing.T) {
 		t.Run(tc.left+"-"+tc.right, func(t *testing.T) {
 			t.Parallel()
 
-			l, err := rules.NewNetworkRule(tc.left, testListID)
-			require.NoError(t, err)
-
-			r, err := rules.NewNetworkRule(tc.right, testListID)
-			require.NoError(t, err)
-
+			l := uftest.NewNetworkRule(t, tc.left)
+			r := uftest.NewNetworkRule(t, tc.right)
 			tc.want(t, l.IsHigherPriority(r))
 		})
 	}
@@ -796,56 +739,55 @@ func TestNetworkRule_IsHigherPriority(t *testing.T) {
 func TestNetworkRule_Match_source(t *testing.T) {
 	t.Parallel()
 
-	u := "https://ci.phncdn.com/videos/201809/25/184777011/original/(m=ecuKGgaaaa)(mh=VSmV9NL_iouBcWJJ)4.jpg"
-	sourceURL := "https://www.pornhub.com/view_video.php?viewkey=ph5be89d11de4b0"
+	urlStr := "https://ci.phncdn.com/videos/201809/25/184777011/original/" +
+		"(m=ecuKGgaaaa)(mh=VSmV9NL_iouBcWJJ)4.jpg"
+	sourceURLStr := "https://www.pornhub.com/view_video.php?viewkey=ph5be89d11de4b0"
 
-	req := rules.NewRequest(u, sourceURL, rules.TypeImage)
+	req := rules.NewRequest(urlStr, sourceURLStr, rules.TypeImage)
 	ruleText := "|https://$image,media,script,third-party,domain=" +
 		"~feedback.pornhub.com|pornhub.com|redtube.com|redtube.com.br|tube8.com|" +
 		"tube8.es|tube8.fr|youporn.com|youporngay.com"
 
-	r, err := rules.NewNetworkRule(ruleText, testListID)
-	require.NoError(t, err)
-
+	r := uftest.NewNetworkRule(t, ruleText)
 	assert.True(t, r.Match(req))
 }
 
 func TestNetworkRule_invalidRule(t *testing.T) {
 	t.Parallel()
 
-	r, err := rules.NewNetworkRule("*$third-party", testListID)
+	r, err := rules.NewNetworkRule("*$third-party", uftest.ListID1)
 	assert.Nil(t, r)
 	assert.ErrorIs(t, err, rules.ErrTooWideRule)
 
-	r, err = rules.NewNetworkRule("$third-party", testListID)
+	r, err = rules.NewNetworkRule("$third-party", uftest.ListID1)
 	assert.Nil(t, r)
 	assert.ErrorIs(t, err, rules.ErrTooWideRule)
 
-	r, err = rules.NewNetworkRule("ad$third-party", testListID)
+	r, err = rules.NewNetworkRule("ad$third-party", uftest.ListID1)
 	assert.Nil(t, r)
 	assert.ErrorIs(t, err, rules.ErrTooWideRule)
 
 	// This one is valid because it has domain restriction.
-	r, err = rules.NewNetworkRule("$domain=ya.ru", testListID)
+	r, err = rules.NewNetworkRule("$domain=ya.ru", uftest.ListID1)
 	require.NoError(t, err)
 	assert.NotNil(t, r)
 
 	// This one is valid because it has $ctag restriction.
-	r, err = rules.NewNetworkRule("$ctag=pc", testListID)
+	r, err = rules.NewNetworkRule("$ctag=pc", uftest.ListID1)
 	require.NoError(t, err)
 	assert.NotNil(t, r)
 
 	// This one is valid because it has $client restriction.
-	r, err = rules.NewNetworkRule("$client=127.0.0.1", testListID)
+	r, err = rules.NewNetworkRule("$client=127.0.0.1", uftest.ListID1)
 	require.NoError(t, err)
 	assert.NotNil(t, r)
 
 	// This one is valid because it has $client restriction.
-	r, err = rules.NewNetworkRule("/$client=127.0.0.1", testListID)
+	r, err = rules.NewNetworkRule("/$client=127.0.0.1", uftest.ListID1)
 	require.NoError(t, err)
 	require.NotNil(t, r)
 
-	req := rules.NewRequest(testURLStr, "", rules.TypeOther)
+	req := rules.NewRequest(uftest.URLStrHost, "", rules.TypeOther)
 	req.ClientIP = netip.MustParseAddr("127.0.0.1")
 	assert.True(t, r.Match(req))
 }
@@ -891,9 +833,7 @@ func TestNetworkRule_IsHostLevelNetworkRule(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			r, err := rules.NewNetworkRule(tc.ruleText, testListID)
-			require.NoError(t, err)
-
+			r := uftest.NewNetworkRule(t, tc.ruleText)
 			tc.want(t, r.IsHostLevelNetworkRule())
 		})
 	}
@@ -902,8 +842,7 @@ func TestNetworkRule_IsHostLevelNetworkRule(t *testing.T) {
 func TestNetworkRule_Match_ip(t *testing.T) {
 	t.Parallel()
 
-	r, err := rules.NewNetworkRule("://104.154.", testListID)
-	require.NoError(t, err)
+	r := uftest.NewNetworkRule(t, "://104.154.")
 	require.True(t, r.IsHostLevelNetworkRule())
 
 	req := rules.NewRequestForHostname("104.154.1.1")
@@ -912,15 +851,16 @@ func TestNetworkRule_Match_ip(t *testing.T) {
 	req = rules.NewRequestForHostname("1.104.154.1")
 	assert.False(t, r.Match(req))
 
-	r, err = rules.NewNetworkRule("/sub.", testListID)
-	require.NoError(t, err)
-
+	r = uftest.NewNetworkRule(t, "/sub.")
 	req = rules.NewRequestForHostname("sub.example.org")
 	assert.True(t, r.Match(req))
+
 	req = rules.NewRequestForHostname("sub.host.org")
 	assert.True(t, r.Match(req))
+
 	req = rules.NewRequestForHostname("sub2.host.org")
 	assert.False(t, r.Match(req))
+
 	req = rules.NewRequestForHostname("2sub.host.org")
 	assert.False(t, r.Match(req))
 }
@@ -928,40 +868,35 @@ func TestNetworkRule_Match_ip(t *testing.T) {
 func TestNetworkRule_Match_dnsType(t *testing.T) {
 	t.Parallel()
 
-	req := rules.NewRequestForHostname(testHostname)
+	req := rules.NewRequestForHostname(uftest.Host)
 	req.DNSType = dns.TypeAAAA
 
-	r, err := rules.NewNetworkRule("||test.example^$dnstype=TXT|AAAA", testListID)
-	require.NoError(t, err)
+	r := uftest.NewNetworkRule(t, uftest.RuleHost+"$dnstype=TXT|AAAA")
 	assert.True(t, r.Match(req))
 
-	r, err = rules.NewNetworkRule("||test.example^$dnstype=~TXT|~AAAA", testListID)
-	require.NoError(t, err)
+	r = uftest.NewNetworkRule(t, uftest.RuleHost+"$dnstype=~TXT|~AAAA")
 	assert.False(t, r.Match(req))
 
-	r, err = rules.NewNetworkRule("$dnstype=AAAA", testListID)
-	require.NoError(t, err)
+	r = uftest.NewNetworkRule(t, "$dnstype=AAAA")
 	assert.True(t, r.Match(req))
 
 	t.Run("parse_errors", func(t *testing.T) {
-		_, err = rules.NewNetworkRule("||test.example^$dnstype=", testListID)
+		_, err := rules.NewNetworkRule("||error.example^$dnstype=", uftest.ListID1)
 		assert.Error(t, err)
 
-		_, err = rules.NewNetworkRule("||test.example^$dnstype=TXT|", testListID)
+		_, err = rules.NewNetworkRule("||error.example^$dnstype=TXT|", uftest.ListID1)
 		assert.Error(t, err)
 
-		_, err = rules.NewNetworkRule("||test.example^$dnstype=NONE", testListID)
+		_, err = rules.NewNetworkRule("||error.example^$dnstype=NONE", uftest.ListID1)
 		assert.Error(t, err)
 
-		_, err = rules.NewNetworkRule("||test.example^$dnstype=INVALIDTYPE", testListID)
+		_, err = rules.NewNetworkRule("||error.example^$dnstype=INVALIDTYPE", uftest.ListID1)
 		assert.Error(t, err)
 	})
 }
 
 func BenchmarkNetworkRule_Match(b *testing.B) {
-	r, err := rules.NewNetworkRule("||example.org^", testListID)
-	require.NoError(b, err)
-
+	r := uftest.NewNetworkRule(b, "||example.org^")
 	req := rules.NewRequestForHostname("example.org")
 
 	// Warmup to make sure the init has run.
@@ -985,14 +920,10 @@ func BenchmarkNetworkRule_Match(b *testing.B) {
 
 // TODO(d.kolyshev): Improve this benchmark.
 func BenchmarkNetworkRule_IsHigherPriority(b *testing.B) {
-	l, err := rules.NewNetworkRule("||example.org$ctag=123,client=123,dnstype=AAAA", testListID)
-	require.NoError(b, err)
-
-	r, err := rules.NewNetworkRule("||example.org$client=123,dnstype=AAAA", testListID)
-	require.NoError(b, err)
+	l := uftest.NewNetworkRule(b, "||example.org$ctag=123,client=123,dnstype=AAAA")
+	r := uftest.NewNetworkRule(b, "||example.org$client=123,dnstype=AAAA")
 
 	var ok bool
-
 	b.ReportAllocs()
 	for b.Loop() {
 		ok = l.IsHigherPriority(r)
@@ -1009,8 +940,7 @@ func BenchmarkNetworkRule_IsHigherPriority(b *testing.B) {
 }
 
 func FuzzNetworkRule_Match(f *testing.F) {
-	r, err := rules.NewNetworkRule("||test.example^", testListID)
-	require.NoError(f, err)
+	r := uftest.NewNetworkRule(f, "||test.example^")
 
 	for _, seed := range []string{
 		"",

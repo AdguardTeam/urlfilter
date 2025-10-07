@@ -74,6 +74,7 @@ func (s *Server) buildContentScript(session *Session) *http.Response {
 
 	hostname := getQueryParameter(r, "hostname")
 	option := getQueryParameterUint64(r, "option")
+	// #nosec G115 -- TODO(a.garipov):  Validate ts properly.
 	ts := int64(getQueryParameterUint64(r, "ts"))
 
 	if hostname == "" || option == 0 || ts == 0 {
@@ -90,6 +91,7 @@ func (s *Server) buildContentScript(session *Session) *http.Response {
 		return res
 	}
 
+	// #nosec G115 -- TODO(a.garipov):  Validate option properly.
 	cosmeticResult := s.engine.GetCosmeticResult(hostname, rules.CosmeticOption(option))
 	bodyBytes := []byte(s.buildContentScriptCode(cosmeticResult))
 	contentLen := len(bodyBytes)

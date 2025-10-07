@@ -6,6 +6,7 @@ import (
 	"github.com/AdguardTeam/golibs/testutil"
 	"github.com/AdguardTeam/urlfilter"
 	"github.com/AdguardTeam/urlfilter/filterlist"
+	"github.com/AdguardTeam/urlfilter/internal/uftest"
 	"github.com/stretchr/testify/require"
 
 	"github.com/AdguardTeam/urlfilter/rules"
@@ -67,7 +68,7 @@ func newTestEngine(tb testing.TB, rulesText string) (engine *urlfilter.Engine) {
 	lists := []filterlist.Interface{
 		filterlist.NewString(&filterlist.StringConfig{
 			RulesText: rulesText,
-			ID:        testListID,
+			ID:        uftest.ListID1,
 		}),
 	}
 

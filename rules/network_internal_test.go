@@ -115,9 +115,7 @@ func TestParseRuleText(t *testing.T) {
 func checkRequestType(t testing.TB, modifier string, requestType RequestType, permitted bool) {
 	t.Helper()
 
-	r, err := NewNetworkRule("||example.org^$"+modifier, 0)
-	require.Nil(t, err)
-	require.NotNil(t, r)
+	r := newNetworkRule(t, "||example.org^$"+modifier)
 
 	if permitted {
 		assert.Equal(t, r.permittedRequestTypes, requestType)
@@ -271,10 +269,7 @@ func TestNetworkRule_cTagRules(t *testing.T) {
 	t.Run("permitted_one", func(t *testing.T) {
 		t.Parallel()
 
-		r, err := NewNetworkRule("||test.example^$ctag=pc", 0)
-		require.NoError(t, err)
-		require.NotNil(t, r)
-
+		r := newNetworkRule(t, "||test.example^$ctag=pc")
 		assert.Equal(t, []string{"pc"}, r.permittedClientTags)
 
 		req := NewRequestForHostname("test.example")
@@ -288,8 +283,7 @@ func TestNetworkRule_cTagRules(t *testing.T) {
 	t.Run("permitted_list", func(t *testing.T) {
 		t.Parallel()
 
-		r, err := NewNetworkRule("||test.example^$ctag=phone|pc", 0)
-		require.NoError(t, err)
+		r := newNetworkRule(t, "||test.example^$ctag=phone|pc")
 		assert.Equal(t, []string{"pc", "phone"}, r.permittedClientTags)
 
 		req := NewRequestForHostname("test.example")
@@ -303,8 +297,7 @@ func TestNetworkRule_cTagRules(t *testing.T) {
 	t.Run("permitted_restricted", func(t *testing.T) {
 		t.Parallel()
 
-		r, err := NewNetworkRule("||test.example^$ctag=~phone|pc", 0)
-		require.NoError(t, err)
+		r := newNetworkRule(t, "||test.example^$ctag=~phone|pc")
 		assert.Equal(t, []string{"pc"}, r.permittedClientTags)
 		assert.Equal(t, []string{"phone"}, r.restrictedClientTags)
 
@@ -519,13 +512,8 @@ func TestNetworkRule_negatesBadfilter(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			r, err := NewNetworkRule(tc.rule, testListID)
-			require.NoError(t, err)
-			require.NotNil(t, r)
-
-			b, err := NewNetworkRule(tc.badfilter, testListID)
-			require.NoError(t, err)
-			require.NotNil(t, b)
+			r := newNetworkRule(t, tc.rule)
+			b := newNetworkRule(t, tc.badfilter)
 
 			tc.want(t, b.negatesBadfilter(r))
 		})

@@ -15,23 +15,23 @@ type SeqScanTable struct {
 var _ Table = (*SeqScanTable)(nil)
 
 // Add implements the [Table] interface for *SeqScanTable.
-func (s *SeqScanTable) Add(f *rules.NetworkRule, _ filterlist.StorageID) (ok bool) {
-	if containsRule(s.rules, f) {
+func (t *SeqScanTable) Add(f *rules.NetworkRule, _ filterlist.StorageID) (ok bool) {
+	if containsRule(t.rules, f) {
 		return false
 	}
 
-	s.rules = append(s.rules, f)
+	t.rules = append(t.rules, f)
 
 	return true
 }
 
 // AppendMatching implements the [Table] interface for *SeqScanTable.
-func (s *SeqScanTable) AppendMatching(
+func (t *SeqScanTable) AppendMatching(
 	matching []*rules.NetworkRule,
 	r *rules.Request,
 ) (res []*rules.NetworkRule) {
 	res = matching
-	for _, rule := range s.rules {
+	for _, rule := range t.rules {
 		if rule.Match(r) {
 			res = append(res, rule)
 		}
@@ -56,4 +56,9 @@ func containsRule(rules []*rules.NetworkRule, r *rules.NetworkRule) (ok bool) {
 	}
 
 	return false
+}
+
+// Reset prepares t for reuse.
+func (t *SeqScanTable) Reset() {
+	t.rules = t.rules[:0]
 }

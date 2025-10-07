@@ -25,8 +25,9 @@ type DomainsTable struct {
 // subdomainsEst is the estimate for the number of subdomains in a domain.
 const subdomainsEst = 4
 
-// NewDomainsTable creates a new instance of the DomainsTable.
-func NewDomainsTable(rs *filterlist.RuleStorage) (s *DomainsTable) {
+// NewDomainsTable creates a new instance of the DomainsTable.  rs must not be
+// nil.
+func NewDomainsTable(rs *filterlist.RuleStorage) (t *DomainsTable) {
 	return &DomainsTable{
 		ruleStorage:    rs,
 		subdomainsPool: syncutil.NewSlicePool[string](subdomainsEst),
@@ -38,23 +39,23 @@ func NewDomainsTable(rs *filterlist.RuleStorage) (s *DomainsTable) {
 var _ Table = (*DomainsTable)(nil)
 
 // Add implements the [Table] interface for *DomainsTable.
-func (d *DomainsTable) Add(f *rules.NetworkRule, id filterlist.StorageID) (ok bool) {
+func (t *DomainsTable) Add(f *rules.NetworkRule, id filterlist.StorageID) (ok bool) {
 	permittedDomains := f.GetPermittedDomains()
 	if len(permittedDomains) == 0 {
 		return false
 	}
 
 	for _, domain := range permittedDomains {
-		rulesIndexes := d.domainsIndex[domain]
+		rulesIndexes := t.domainsIndex[domain]
 		rulesIndexes = append(rulesIndexes, id)
-		d.domainsIndex[domain] = rulesIndexes
+		t.domainsIndex[domain] = rulesIndexes
 	}
 
 	return true
 }
 
 // AppendMatching implements the [Table] interface for *DomainsTable.
-func (d *DomainsTable) AppendMatching(
+func (t *DomainsTable) AppendMatching(
 	matching []*rules.NetworkRule,
 	r *rules.Request,
 ) (res []*rules.NetworkRule) {
@@ -63,8 +64,8 @@ func (d *DomainsTable) AppendMatching(
 		return res
 	}
 
-	subdomainsPtr := d.subdomainsPool.Get()
-	defer d.subdomainsPool.Put(subdomainsPtr)
+	subdomainsPtr := t.subdomainsPool.Get()
+	defer t.subdomainsPool.Put(subdomainsPtr)
 
 	*subdomainsPtr = appendSubdomains((*subdomainsPtr)[:0], r.SourceHostname)
 	if len(*subdomainsPtr) == 0 {
@@ -72,9 +73,9 @@ func (d *DomainsTable) AppendMatching(
 	}
 
 	for _, domain := range *subdomainsPtr {
-		matchingIDs := d.domainsIndex[domain]
+		matchingIDs := t.domainsIndex[domain]
 		for _, id := range matchingIDs {
-			rule := d.ruleStorage.RetrieveNetworkRule(id)
+			rule := t.ruleStorage.RetrieveNetworkRule(id)
 			if rule != nil && rule.Match(r) {
 				res = append(res, rule)
 			}
@@ -109,4 +110,9 @@ func appendSubdomains(sub []string, domain string) (res []string) {
 	}
 
 	return res
+}
+
+// Reset prepares t for reuse.
+func (t *DomainsTable) Reset() {
+	clear(t.domainsIndex)
 }

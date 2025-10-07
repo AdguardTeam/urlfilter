@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/AdguardTeam/golibs/testutil"
+	"github.com/AdguardTeam/urlfilter/internal/uftest"
 	"github.com/AdguardTeam/urlfilter/rules"
 	"github.com/stretchr/testify/assert"
 )
@@ -67,14 +68,14 @@ func TestNewRule(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			r, err := rules.NewRule(tc.in, testListID)
+			r, err := rules.NewRule(tc.in, uftest.ListID1)
 			testutil.AssertErrorMsg(t, tc.wantErrMsg, err)
 
 			if tc.wantNil {
 				assert.Nil(t, r)
 			} else {
 				assert.NotNil(t, r)
-				assert.Equal(t, testListID, r.GetFilterListID())
+				assert.Equal(t, uftest.ListID1, r.GetFilterListID())
 				assert.Equal(t, tc.in, r.Text())
 			}
 		})
@@ -102,7 +103,7 @@ func FuzzNewRule(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, in string) {
 		assert.NotPanics(t, func() {
-			_, _ = rules.NewRule(in, testListID)
+			_, _ = rules.NewRule(in, uftest.ListID1)
 		})
 	})
 }

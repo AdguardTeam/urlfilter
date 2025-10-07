@@ -3,19 +3,20 @@ package rules_test
 import (
 	"testing"
 
+	"github.com/AdguardTeam/urlfilter/internal/uftest"
 	"github.com/AdguardTeam/urlfilter/rules"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestCosmeticRule_Match(t *testing.T) {
-	r, err := rules.NewCosmeticRule("##banner", testListID)
+	r, err := rules.NewCosmeticRule("##banner", uftest.ListID1)
 	require.NotNil(t, r)
 	require.NoError(t, err)
 
 	assert.True(t, r.Match("example.org"))
 
-	r, err = rules.NewCosmeticRule("example.org,~sub.example.org##banner", testListID)
+	r, err = rules.NewCosmeticRule("example.org,~sub.example.org##banner", uftest.ListID1)
 	require.NotNil(t, r)
 	require.NoError(t, err)
 
@@ -27,7 +28,7 @@ func TestCosmeticRule_Match(t *testing.T) {
 }
 
 func TestCosmeticRule_Match_wildcardTLD(t *testing.T) {
-	r, err := rules.NewCosmeticRule("example.*##banner", testListID)
+	r, err := rules.NewCosmeticRule("example.*##banner", uftest.ListID1)
 	require.NotNil(t, r)
 	require.NoError(t, err)
 
@@ -39,7 +40,7 @@ func TestCosmeticRule_Match_wildcardTLD(t *testing.T) {
 }
 
 func FuzzCosmeticRule_Match(f *testing.F) {
-	r, err := rules.NewCosmeticRule("example.*##banner", testListID)
+	r, err := rules.NewCosmeticRule("example.*##banner", uftest.ListID1)
 	require.NoError(f, err)
 
 	for _, seed := range []string{

@@ -5,6 +5,7 @@ import (
 
 	"github.com/AdguardTeam/golibs/testutil"
 	"github.com/AdguardTeam/urlfilter/filterlist"
+	"github.com/AdguardTeam/urlfilter/internal/uftest"
 	"github.com/AdguardTeam/urlfilter/rules"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -15,12 +16,12 @@ func TestString_RuleListScanner(t *testing.T) {
 
 	conf := &filterlist.StringConfig{
 		RulesText: testRuleText,
-		ID:        testListID,
+		ID:        uftest.ListID1,
 	}
 
 	ruleList := filterlist.NewString(conf)
 	testutil.CleanupAndRequireSuccess(t, ruleList.Close)
-	assert.Equal(t, testListID, ruleList.ListID())
+	assert.Equal(t, uftest.ListID1, ruleList.ListID())
 
 	scanner := ruleList.NewScanner()
 	assert.True(t, scanner.Scan())
@@ -28,8 +29,8 @@ func TestString_RuleListScanner(t *testing.T) {
 	f, idx := scanner.Rule()
 	require.NotNil(t, f)
 
-	assert.Equal(t, testRuleDomain, f.Text())
-	assert.Equal(t, testListID, f.GetFilterListID())
+	assert.Equal(t, uftest.RuleHost, f.Text())
+	assert.Equal(t, uftest.ListID1, f.GetFilterListID())
 	assert.Equal(t, int64(0), idx)
 
 	assert.True(t, scanner.Scan())
@@ -38,7 +39,7 @@ func TestString_RuleListScanner(t *testing.T) {
 	require.NotNil(t, f)
 
 	assert.Equal(t, testRuleCosmetic, f.Text())
-	assert.Equal(t, testListID, f.GetFilterListID())
+	assert.Equal(t, uftest.ListID1, f.GetFilterListID())
 	assert.Equal(t, cosmeticRuleIndex, idx)
 
 	// Finish scanning.
@@ -48,21 +49,21 @@ func TestString_RuleListScanner(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, f)
 
-	assert.Equal(t, testRuleDomain, f.Text())
-	assert.Equal(t, testListID, f.GetFilterListID())
+	assert.Equal(t, uftest.RuleHost, f.Text())
+	assert.Equal(t, uftest.ListID1, f.GetFilterListID())
 
 	f, err = ruleList.RetrieveRule(cosmeticRuleIndex)
 	require.NoError(t, err)
 	require.NotNil(t, f)
 
 	assert.Equal(t, testRuleCosmetic, f.Text())
-	assert.Equal(t, testListID, f.GetFilterListID())
+	assert.Equal(t, uftest.ListID1, f.GetFilterListID())
 }
 
 func BenchmarkString_RetrieveRule(b *testing.B) {
 	conf := &filterlist.StringConfig{
 		RulesText: testRuleText,
-		ID:        testListID,
+		ID:        uftest.ListID1,
 	}
 
 	s := filterlist.NewString(conf)

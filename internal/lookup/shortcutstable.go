@@ -47,8 +47,9 @@ type ShortcutsTable struct {
 // based on an analysis of the AdGuard DNS filtering-rule list.
 const shortcutsInARuleEst = 16
 
-// NewShortcutsTable creates a new instance of *ShortcutsTable.
-func NewShortcutsTable(rs *filterlist.RuleStorage) (s *ShortcutsTable) {
+// NewShortcutsTable creates a new instance of *ShortcutsTable.  rs must not be
+// nil.
+func NewShortcutsTable(rs *filterlist.RuleStorage) (t *ShortcutsTable) {
 	return &ShortcutsTable{
 		ruleStorage:   rs,
 		shortcuts:     map[shortcut]*shortcutInfo{},
@@ -60,9 +61,9 @@ func NewShortcutsTable(rs *filterlist.RuleStorage) (s *ShortcutsTable) {
 var _ Table = (*ShortcutsTable)(nil)
 
 // Add implements the [Table] interface for *ShortcutsTable.
-func (s *ShortcutsTable) Add(f *rules.NetworkRule, id filterlist.StorageID) (ok bool) {
-	shortcutsPtr := s.shortcutsPool.Get()
-	defer s.shortcutsPool.Put(shortcutsPtr)
+func (t *ShortcutsTable) Add(f *rules.NetworkRule, id filterlist.StorageID) (ok bool) {
+	shortcutsPtr := t.shortcutsPool.Get()
+	defer t.shortcutsPool.Put(shortcutsPtr)
 
 	*shortcutsPtr = appendRuleShortcuts((*shortcutsPtr)[:0], f)
 	if len(*shortcutsPtr) == 0 {
@@ -73,7 +74,7 @@ func (s *ShortcutsTable) Add(f *rules.NetworkRule, id filterlist.StorageID) (ok 
 	var minSCInfo *shortcutInfo
 	minCount := uint64(math.MaxUint64)
 	for _, sc := range *shortcutsPtr {
-		scInfo := s.shortcuts[sc]
+		scInfo := t.shortcuts[sc]
 
 		if scInfo == nil {
 			minSC = sc
@@ -89,7 +90,7 @@ func (s *ShortcutsTable) Add(f *rules.NetworkRule, id filterlist.StorageID) (ok 
 		}
 	}
 
-	s.shortcuts[minSC] = minSCInfo
+	t.shortcuts[minSC] = minSCInfo
 	minSCInfo.count++
 	minSCInfo.ids = append(minSCInfo.ids, id)
 
@@ -97,7 +98,7 @@ func (s *ShortcutsTable) Add(f *rules.NetworkRule, id filterlist.StorageID) (ok 
 }
 
 // AppendMatching implements the [Table] interface for *ShortcutsTable.
-func (s *ShortcutsTable) AppendMatching(
+func (t *ShortcutsTable) AppendMatching(
 	matching []*rules.NetworkRule,
 	r *rules.Request,
 ) (res []*rules.NetworkRule) {
@@ -110,13 +111,13 @@ func (s *ShortcutsTable) AppendMatching(
 
 	for i := range l - shortcutLength {
 		sc := shortcut(r.URLLowerCase[i : i+shortcutLength])
-		scInfo := s.shortcuts[sc]
+		scInfo := t.shortcuts[sc]
 		if scInfo == nil {
 			continue
 		}
 
 		for _, id := range scInfo.ids {
-			rule := s.ruleStorage.RetrieveNetworkRule(id)
+			rule := t.ruleStorage.RetrieveNetworkRule(id)
 
 			// Make sure that the same rule isn't returned twice.  This happens
 			// when the URL has a repeating pattern.  The check is performed
@@ -170,4 +171,9 @@ func isAnyURLShortcut(r *rules.NetworkRule) bool {
 	default:
 		return false
 	}
+}
+
+// Reset prepares t for reuse.
+func (t *ShortcutsTable) Reset() {
+	clear(t.shortcuts)
 }

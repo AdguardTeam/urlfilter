@@ -9,7 +9,7 @@ import (
 
 	"github.com/AdguardTeam/golibs/testutil"
 	"github.com/AdguardTeam/urlfilter/filterlist"
-	"github.com/AdguardTeam/urlfilter/internal/ufnet"
+	"github.com/AdguardTeam/urlfilter/internal/uftest"
 	"github.com/AdguardTeam/urlfilter/rules"
 	"github.com/miekg/dns"
 	"github.com/stretchr/testify/assert"
@@ -21,7 +21,7 @@ func TestDNSEnginePriority(t *testing.T) {
 127.0.0.1  example.org
 `
 
-	ruleStorage := newTestRuleStorage(t, testListID, rulesText)
+	ruleStorage := newTestRuleStorage(t, uftest.ListID1, rulesText)
 	dnsEngine := NewDNSEngine(ruleStorage)
 	assert.NotNil(t, dnsEngine)
 
@@ -47,7 +47,7 @@ func TestDNSEngineMatchHostname(t *testing.T) {
 ::1 v4and6.com
 ::2 v4and6.com
 `
-	ruleStorage := newTestRuleStorage(t, testListID, rulesText)
+	ruleStorage := newTestRuleStorage(t, uftest.ListID1, rulesText)
 	dnsEngine := NewDNSEngine(ruleStorage)
 	require.NotNil(t, dnsEngine)
 
@@ -95,7 +95,7 @@ func TestDNSEngineMatchHostname(t *testing.T) {
 
 func TestHostLevelNetworkRuleWithProtocol(t *testing.T) {
 	rulesText := "://example.org"
-	ruleStorage := newTestRuleStorage(t, testListID, rulesText)
+	ruleStorage := newTestRuleStorage(t, uftest.ListID1, rulesText)
 	dnsEngine := NewDNSEngine(ruleStorage)
 	assert.NotNil(t, dnsEngine)
 
@@ -106,14 +106,14 @@ func TestHostLevelNetworkRuleWithProtocol(t *testing.T) {
 
 func TestRegexp(t *testing.T) {
 	text := "/^stats?\\./"
-	ruleStorage := newTestRuleStorage(t, testListID, text)
+	ruleStorage := newTestRuleStorage(t, uftest.ListID1, text)
 	dnsEngine := NewDNSEngine(ruleStorage)
 
 	res, ok := dnsEngine.Match("stats.test.com")
 	assert.True(t, ok && res.NetworkRule.Text() == text)
 
 	text = "@@/^stats?\\./"
-	ruleStorage = newTestRuleStorage(t, testListID, "||stats.test.com^\n"+text)
+	ruleStorage = newTestRuleStorage(t, uftest.ListID1, "||stats.test.com^\n"+text)
 	dnsEngine = NewDNSEngine(ruleStorage)
 
 	res, ok = dnsEngine.Match("stats.test.com")
@@ -123,7 +123,7 @@ func TestRegexp(t *testing.T) {
 func TestMultipleIPPerHost(t *testing.T) {
 	text := `1.1.1.1 example.org
 2.2.2.2 example.org`
-	ruleStorage := newTestRuleStorage(t, testListID, text)
+	ruleStorage := newTestRuleStorage(t, uftest.ListID1, text)
 	dnsEngine := NewDNSEngine(ruleStorage)
 
 	res, ok := dnsEngine.Match("example.org")
@@ -145,7 +145,7 @@ func TestClientTags(t *testing.T) {
 ||host7^$ctag=~pc
 ||host7^$ctag=~pc,badfilter
 `
-	ruleStorage := newTestRuleStorage(t, testListID, rulesText)
+	ruleStorage := newTestRuleStorage(t, uftest.ListID1, rulesText)
 	dnsEngine := NewDNSEngine(ruleStorage)
 	assert.NotNil(t, dnsEngine)
 
@@ -224,7 +224,7 @@ func TestClient(t *testing.T) {
 		"||host9^$client=0.0.0.0",
 		"||host10^$client=::",
 	}
-	ruleStorage := newTestRuleStorage(t, testListID, strings.Join(ruleTexts, "\n"))
+	ruleStorage := newTestRuleStorage(t, uftest.ListID1, strings.Join(ruleTexts, "\n"))
 	dnsEngine := NewDNSEngine(ruleStorage)
 	assert.NotNil(t, dnsEngine)
 
@@ -344,7 +344,7 @@ func TestClient(t *testing.T) {
 
 func TestBadfilterRules(t *testing.T) {
 	rulesText := "||example.org^\n||example.org^$badfilter"
-	ruleStorage := newTestRuleStorage(t, testListID, rulesText)
+	ruleStorage := newTestRuleStorage(t, uftest.ListID1, rulesText)
 	dnsEngine := NewDNSEngine(ruleStorage)
 	assert.NotNil(t, dnsEngine)
 
@@ -366,7 +366,7 @@ func TestDNSEngine_MatchRequest_dnsType(t *testing.T) {
 ||priority^$client=127.0.0.1,dnstype=AAAA
 `
 
-	ruleStorage := newTestRuleStorage(t, testListID, rulesText)
+	ruleStorage := newTestRuleStorage(t, uftest.ListID1, rulesText)
 	dnsEngine := NewDNSEngine(ruleStorage)
 	assert.NotNil(t, dnsEngine)
 
@@ -501,7 +501,7 @@ func TestDNSEngine_MatchRequest_dnsType(t *testing.T) {
 }
 
 func TestSlash(t *testing.T) {
-	ruleStorage := newTestRuleStorage(t, testListID, "/$client=127.0.0.1")
+	ruleStorage := newTestRuleStorage(t, uftest.ListID1, "/$client=127.0.0.1")
 	dnsEngine := NewDNSEngine(ruleStorage)
 	assert.NotNil(t, dnsEngine)
 
@@ -536,7 +536,7 @@ func BenchmarkDNSEngine_heapAlloc(b *testing.B) {
 	s := newRuleStorage(b)
 	testutil.CleanupAndRequireSuccess(b, s.Close)
 
-	hostnames := loadHostnames(b)
+	hostnames := uftest.RequestHostnames(b)
 	m := &dnsEngineMeasurement{}
 
 	b.ReportAllocs()
@@ -594,7 +594,7 @@ func (m *dnsEngineMeasurement) run(tb testing.TB, s *filterlist.RuleStorage, hos
 }
 
 func BenchmarkDNSEngine_Match(b *testing.B) {
-	testHostnames := loadHostnames(b)
+	reqHostnames := uftest.RequestHostnames(b)
 
 	ruleStorage := newRuleStorage(b)
 	testutil.CleanupAndRequireSuccess(b, ruleStorage.Close)
@@ -604,13 +604,13 @@ func BenchmarkDNSEngine_Match(b *testing.B) {
 	// Warmup to fill the pools.
 	var r *DNSResult
 	var match bool
-	for _, reqHostname := range testHostnames {
+	for _, reqHostname := range reqHostnames {
 		r, match = dnsEngine.Match(reqHostname)
 	}
 
 	b.ReportAllocs()
 	for b.Loop() {
-		for _, reqHostname := range testHostnames {
+		for _, reqHostname := range reqHostnames {
 			r, match = dnsEngine.Match(reqHostname)
 		}
 	}
@@ -627,7 +627,7 @@ func BenchmarkDNSEngine_Match(b *testing.B) {
 }
 
 func BenchmarkDNSEngine_MatchRequestInto(b *testing.B) {
-	testHostnames := loadHostnames(b)
+	reqHostnames := uftest.RequestHostnames(b)
 
 	ruleStorage := newRuleStorage(b)
 	testutil.CleanupAndRequireSuccess(b, ruleStorage.Close)
@@ -639,7 +639,7 @@ func BenchmarkDNSEngine_MatchRequestInto(b *testing.B) {
 	res := &DNSResult{}
 
 	// Warmup to fill the structs and the pools.
-	for _, reqHostname := range testHostnames {
+	for _, reqHostname := range reqHostnames {
 		req.Hostname = reqHostname
 		res.Reset()
 
@@ -648,7 +648,7 @@ func BenchmarkDNSEngine_MatchRequestInto(b *testing.B) {
 
 	b.ReportAllocs()
 	for b.Loop() {
-		for _, reqHostname := range testHostnames {
+		for _, reqHostname := range reqHostnames {
 			req.Hostname = reqHostname
 			res.Reset()
 
@@ -689,7 +689,7 @@ func FuzzDNSEngine_Match(f *testing.F) {
 	lists := []filterlist.Interface{
 		filterlist.NewString(&filterlist.StringConfig{
 			RulesText: rulesText,
-			ID:        testListID,
+			ID:        uftest.ListID1,
 		}),
 	}
 
@@ -730,8 +730,8 @@ const (
 func newRuleStorage(tb testing.TB) (ruleStorage *filterlist.RuleStorage) {
 	tb.Helper()
 
-	filterRuleList := ruleListFromPath(tb, networkFilterPath, testListID)
-	hostsRuleList := ruleListFromPath(tb, hostsPath, testListIDOther)
+	filterRuleList := ruleListFromPath(tb, networkFilterPath, uftest.ListID1)
+	hostsRuleList := ruleListFromPath(tb, hostsPath, uftest.ListID2)
 
 	ruleLists := []filterlist.Interface{
 		filterRuleList,
@@ -742,18 +742,4 @@ func newRuleStorage(tb testing.TB) (ruleStorage *filterlist.RuleStorage) {
 	require.NoError(tb, err)
 
 	return ruleStorage
-}
-
-// loadHostnames returns a slice of test hostnames.
-func loadHostnames(t *testing.B) (hostnames []string) {
-	t.Helper()
-
-	for _, req := range loadRequests(t) {
-		h := ufnet.ExtractHostname(req.URL)
-		if h != "" {
-			hostnames = append(hostnames, h)
-		}
-	}
-
-	return hostnames
 }

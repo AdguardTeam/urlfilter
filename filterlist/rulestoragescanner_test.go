@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/AdguardTeam/urlfilter/filterlist"
+	"github.com/AdguardTeam/urlfilter/internal/uftest"
 	"github.com/AdguardTeam/urlfilter/rules"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -16,8 +17,8 @@ func TestRuleStorageScanner(t *testing.T) {
 	l1 := strings.NewReader(testRuleText)
 	l2 := strings.NewReader(testRuleTextOther)
 
-	s1 := filterlist.NewRuleScanner(l1, testListID, false)
-	s2 := filterlist.NewRuleScanner(l2, testListIDOther, false)
+	s1 := filterlist.NewRuleScanner(l1, uftest.ListID1, false)
+	s2 := filterlist.NewRuleScanner(l2, uftest.ListID2, false)
 
 	// Now create the storage scanner.
 	storageScanner := &filterlist.RuleStorageScanner{
@@ -29,8 +30,8 @@ func TestRuleStorageScanner(t *testing.T) {
 	f, id := storageScanner.Rule()
 
 	assert.NotNil(t, f)
-	assert.Equal(t, testRuleDomain, f.Text())
-	assert.Equal(t, testListID, f.GetFilterListID())
+	assert.Equal(t, uftest.RuleHost, f.Text())
+	assert.Equal(t, uftest.ListID1, f.GetFilterListID())
 	assert.Equal(t, testStrgID1Rule1, id)
 
 	// Rule 2 from the list 1.
@@ -39,7 +40,7 @@ func TestRuleStorageScanner(t *testing.T) {
 
 	assert.NotNil(t, f)
 	assert.Equal(t, testRuleCosmetic, f.Text())
-	assert.Equal(t, testListID, f.GetFilterListID())
+	assert.Equal(t, uftest.ListID1, f.GetFilterListID())
 	assert.Equal(t, testStrgID1Rule2, id)
 
 	// Rule 1 from the list 2.
@@ -47,8 +48,8 @@ func TestRuleStorageScanner(t *testing.T) {
 	f, id = storageScanner.Rule()
 
 	assert.NotNil(t, f)
-	assert.Equal(t, "||example.com", f.Text())
-	assert.Equal(t, testListIDOther, f.GetFilterListID())
+	assert.Equal(t, uftest.RuleHostOther, f.Text())
+	assert.Equal(t, uftest.ListID2, f.GetFilterListID())
 	assert.Equal(t, testStrgID2Rule1, id)
 
 	// Rule 2 from the list 2.
@@ -57,7 +58,7 @@ func TestRuleStorageScanner(t *testing.T) {
 
 	assert.NotNil(t, f)
 	assert.Equal(t, "##advert", f.Text())
-	assert.Equal(t, testListIDOther, f.GetFilterListID())
+	assert.Equal(t, uftest.ListID2, f.GetFilterListID())
 	assert.Equal(t, testStrgID2Rule2, id)
 
 	// Now check that there's nothing to read.
@@ -71,8 +72,8 @@ func BenchmarkRuleStorageScanner_Scan(b *testing.B) {
 	r1 := strings.NewReader(testRuleText)
 	r2 := strings.NewReader(testRuleTextOther)
 
-	s1 := filterlist.NewRuleScanner(r1, testListID, false)
-	s2 := filterlist.NewRuleScanner(r2, testListIDOther, false)
+	s1 := filterlist.NewRuleScanner(r1, uftest.ListID1, false)
+	s2 := filterlist.NewRuleScanner(r2, uftest.ListID2, false)
 
 	s := &filterlist.RuleStorageScanner{
 		Scanners: []*filterlist.RuleScanner{s1, s2},

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/AdguardTeam/golibs/errors"
+	"github.com/AdguardTeam/urlfilter/internal/uftest"
 	"github.com/AdguardTeam/urlfilter/rules"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -11,17 +12,16 @@ import (
 
 // Test rules sources.
 const (
-	ruleSrcBlock     = "||" + testHostname + "^"
-	ruleSrcWhitelist = "@@" + ruleSrcBlock
+	ruleSrcWhitelist = "@@" + uftest.RuleHost
 )
 
 // Test rules.
 var (
-	blockingRule          = mustNewTestRule(ruleSrcBlock)
+	blockingRule          = mustNewTestRule(uftest.RuleHost)
 	whitelistRule         = mustNewTestRule(ruleSrcWhitelist)
 	whitelistDocumentRule = mustNewTestRule(ruleSrcWhitelist + "$document")
 
-	badFltRule                  = mustNewTestRule(ruleSrcBlock + "$badfilter")
+	badFltRule                  = mustNewTestRule(uftest.RuleHost + "$badfilter")
 	badFltWhitelistRule         = mustNewTestRule(ruleSrcWhitelist + "$badfilter")
 	badFltWhitelistDocumentRule = mustNewTestRule(ruleSrcWhitelist + "$document,badfilter")
 )
@@ -201,9 +201,9 @@ func TestMatchingResult_GetCosmeticOption(t *testing.T) {
 // TODO(ameshkov):  Add more tests!
 
 func TestGetDNSBasicRule(t *testing.T) {
-	blockRule := newTestNetworkRule(t, "example.block")
-	allowlistRule := newTestNetworkRule(t, "@@||example.allow^")
-	importantBlockRule := newTestNetworkRule(t, "example.block$important")
+	blockRule := uftest.NewNetworkRule(t, "example.block")
+	allowlistRule := uftest.NewNetworkRule(t, "@@||example.allow^")
+	importantBlockRule := uftest.NewNetworkRule(t, "example.block$important")
 
 	testCases := []struct {
 		want *rules.NetworkRule
@@ -238,7 +238,7 @@ func TestGetDNSBasicRule(t *testing.T) {
 		want: blockRule,
 		rs: []*rules.NetworkRule{
 			blockRule,
-			newTestNetworkRule(t, "@@||example.org^$stealth"),
+			uftest.NewNetworkRule(t, "@@||example.org^$stealth"),
 		},
 		name: "stealth",
 	}}
@@ -256,23 +256,13 @@ func newTestNetworkRules(tb testing.TB, lines []string) (rs []*rules.NetworkRule
 	tb.Helper()
 
 	for _, line := range lines {
-		rs = append(rs, newTestNetworkRule(tb, line))
+		rs = append(rs, uftest.NewNetworkRule(tb, line))
 	}
 
 	return rs
 }
 
-// newTestNetworkRule returns a network rule created from given source text.
-func newTestNetworkRule(tb testing.TB, srcText string) (r *rules.NetworkRule) {
-	tb.Helper()
-
-	r, err := rules.NewNetworkRule(srcText, testListID)
-	require.NoError(tb, err)
-
-	return r
-}
-
 // mustNewTestRule returns a network rule created from given source text.
 func mustNewTestRule(srcText string) (r *rules.NetworkRule) {
-	return errors.Must(rules.NewNetworkRule(srcText, testListID))
+	return errors.Must(rules.NewNetworkRule(srcText, uftest.ListID1))
 }

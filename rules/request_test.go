@@ -5,6 +5,7 @@ import (
 	"net/netip"
 	"testing"
 
+	"github.com/AdguardTeam/urlfilter/internal/uftest"
 	"github.com/AdguardTeam/urlfilter/rules"
 	"github.com/stretchr/testify/assert"
 )
@@ -21,10 +22,10 @@ func TestNewRequest(t *testing.T) {
 		want: &rules.Request{
 			ClientIP:          netip.Addr{},
 			ClientName:        "",
-			URL:               testURLStr,
-			URLLowerCase:      testURLStr,
-			Hostname:          testHostname,
-			Domain:            testHostname,
+			URL:               uftest.URLStrHost,
+			URLLowerCase:      uftest.URLStrHost,
+			Hostname:          uftest.Host,
+			Domain:            uftest.Host,
 			SourceURL:         "",
 			SourceHostname:    "",
 			SourceDomain:      "",
@@ -36,18 +37,18 @@ func TestNewRequest(t *testing.T) {
 		},
 		name:      "no_source",
 		sourceURL: "",
-		url:       testURLStr,
+		url:       uftest.URLStrHost,
 	}, {
 		want: &rules.Request{
 			ClientIP:          netip.Addr{},
 			ClientName:        "",
-			URL:               testURLStr,
-			URLLowerCase:      testURLStr,
-			Hostname:          testHostname,
-			Domain:            testHostname,
-			SourceURL:         testURLSubStr,
-			SourceHostname:    testHostnameSub,
-			SourceDomain:      testHostname,
+			URL:               uftest.URLStrHost,
+			URLLowerCase:      uftest.URLStrHost,
+			Hostname:          uftest.Host,
+			Domain:            uftest.Host,
+			SourceURL:         uftest.URLStrHostSub,
+			SourceHostname:    uftest.HostSub,
+			SourceDomain:      uftest.Host,
 			SortedClientTags:  nil,
 			RequestType:       rules.TypeOther,
 			DNSType:           0,
@@ -55,14 +56,14 @@ func TestNewRequest(t *testing.T) {
 			IsHostnameRequest: false,
 		},
 		name:      "source",
-		sourceURL: testURLSubStr,
-		url:       testURLStr,
+		sourceURL: uftest.URLStrHostSub,
+		url:       uftest.URLStrHost,
 	}, {
 		want: &rules.Request{
 			ClientIP:          netip.Addr{},
 			ClientName:        "",
-			URL:               testURLLongTLDStr,
-			URLLowerCase:      testURLLongTLDStr,
+			URL:               testURLStrDoubleTLD,
+			URLLowerCase:      testURLStrDoubleTLD,
 			Hostname:          testHostnameLongTLD,
 			Domain:            testHostnameLongTLD,
 			SourceURL:         "",
@@ -76,16 +77,16 @@ func TestNewRequest(t *testing.T) {
 		},
 		name:      "long_tld",
 		sourceURL: "",
-		url:       testURLLongTLDStr,
+		url:       testURLStrDoubleTLD,
 	}, {
 		want: &rules.Request{
 			ClientIP:          netip.Addr{},
 			ClientName:        "",
-			URL:               testURLStr,
-			URLLowerCase:      testURLStr,
-			Hostname:          testHostname,
-			Domain:            testHostname,
-			SourceURL:         testURLLongTLDStr,
+			URL:               uftest.URLStrHost,
+			URLLowerCase:      uftest.URLStrHost,
+			Hostname:          uftest.Host,
+			Domain:            uftest.Host,
+			SourceURL:         testURLStrDoubleTLD,
 			SourceHostname:    testHostnameLongTLD,
 			SourceDomain:      testHostnameLongTLD,
 			SortedClientTags:  nil,
@@ -95,8 +96,8 @@ func TestNewRequest(t *testing.T) {
 			IsHostnameRequest: false,
 		},
 		name:      "third_party",
-		sourceURL: testURLLongTLDStr,
-		url:       testURLStr,
+		sourceURL: testURLStrDoubleTLD,
+		url:       uftest.URLStrHost,
 	}}
 
 	for _, tc := range testCases {
@@ -143,14 +144,14 @@ func TestFillRequestForHostname(t *testing.T) {
 
 	req := rules.NewRequest("http://other.example/", "", rules.TypeOther)
 
-	rules.FillRequestForHostname(req, testHostname)
+	rules.FillRequestForHostname(req, uftest.Host)
 	assert.Equal(t, &rules.Request{
 		ClientIP:          netip.Addr{},
 		ClientName:        "",
-		URL:               testURLStr,
-		URLLowerCase:      testURLStr,
-		Hostname:          testHostname,
-		Domain:            testHostname,
+		URL:               uftest.URLStrHost,
+		URLLowerCase:      uftest.URLStrHost,
+		Hostname:          uftest.Host,
+		Domain:            uftest.Host,
 		SourceURL:         "",
 		SourceHostname:    "",
 		SourceDomain:      "",
@@ -167,16 +168,16 @@ func BenchmarkFillRequestForHostname(b *testing.B) {
 
 	b.ReportAllocs()
 	for b.Loop() {
-		rules.FillRequestForHostname(req, testHostname)
+		rules.FillRequestForHostname(req, uftest.Host)
 	}
 
 	assert.Equal(b, &rules.Request{
 		ClientIP:          netip.Addr{},
 		ClientName:        "",
-		URL:               testURLStr,
-		URLLowerCase:      testURLStr,
-		Hostname:          testHostname,
-		Domain:            testHostname,
+		URL:               uftest.URLStrHost,
+		URLLowerCase:      uftest.URLStrHost,
+		Hostname:          uftest.Host,
+		Domain:            uftest.Host,
 		SourceURL:         "",
 		SourceHostname:    "",
 		SourceDomain:      "",

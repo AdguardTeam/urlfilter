@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/AdguardTeam/urlfilter/filterlist"
+	"github.com/AdguardTeam/urlfilter/internal/uftest"
 	"github.com/AdguardTeam/urlfilter/rules"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -15,14 +16,14 @@ func TestRuleScanner_stringReader(t *testing.T) {
 	t.Parallel()
 
 	r := strings.NewReader(testRuleText)
-	scanner := filterlist.NewRuleScanner(r, testListID, false)
+	scanner := filterlist.NewRuleScanner(r, uftest.ListID1, false)
 
 	assert.True(t, scanner.Scan())
 	f, idx := scanner.Rule()
 
 	assert.NotNil(t, f)
-	assert.Equal(t, testRuleDomain, f.Text())
-	assert.Equal(t, testListID, f.GetFilterListID())
+	assert.Equal(t, uftest.RuleHost, f.Text())
+	assert.Equal(t, uftest.ListID1, f.GetFilterListID())
 	assert.Equal(t, int64(0), idx)
 
 	assert.True(t, scanner.Scan())
@@ -30,7 +31,7 @@ func TestRuleScanner_stringReader(t *testing.T) {
 
 	assert.NotNil(t, f)
 	assert.Equal(t, testRuleCosmetic, f.Text())
-	assert.Equal(t, testListID, f.GetFilterListID())
+	assert.Equal(t, uftest.ListID1, f.GetFilterListID())
 	assert.Equal(t, cosmeticRuleIndex, idx)
 
 	assert.False(t, scanner.Scan())
@@ -43,7 +44,7 @@ func TestRuleScanner_fileReader(t *testing.T) {
 	file, err := os.Open(hostsPath)
 	require.NoError(t, err)
 
-	scanner := filterlist.NewRuleScanner(file, testListID, true)
+	scanner := filterlist.NewRuleScanner(file, uftest.ListID1, true)
 	rulesCount := 0
 	for scanner.Scan() {
 		f, id := scanner.Rule()
@@ -59,7 +60,7 @@ func TestRuleScanner_fileReader(t *testing.T) {
 
 func BenchmarkRuleScanner_Scan(b *testing.B) {
 	r := strings.NewReader(testRuleText)
-	s := filterlist.NewRuleScanner(r, testListID, false)
+	s := filterlist.NewRuleScanner(r, uftest.ListID1, false)
 
 	var rule rules.Rule
 	b.ReportAllocs()

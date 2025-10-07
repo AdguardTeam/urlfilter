@@ -32,21 +32,23 @@ fi
 readonly race_flags
 
 go="${GO:-go}"
+readonly go
 
+benchtime_flags="${BENCHTIME_FLAGS:---benchtime=1s}"
 count_flags='--count=1'
 shuffle_flags='--shuffle=on'
 timeout_flags="${TIMEOUT_FLAGS:---timeout=30s}"
-readonly go count_flags shuffle_flags timeout_flags
+readonly benchtime_flags count_flags shuffle_flags timeout_flags
 
 "$go" test \
+	"$benchtime_flags" \
 	"$count_flags" \
-	"$shuffle_flags" \
 	"$race_flags" \
+	"$shuffle_flags" \
 	"$timeout_flags" \
-	"$x_flags" \
 	"$v_flags" \
+	"$x_flags" \
 	--bench='.' \
 	--benchmem \
-	--benchtime='1s' \
 	--run='^$' \
 	./...

@@ -5,6 +5,7 @@ import (
 	"path"
 	"testing"
 
+	"github.com/AdguardTeam/urlfilter/internal/uftest"
 	"github.com/AdguardTeam/urlfilter/rules"
 	"github.com/miekg/dns"
 	"github.com/stretchr/testify/assert"
@@ -69,7 +70,7 @@ func TestDNSResult_DNSRewrites(t *testing.T) {
 @@||priority-disable-exc-important^$important,dnsrewrite=127.0.0.1
 `
 
-	ruleStorage := newTestRuleStorage(t, testListID, rulesText)
+	ruleStorage := newTestRuleStorage(t, uftest.ListID1, rulesText)
 	dnsEngine := NewDNSEngine(ruleStorage)
 	assert.NotNil(t, dnsEngine)
 
@@ -301,7 +302,7 @@ func TestDNSEngine_MatchRequest_dnsRewrite(t *testing.T) {
 |srv-record^$dnsrewrite=NOERROR;SRV;30 60 8080 srv-record-host
 `
 
-	ruleStorage := newTestRuleStorage(t, testListID, rulesText)
+	ruleStorage := newTestRuleStorage(t, uftest.ListID1, rulesText)
 	dnsEngine := NewDNSEngine(ruleStorage)
 	assert.NotNil(t, dnsEngine)
 

@@ -4,33 +4,23 @@ import (
 	"strings"
 
 	"github.com/AdguardTeam/urlfilter/filterlist"
-	"github.com/AdguardTeam/urlfilter/rules"
+	"github.com/AdguardTeam/urlfilter/internal/uftest"
 )
-
-// Common list IDs for tests.
-const (
-	testListID      rules.ListID = 1
-	testListIDOther rules.ListID = 2
-)
-
-// Common domains for tests.
-const testDomain = "test.example"
 
 // Common rules for tests.
 const (
-	testRuleDomain   = "||" + testDomain
 	testRuleCosmetic = "##banner"
 	testComment      = "! comment"
 )
 
 // Common text rules for tests.
 const (
-	testRuleTextDomain   = testRuleDomain + "\n"
+	testRuleTextDomain   = uftest.RuleHost + "\n"
 	testRuleTextCosmetic = testRuleCosmetic + "\n"
 	testCommentText      = testComment + "\n"
 
 	testRuleText      = testRuleTextDomain + testCommentText + testRuleTextCosmetic
-	testRuleTextOther = "||example.com\n! test\n##advert\n"
+	testRuleTextOther = uftest.RuleHostOther + "\n! test\n##advert\n"
 )
 
 const (
@@ -54,8 +44,8 @@ var cosmeticRuleIndex = int64(strings.Index(testRuleText, testRuleCosmetic))
 //
 // NOTE:  Keep in sync with [testRuleText] and [testRuleTextOther].
 var (
-	testStrgID1Rule1 = filterlist.NewStorageID(testListID, 0)
-	testStrgID1Rule2 = filterlist.NewStorageID(testListID, 25)
-	testStrgID2Rule1 = filterlist.NewStorageID(testListIDOther, 0)
-	testStrgID2Rule2 = filterlist.NewStorageID(testListIDOther, 21)
+	testStrgID1Rule1 = filterlist.NewStorageID(uftest.ListID1, 0)
+	testStrgID1Rule2 = filterlist.NewStorageID(uftest.ListID1, 26)
+	testStrgID2Rule1 = filterlist.NewStorageID(uftest.ListID2, 0)
+	testStrgID2Rule2 = filterlist.NewStorageID(uftest.ListID2, 24)
 )

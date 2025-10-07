@@ -81,7 +81,6 @@ require (
 ignore (
 	/bin/
 	/test-reports/
-	/testdata/
 	/tmp/
 )
 

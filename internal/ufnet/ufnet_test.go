@@ -6,6 +6,7 @@ import (
 
 	"github.com/AdguardTeam/golibs/netutil"
 	"github.com/AdguardTeam/urlfilter/internal/ufnet"
+	"github.com/AdguardTeam/urlfilter/internal/uftest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -21,16 +22,16 @@ func TestExtractHostname(t *testing.T) {
 		want: "",
 	}, {
 		name: "http",
-		in:   "http://example.com",
-		want: "example.com",
+		in:   uftest.URLStrHost,
+		want: uftest.Host,
 	}, {
 		name: "http_port",
-		in:   "http://example.com:80",
-		want: "example.com",
+		in:   uftest.URLStrHost + ":80",
+		want: uftest.Host,
 	}, {
 		name: "http_path",
-		in:   "http://example.com/",
-		want: "example.com",
+		in:   uftest.URLStrHost + "/",
+		want: uftest.Host,
 	}, {
 		name: "path",
 		in:   "/foo?query=bar",
@@ -64,11 +65,6 @@ func TestExtractHostname(t *testing.T) {
 }
 
 func BenchmarkExtractHostname(b *testing.B) {
-	const (
-		exampleURL  = "http://example.com"
-		exampleHost = "example.com"
-	)
-
 	// Compare custom implementation of hostname extraction against a solution
 	// using the standard library.
 	b.Run("no_std", func(b *testing.B) {
@@ -76,10 +72,10 @@ func BenchmarkExtractHostname(b *testing.B) {
 
 		b.ReportAllocs()
 		for b.Loop() {
-			got = ufnet.ExtractHostname(exampleURL)
+			got = ufnet.ExtractHostname(uftest.URLStrHost)
 		}
 
-		assert.Equal(b, exampleHost, got)
+		assert.Equal(b, uftest.Host, got)
 	})
 
 	b.Run("std", func(b *testing.B) {
@@ -87,10 +83,10 @@ func BenchmarkExtractHostname(b *testing.B) {
 
 		b.ReportAllocs()
 		for b.Loop() {
-			got = extractHostnameStd(exampleURL)
+			got = extractHostnameStd(uftest.URLStrHost)
 		}
 
-		assert.Equal(b, exampleHost, got)
+		assert.Equal(b, uftest.Host, got)
 	})
 
 	// Most recent results:
@@ -116,6 +112,9 @@ func extractHostnameStd(addr string) (hostname string) {
 
 func FuzzExtractHostname(f *testing.F) {
 	testCases := []string{
+		uftest.URLStrHost,
+		uftest.URLStrHostOther,
+		uftest.URLStrHostSub,
 		"http://www.example.com/",
 		"http://user@www.example.com/",
 		"http://user%20space@www.example.com/",

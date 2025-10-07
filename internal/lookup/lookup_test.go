@@ -7,6 +7,7 @@ import (
 	"github.com/AdguardTeam/golibs/errors"
 	"github.com/AdguardTeam/urlfilter/filterlist"
 	"github.com/AdguardTeam/urlfilter/internal/lookup"
+	"github.com/AdguardTeam/urlfilter/internal/uftest"
 	"github.com/AdguardTeam/urlfilter/rules"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -14,18 +15,16 @@ import (
 
 // Common domains for tests.
 const (
-	testDomain      = "domain.example"
-	testDomainNoMod = "nomod.domain.example"
-	testDomainSub   = "sub.domain.example"
+	testDomainNoMod = "nomod." + uftest.Host
 )
 
 // Common rules for tests.
 const (
-	testRule                = "||" + testDomain + "^"
+	testRule                = "||" + uftest.Host + "^"
 	testRuleNoDomain        = "||" + testDomainNoMod + "^"
 	testRuleNoShortcutsTiny = "||tiny^"
 	testRuleNoShortcutsURL  = "|ws://^"
-	testRuleWithDomain      = "||" + testDomainSub + "^$domain=" + testDomain
+	testRuleWithDomain      = "||" + uftest.HostSub + "^$domain=" + uftest.Host
 )
 
 // Common text rules for tests.
@@ -45,10 +44,7 @@ const (
 
 // Common URL strings for tests.
 const (
-	testURLStrNoDomain      = "https://" + testDomainNoMod + "/"
-	testURLStrNoMatch       = "https://no-match.example/"
-	testURLStrWithDomain    = "https://" + testDomain + "/"
-	testURLStrWithSubdomain = "https://" + testDomainSub + "/"
+	testURLStrNoDomain = "https://" + testDomainNoMod + "/"
 )
 
 // Common constants from the AdGuard Base Filter for tests.

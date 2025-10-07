@@ -1,19 +1,14 @@
 package urlfilter
 
 import (
-	"archive/zip"
-	"bufio"
-	"encoding/json"
-	"io"
 	"os"
-	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
 
-	"github.com/AdguardTeam/golibs/errors"
 	"github.com/AdguardTeam/golibs/testutil"
 	"github.com/AdguardTeam/urlfilter/filterlist"
+	"github.com/AdguardTeam/urlfilter/internal/uftest"
 	"github.com/AdguardTeam/urlfilter/rules"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -22,19 +17,10 @@ import (
 const (
 	testResourcesDir = "testdata"
 	filterPath       = testResourcesDir + "/easylist.txt"
-	requestsPath     = testResourcesDir + "/requests.json"
 )
 
-type testRequest struct {
-	Line        string
-	URL         string `json:"url"`
-	FrameURL    string `json:"frameUrl"`
-	RequestType string `json:"cpt"`
-	LineNumber  int
-}
-
 func TestEmptyNetworkEngine(t *testing.T) {
-	ruleStorage := newTestRuleStorage(t, testListID, "")
+	ruleStorage := newTestRuleStorage(t, uftest.ListID1, "")
 	engine := NewNetworkEngine(ruleStorage)
 	r := rules.NewRequest("http://example.org/", "", rules.TypeOther)
 	rule, ok := engine.Match(r)
@@ -46,7 +32,7 @@ func TestMatchWhitelistRule(t *testing.T) {
 	r1 := "||example.org^$script"
 	r2 := "@@http://example.org^"
 	rulesText := strings.Join([]string{r1, r2}, "\n")
-	ruleStorage := newTestRuleStorage(t, testListID, rulesText)
+	ruleStorage := newTestRuleStorage(t, uftest.ListID1, rulesText)
 	engine := NewNetworkEngine(ruleStorage)
 
 	r := rules.NewRequest("http://example.org/", "", rules.TypeScript)
@@ -61,7 +47,7 @@ func TestMatchImportantRule(t *testing.T) {
 	r2 := "@@||example.org^"
 	r3 := "||test1.example.org^"
 	rulesText := strings.Join([]string{r1, r2, r3}, "\n")
-	ruleStorage := newTestRuleStorage(t, testListID, rulesText)
+	ruleStorage := newTestRuleStorage(t, uftest.ListID1, rulesText)
 	engine := NewNetworkEngine(ruleStorage)
 
 	r := rules.NewRequest("http://example.org/", "", rules.TypeOther)
@@ -85,7 +71,7 @@ func TestMatchImportantRule(t *testing.T) {
 
 func TestMatchSourceRule(t *testing.T) {
 	ruleText := "|https://$image,media,script,third-party,domain=~feedback.pornhub.com|pornhub.com|redtube.com|redtube.com.br|tube8.com|tube8.es|tube8.fr|youporn.com|youporngay.com"
-	ruleStorage := newTestRuleStorage(t, testListID, ruleText)
+	ruleStorage := newTestRuleStorage(t, uftest.ListID1, ruleText)
 	engine := NewNetworkEngine(ruleStorage)
 
 	url := "https://ci.phncdn.com/videos/201809/25/184777011/original/(m=ecuKGgaaaa)(mh=VSmV9NL_iouBcWJJ)4.jpg"
@@ -100,7 +86,7 @@ func TestMatchSourceRule(t *testing.T) {
 func TestMatchSimplePattern(t *testing.T) {
 	// Simple pattern rule
 	ruleText := "_prebid_"
-	ruleStorage := newTestRuleStorage(t, testListID, ruleText)
+	ruleStorage := newTestRuleStorage(t, uftest.ListID1, ruleText)
 	engine := NewNetworkEngine(ruleStorage)
 
 	url := "https://ap.lijit.com/rtb/bid?src=prebid_prebid_1.35.0"
@@ -127,7 +113,7 @@ func TestMatchSimplePattern(t *testing.T) {
 // to get a better picture of the real changes in performance.
 func BenchmarkNetworkEngine_heapAlloc(b *testing.B) {
 	var requests []*rules.Request
-	testRequests := loadRequests(b)
+	testRequests := uftest.ParseRequests(b)
 	for _, req := range testRequests {
 		req := rules.NewRequest(req.URL, req.FrameURL, reqTypeToInternal(req.RequestType))
 		requests = append(requests, req)
@@ -225,7 +211,7 @@ func FuzzNetworkEngine_Match(f *testing.F) {
 	lists := []filterlist.Interface{
 		filterlist.NewString(&filterlist.StringConfig{
 			RulesText:      rulesText,
-			ID:             testListID,
+			ID:             uftest.ListID1,
 			IgnoreCosmetic: true,
 		}),
 	}
@@ -244,11 +230,6 @@ func FuzzNetworkEngine_Match(f *testing.F) {
 	})
 }
 
-func isSupportedURL(url string) bool {
-	return url != "" && (strings.HasPrefix(url, "http") ||
-		strings.HasPrefix(url, "ws"))
-}
-
 // newTestNetworkEngine returns a new NetworkEngine initialized with the rules
 // from filterPath.
 func newTestNetworkEngine(tb testing.TB) (engine *NetworkEngine) {
@@ -260,7 +241,7 @@ func newTestNetworkEngine(tb testing.TB) (engine *NetworkEngine) {
 	lists := []filterlist.Interface{
 		filterlist.NewBytes(&filterlist.BytesConfig{
 			RulesText:      filterBytes,
-			ID:             testListID,
+			ID:             uftest.ListID1,
 			IgnoreCosmetic: true,
 		}),
 	}
@@ -281,107 +262,4 @@ func newTestRuleStorage(t *testing.T, id rules.ListID, text string) (s *filterli
 	require.NoError(t, err)
 
 	return s
-}
-
-// loadRequests loads requests for tests from the testdata.
-func loadRequests(tb testing.TB) (requests []testRequest) {
-	tb.Helper()
-
-	if _, err := os.Stat(requestsPath); errors.Is(err, os.ErrNotExist) {
-		err = unzip(requestsPath+".zip", testResourcesDir)
-		if err != nil {
-			tb.Fatalf("cannot unzip %s.zip", requestsPath)
-		}
-	}
-
-	file, err := os.Open(requestsPath)
-	if err != nil {
-		tb.Fatalf("cannot load %s: %s", requestsPath, err)
-	}
-	testutil.CleanupAndRequireSuccess(tb, file.Close)
-
-	scanner := bufio.NewScanner(file)
-	lineNumber := 0
-	for scanner.Scan() {
-		lineNumber++
-		line := strings.TrimSpace(scanner.Text())
-		if line != "" {
-			var req testRequest
-			err = json.Unmarshal([]byte(line), &req)
-			if err == nil && isSupportedURL(req.URL) && isSupportedURL(req.FrameURL) {
-				req.Line = line
-				req.LineNumber = lineNumber
-				requests = append(requests, req)
-			}
-		}
-	}
-
-	if err = scanner.Err(); err != nil {
-		tb.Fatal(err)
-	}
-
-	return requests
-}
-
-func unzip(src, dest string) (err error) {
-	r, err := zip.OpenReader(src)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if err = r.Close(); err != nil {
-			panic(err)
-		}
-	}()
-
-	_ = os.MkdirAll(dest, 0o755)
-
-	// Closure to address file descriptors issue with all the deferred .Close() methods
-	extractAndWriteFile := func(zipFile *zip.File) (err error) {
-		var rc io.ReadCloser
-		rc, err = zipFile.Open()
-		if err != nil {
-			return err
-		}
-
-		defer func() {
-			if rcErr := rc.Close(); err != nil {
-				panic(rcErr)
-			}
-		}()
-
-		path := filepath.Join(dest, zipFile.Name)
-
-		if zipFile.FileInfo().IsDir() {
-			_ = os.MkdirAll(path, zipFile.Mode())
-		} else {
-			_ = os.MkdirAll(filepath.Dir(path), zipFile.Mode())
-
-			var f *os.File
-			f, err = os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, zipFile.Mode())
-			if err != nil {
-				return err
-			}
-			defer func() {
-				if cerr := f.Close(); cerr != nil {
-					panic(cerr)
-				}
-			}()
-
-			_, err = io.Copy(f, rc)
-			if err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-
-	for _, f := range r.File {
-		err = extractAndWriteFile(f)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
 }

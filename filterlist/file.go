@@ -80,6 +80,7 @@ func NewFile(conf *FileConfig) (f *File, err error) {
 		return nil, fmt.Errorf("getting fileinfo for size estimation: %w", err)
 	}
 
+	// #nosec G115 -- Files cannot have negative sizes.
 	f.size = datasize.ByteSize(fi.Size())
 
 	return f, nil
