@@ -54,7 +54,7 @@ func NewNetworkEngineSkipStorageScan(s *filterlist.RuleStorage) (engine *Network
 		lookupTables: []lookup.Table{
 			lookup.NewShortcutsTable(s),
 			lookup.NewDomainsTable(s),
-			&lookup.SeqScanTable{},
+			lookup.NewSeqScanTable(),
 		},
 	}
 }

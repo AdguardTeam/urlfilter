@@ -13,7 +13,7 @@ import (
 func TestSeqScanTable_Add(t *testing.T) {
 	t.Parallel()
 
-	tbl := &lookup.SeqScanTable{}
+	tbl := lookup.NewSeqScanTable()
 	s := newStorage(t, testRuleText)
 
 	require.True(t, t.Run("first", func(t *testing.T) {
@@ -29,7 +29,7 @@ func TestSeqScanTable_AppendMatching(t *testing.T) {
 	t.Parallel()
 
 	s := newStorage(t, testRuleTextAll)
-	tbl := &lookup.SeqScanTable{}
+	tbl := lookup.NewSeqScanTable()
 	loadTable(t, tbl, s)
 
 	testCases := []struct {
@@ -58,7 +58,7 @@ func TestSeqScanTable_AppendMatching(t *testing.T) {
 
 func BenchmarkSeqScanTable_AppendMatching(b *testing.B) {
 	s := newStorage(b, testRuleTextAll)
-	tbl := &lookup.SeqScanTable{}
+	tbl := lookup.NewSeqScanTable()
 	loadTable(b, tbl, s)
 
 	r := rules.NewRequest(uftest.URLStrHost, uftest.URLStrHost, rules.TypeOther)
@@ -85,7 +85,7 @@ func BenchmarkSeqScanTable_AppendMatching(b *testing.B) {
 
 func BenchmarkSeqScanTable_AppendMatching_baseFilter(b *testing.B) {
 	s := newStorage(b, string(baseFilterData))
-	tbl := &lookup.SeqScanTable{}
+	tbl := lookup.NewSeqScanTable()
 	loadTable(b, tbl, s)
 
 	r := rules.NewRequest(testURLStrBaseFilterDomain, testURLStrBaseFilterDomain, rules.TypeOther)
@@ -117,7 +117,7 @@ func BenchmarkSeqScanTable_AppendMatching_baseFilter(b *testing.B) {
 
 func BenchmarkSeqScanTable_init_baseFilter(b *testing.B) {
 	s := newStorage(b, string(baseFilterData))
-	tbl := &lookup.SeqScanTable{}
+	tbl := lookup.NewSeqScanTable()
 
 	// Warmup to fill the slice and the pools.
 	loadTable(b, tbl, s)
@@ -133,5 +133,5 @@ func BenchmarkSeqScanTable_init_baseFilter(b *testing.B) {
 	// TODO(a.garipov):  Benchmark against decoding of a binary format.
 
 	// Most recent results:
-	//	BenchmarkSeqScanTable_init_baseFilter/add-16  	       1	11827496076 ns/op	59355352 B/op	  752847 allocs/op
+	//	BenchmarkSeqScanTable_init_baseFilter/add-16         	      12	  85245146 ns/op	59263900 B/op	  752826 allocs/op
 }
