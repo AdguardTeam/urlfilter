@@ -150,63 +150,99 @@ func TestClientTags(t *testing.T) {
 	assert.NotNil(t, dnsEngine)
 
 	// global rule
-	res, ok := dnsEngine.MatchRequest(&DNSRequest{Hostname: "host1", SortedClientTags: []string{"phone"}})
+	res, ok := dnsEngine.MatchRequest(&DNSRequest{
+		Hostname:         "host1",
+		SortedClientTags: []string{"phone"},
+	})
 	assert.True(t, ok)
 	assert.NotNil(t, res.NetworkRule)
 	assert.Equal(t, "||host1^", res.NetworkRule.Text())
 
 	// $ctag rule overrides global rule
-	res, ok = dnsEngine.MatchRequest(&DNSRequest{Hostname: "host1", SortedClientTags: []string{"pc"}})
+	res, ok = dnsEngine.MatchRequest(&DNSRequest{
+		Hostname:         "host1",
+		SortedClientTags: []string{"pc"},
+	})
 	assert.True(t, ok)
 	assert.NotNil(t, res.NetworkRule)
 	assert.Equal(t, "||host1^$ctag=pc|printer", res.NetworkRule.Text())
 
 	// 1 tag matches
-	res, ok = dnsEngine.MatchRequest(&DNSRequest{Hostname: "host2", SortedClientTags: []string{"phone", "printer"}})
+	res, ok = dnsEngine.MatchRequest(&DNSRequest{
+		Hostname:         "host2",
+		SortedClientTags: []string{"phone", "printer"},
+	})
 	assert.True(t, ok)
 	assert.NotNil(t, res.NetworkRule)
 	assert.Equal(t, "||host2^$ctag=pc|printer", res.NetworkRule.Text())
 
 	// tags don't match
-	_, ok = dnsEngine.MatchRequest(&DNSRequest{Hostname: "host2", SortedClientTags: []string{"phone"}})
+	_, ok = dnsEngine.MatchRequest(&DNSRequest{
+		Hostname:         "host2",
+		SortedClientTags: []string{"phone"},
+	})
 	assert.False(t, ok)
 
 	// tags don't match
-	_, ok = dnsEngine.MatchRequest(&DNSRequest{Hostname: "host2", SortedClientTags: []string{}})
+	_, ok = dnsEngine.MatchRequest(&DNSRequest{
+		Hostname:         "host2",
+		SortedClientTags: []string{},
+	})
 	assert.False(t, ok)
 
 	// 1 tag matches (exclusion)
-	res, ok = dnsEngine.MatchRequest(&DNSRequest{Hostname: "host3", SortedClientTags: []string{"phone", "printer"}})
+	res, ok = dnsEngine.MatchRequest(&DNSRequest{
+		Hostname:         "host3",
+		SortedClientTags: []string{"phone", "printer"},
+	})
 	assert.True(t, ok)
 	assert.NotNil(t, res.NetworkRule)
 	assert.Equal(t, "||host3^$ctag=~pc|~router", res.NetworkRule.Text())
 
 	// 1 tag matches (exclusion)
-	res, ok = dnsEngine.MatchRequest(&DNSRequest{Hostname: "host4", SortedClientTags: []string{"phone", "router"}})
+	res, ok = dnsEngine.MatchRequest(&DNSRequest{
+		Hostname:         "host4",
+		SortedClientTags: []string{"phone", "router"},
+	})
 	assert.True(t, ok)
 	assert.NotNil(t, res.NetworkRule)
 	assert.Equal(t, "||host4^$ctag=~pc|router", res.NetworkRule.Text())
 
 	// tags don't match (exclusion)
-	_, ok = dnsEngine.MatchRequest(&DNSRequest{Hostname: "host3", SortedClientTags: []string{"pc"}})
+	_, ok = dnsEngine.MatchRequest(&DNSRequest{
+		Hostname:         "host3",
+		SortedClientTags: []string{"pc"},
+	})
 	assert.False(t, ok)
 
 	// tags don't match (exclusion)
-	_, ok = dnsEngine.MatchRequest(&DNSRequest{Hostname: "host4", SortedClientTags: []string{"pc", "router"}})
+	_, ok = dnsEngine.MatchRequest(&DNSRequest{
+		Hostname:         "host4",
+		SortedClientTags: []string{"pc", "router"},
+	})
 	assert.False(t, ok)
 
 	// tags match but it's a $badfilter
-	_, ok = dnsEngine.MatchRequest(&DNSRequest{Hostname: "host5", SortedClientTags: []string{"pc"}})
+	_, ok = dnsEngine.MatchRequest(&DNSRequest{
+		Hostname:         "host5",
+		SortedClientTags: []string{"pc"},
+	})
 	assert.False(t, ok)
 
 	// tags match and $badfilter rule disables global rule
-	res, ok = dnsEngine.MatchRequest(&DNSRequest{Hostname: "host6", SortedClientTags: []string{"pc"}})
+	res, ok = dnsEngine.MatchRequest(&DNSRequest{
+		Hostname:         "host6",
+		SortedClientTags: []string{"pc"},
+	})
 	assert.True(t, ok)
 	assert.NotNil(t, res.NetworkRule)
 	assert.Equal(t, "||host6^$ctag=pc|printer", res.NetworkRule.Text())
 
 	// tags match (exclusion) but it's a $badfilter
-	_, ok = dnsEngine.MatchRequest(&DNSRequest{Hostname: "host7", SortedClientTags: []string{"phone"}})
+	_, ok = dnsEngine.MatchRequest(&DNSRequest{
+		Hostname:         "host7",
+		SortedClientTags: []string{"phone"},
+	})
 	assert.False(t, ok)
 }
 
@@ -551,11 +587,11 @@ func BenchmarkDNSEngine_heapAlloc(b *testing.B) {
 	b.ReportMetric(m.afterMatchingSum/n, "heap_after_matching_bytes/op")
 
 	// Most recent results:
-	//	goos: linux
-	//	goarch: amd64
+	//	goos: darwin
+	//	goarch: arm64
 	//	pkg: github.com/AdguardTeam/urlfilter
-	//	cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
-	//	BenchmarkDNSEngine_heapAlloc-16    	      94	 113303068 ns/op	  38486302 heap_after_compilation_bytes/op	  33066761 heap_after_matching_bytes/op	  17602636 heap_initial_bytes/op	35476597 B/op	  507272 allocs/op
+	//	cpu: Apple M3
+	//	BenchmarkDNSEngine_heapAlloc-8   	      20	  52513985 ns/op	  31019140 heap_after_compilation_bytes/op	  29662390 heap_after_matching_bytes/op	  17230457 heap_initial_bytes/op	36453777 B/op	  482384 allocs/op
 }
 
 // dnsEngineMeasurement emulates a life cycle of a DNS filtering engine.

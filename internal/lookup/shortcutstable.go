@@ -16,12 +16,6 @@ const shortcutLength = 5
 // shortcut is a single shortcut.
 type shortcut string
 
-// shortcutInfo contains the data for a shortcut, including the count of hits.
-type shortcutInfo struct {
-	ids   []filterlist.StorageID
-	count uint64
-}
-
 // ShortcutsTable is a [Table] that relies on the rule shortcuts to quickly find
 // matching rules:
 //
@@ -40,7 +34,7 @@ type ShortcutsTable struct {
 	shortcutsPool *syncutil.Pool[[]shortcut]
 
 	// shortcuts is the index of a shortcut to its data.
-	shortcuts map[shortcut]*shortcutInfo
+	shortcuts map[shortcut][]filterlist.StorageID
 }
 
 // shortcutsInARuleEst is the estimate for the number of shortcuts in a rule
@@ -52,7 +46,7 @@ const shortcutsInARuleEst = 16
 func NewShortcutsTable(rs *filterlist.RuleStorage) (t *ShortcutsTable) {
 	return &ShortcutsTable{
 		ruleStorage:   rs,
-		shortcuts:     map[shortcut]*shortcutInfo{},
+		shortcuts:     map[shortcut][]filterlist.StorageID{},
 		shortcutsPool: syncutil.NewSlicePool[shortcut](shortcutsInARuleEst),
 	}
 }
@@ -71,28 +65,23 @@ func (t *ShortcutsTable) Add(f *rules.NetworkRule, id filterlist.StorageID) (ok 
 	}
 
 	var minSC shortcut
-	var minSCInfo *shortcutInfo
-	minCount := uint64(math.MaxUint64)
+	minLen := uint64(math.MaxUint64)
 	for _, sc := range *shortcutsPtr {
-		scInfo := t.shortcuts[sc]
+		scIDs := t.shortcuts[sc]
 
-		if scInfo == nil {
+		if scIDs == nil {
 			minSC = sc
-			minSCInfo = &shortcutInfo{}
-
 			break
 		}
 
-		if scInfo.count < minCount {
-			minCount = scInfo.count
+		lenSCIds := uint64(len(scIDs))
+		if lenSCIds < minLen {
+			minLen = lenSCIds
 			minSC = sc
-			minSCInfo = scInfo
 		}
 	}
 
-	t.shortcuts[minSC] = minSCInfo
-	minSCInfo.count++
-	minSCInfo.ids = append(minSCInfo.ids, id)
+	t.shortcuts[minSC] = append(t.shortcuts[minSC], id)
 
 	return true
 }
@@ -111,12 +100,9 @@ func (t *ShortcutsTable) AppendMatching(
 
 	for i := range l - shortcutLength {
 		sc := shortcut(r.URLLowerCase[i : i+shortcutLength])
-		scInfo := t.shortcuts[sc]
-		if scInfo == nil {
-			continue
-		}
+		scIDs := t.shortcuts[sc]
 
-		for _, id := range scInfo.ids {
+		for _, id := range scIDs {
 			rule := t.ruleStorage.RetrieveNetworkRule(id)
 
 			// Make sure that the same rule isn't returned twice.  This happens

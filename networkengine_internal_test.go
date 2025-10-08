@@ -133,11 +133,11 @@ func BenchmarkNetworkEngine_heapAlloc(b *testing.B) {
 	b.ReportMetric(m.afterMatchingSum/n, "heap_after_matching_bytes/op")
 
 	// Most recent results:
-	//	goos: linux
-	//	goarch: amd64
+	//	goos: darwin
+	//	goarch: arm64
 	//	pkg: github.com/AdguardTeam/urlfilter
-	//	cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
-	//	BenchmarkNetworkEngine_heapAlloc-16    	      18	 649456831 ns/op	  27444455 heap_after_compilation_bytes/op	  39593128 heap_after_matching_bytes/op	  17089210 heap_initial_bytes/op	51517401 B/op	  515127 allocs/op
+	//	cpu: Apple M3
+	//	BenchmarkNetworkEngine_heapAlloc-8   	       3	 386104320 ns/op	  27992808 heap_after_compilation_bytes/op	  34492312 heap_after_matching_bytes/op	  16833339 heap_initial_bytes/op	53293706 B/op	  478824 allocs/op
 }
 
 // networkEngineMeasurement emulates a life cycle of a network filtering engine.

@@ -93,11 +93,11 @@ func BenchmarkShortcutsTable_AppendMatching(b *testing.B) {
 	require.Len(b, gotRules, 1)
 
 	// Most recent results:
-	//	goos: linux
-	//	goarch: amd64
+	//	goos: darwin
+	//	goarch: arm64
 	//	pkg: github.com/AdguardTeam/urlfilter/internal/lookup
-	//	cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
-	//	BenchmarkShortcutsTable_AppendMatching-16    	 1000000	      1088 ns/op	       0 B/op	       0 allocs/op
+	//	cpu: Apple M3
+	//	BenchmarkShortcutsTable_AppendMatching-8   	 2285751	       515.7 ns/op	       0 B/op	       0 allocs/op
 }
 
 func BenchmarkShortcutsTable_AppendMatching_baseFilter(b *testing.B) {
@@ -125,11 +125,11 @@ func BenchmarkShortcutsTable_AppendMatching_baseFilter(b *testing.B) {
 	assert.True(b, matched)
 
 	// Most recent results:
-	//	goos: linux
-	//	goarch: amd64
+	//	goos: darwin
+	//	goarch: arm64
 	//	pkg: github.com/AdguardTeam/urlfilter/internal/lookup
-	//	cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
-	//	BenchmarkShortcutsTable_AppendMatching_baseFilter-16    	   98634	     12114 ns/op	       0 B/op	       0 allocs/op
+	//	cpu: Apple M3
+	//	BenchmarkShortcutsTable_AppendMatching_baseFilter-8   	  185928	      6641 ns/op	       0 B/op	       0 allocs/op
 }
 
 func BenchmarkShortcutsTable_init_baseFilter(b *testing.B) {
