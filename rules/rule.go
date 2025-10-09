@@ -252,14 +252,6 @@ func parseClients(value string, sep byte) (permitted, restricted *clients, err e
 		}
 	}
 
-	if permitted != nil {
-		permitted.finalize()
-	}
-
-	if restricted != nil {
-		restricted.finalize()
-	}
-
 	return permitted, restricted, nil
 }
 
@@ -272,8 +264,7 @@ func appendClient(
 	permitted = permittedOrig
 	restricted = restrictedOrig
 
-	isRestricted := false
-	client, isRestricted, err = parseClient(client)
+	client, isRestricted, err := parseClient(client)
 	if err != nil {
 		// Don't wrap the error since it's informative enough as is.
 		return permitted, restricted, err

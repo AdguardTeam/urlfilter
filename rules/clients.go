@@ -3,18 +3,20 @@ package rules
 import (
 	"net/netip"
 	"slices"
-	"strings"
 
 	"github.com/AdguardTeam/golibs/netutil"
 )
 
 // clients is a set representation for $client modifier.
 type clients struct {
-	// hosts are the clients not within nets slice.
-	hosts []string
+	// identifiers are the client string identifiers, that are neither IP
+	// addresses nor subnets.
+	//
+	// TODO(e.burkov):  Think of using [container.MapSet].
+	identifiers []string
 
 	// nets are the clients defined by IP addresses or subnets.
-	nets []netip.Prefix
+	nets netutil.SliceSubnetSet
 }
 
 // len returns the number of specified identifiers.  If c is nil, l is 0.
@@ -23,7 +25,7 @@ func (c *clients) len() (l int) {
 		return 0
 	}
 
-	return len(c.hosts) + len(c.nets)
+	return len(c.identifiers) + len(c.nets)
 }
 
 // equal returns true if c and other contain the same identifiers in the same
@@ -34,7 +36,7 @@ func (c *clients) equal(other *clients) (ok bool) {
 		return other == nil
 	case
 		other == nil,
-		!slices.Equal(c.hosts, other.hosts),
+		!slices.Equal(c.identifiers, other.identifiers),
 		!slices.Equal(c.nets, other.nets):
 		return false
 	default:
@@ -42,34 +44,28 @@ func (c *clients) equal(other *clients) (ok bool) {
 	}
 }
 
-// finalize sorts hosts and subnets for more performant further usage.  c must
-// not be nil.
-//
-// TODO(d.kolyshev):  Remove and use binary search for adding new clients.
-func (c *clients) finalize() {
-	slices.Sort(c.hosts)
-	slices.SortFunc(c.nets, comparePrefix)
-}
-
-// add adds a new client to the set.  c must be not be nil, and must be sorted
-// with [finalize] after all additions.
+// add adds a new client to the set.
 func (c *clients) add(client string) {
-	if netutil.IsValidIPString(client) {
+	var pref netip.Prefix
+	switch {
+	case netutil.IsValidIPString(client):
 		ip := netip.MustParseAddr(client)
-
-		c.nets = append(c.nets, netip.PrefixFrom(ip, ip.BitLen()))
+		pref = netip.PrefixFrom(ip, ip.BitLen()).Masked()
+	case netutil.IsValidIPPrefixString(client):
+		pref = netip.MustParsePrefix(client).Masked()
+	default:
+		idx, ok := slices.BinarySearch(c.identifiers, client)
+		if !ok {
+			c.identifiers = slices.Insert(c.identifiers, idx, client)
+		}
 
 		return
-	} else if strings.Contains(client, "/") {
-		subnet, err := netip.ParsePrefix(client)
-		if err == nil {
-			c.nets = append(c.nets, subnet.Masked())
-
-			return
-		}
 	}
 
-	c.hosts = append(c.hosts, client)
+	idx, ok := slices.BinarySearchFunc(c.nets, pref, comparePrefix)
+	if !ok {
+		c.nets = slices.Insert(c.nets, idx, pref)
+	}
 }
 
 // newClients creates a new clients set from a slice of clients.
@@ -78,8 +74,6 @@ func newClients(clientStrs ...string) (c *clients) {
 	for _, s := range clientStrs {
 		c.add(s)
 	}
-
-	c.finalize()
 
 	return c
 }
@@ -92,22 +86,12 @@ func (c *clients) containsAny(host string, ip netip.Addr) (ok bool) {
 	}
 
 	if host != "" {
-		if _, ok = slices.BinarySearch(c.hosts, host); ok {
+		if _, ok = slices.BinarySearch(c.identifiers, host); ok {
 			return true
 		}
 	}
 
-	if ip == (netip.Addr{}) {
-		return false
-	}
-
-	for _, n := range c.nets {
-		if n.Contains(ip) {
-			return true
-		}
-	}
-
-	return false
+	return ip != (netip.Addr{}) && c.nets.Contains(ip)
 }
 
 // comparePrefix is a comparison function for sorting slices of [netip.Prefix].
