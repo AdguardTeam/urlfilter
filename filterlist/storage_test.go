@@ -165,5 +165,5 @@ func BenchmarkStorage_RetrieveRule(b *testing.B) {
 	//	pkg: github.com/AdguardTeam/urlfilter/filterlist
 	//	cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
 	//	BenchmarkStorage_RetrieveRule/cached-16         	56578327	        20.93 ns/op	       0 B/op	       0 allocs/op
-	//	BenchmarkStorage_RetrieveRule/no_cache-16       	 4465053	       267.7 ns/op	      96 B/op	       1 allocs/op
+	//	BenchmarkStorage_RetrieveRule/no_cache-16       	 7131660	       167.4 ns/op	      96 B/op	       1 allocs/op
 }

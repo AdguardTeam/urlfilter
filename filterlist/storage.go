@@ -25,14 +25,13 @@ type RuleStorage struct {
 	// cache with the rules which were retrieved.  The key is the storage index
 	// and the value is the rule.  cache can be nil only in tests.
 	//
-	// TODO(a.garipov):  Use syncutil.Map.
+	// TODO(a.garipov):  Use a type-generic map when one is added and is as
+	// performant.
 	cache *sync.Map
 
-	// listsMap is a map with rule lists.  map key is the list ID.
-	//
-	// TODO(a.garipov):  Consider using an ID-to-index mapping bound to lists
-	// below.
-	listsMap map[rules.ListID]Interface
+	// listIdxByListID is the index of lists by their indexes in
+	// [RuleStorage.lists].
+	listIdxByListID map[rules.ListID]uint64
 
 	// lists is an array of rules lists which can be accessed using this
 	// RuleStorage.
@@ -46,21 +45,23 @@ type RuleStorage struct {
 // list of rules specified.
 func NewRuleStorage(lists []Interface) (s *RuleStorage, err error) {
 	var sizeEst datasize.ByteSize
-	listsMap := make(map[rules.ListID]Interface, len(lists))
+	index := make(map[rules.ListID]uint64, len(lists))
 	for i, l := range lists {
 		id := l.ListID()
-		if _, ok := listsMap[id]; ok {
+		if _, ok := index[id]; ok {
 			return nil, fmt.Errorf("at index %d: id: %w: %d", i, errors.ErrDuplicated, id)
 		}
 
-		listsMap[id] = l
+		// #nosec G115 -- Slice indexes cannot be negative.
+		index[id] = uint64(i)
 		sizeEst += l.SizeEstimate()
 	}
 
 	return &RuleStorage{
-		cache:    &sync.Map{},
-		listsMap: listsMap,
-		lists:    lists,
+		cache:           &sync.Map{},
+		listIdxByListID: index,
+		lists:           lists,
+		sizeEst:         sizeEst,
 	}, nil
 }
 
@@ -88,11 +89,12 @@ func (s *RuleStorage) RetrieveRule(id StorageID) (r rules.Rule, err error) {
 		}
 	}
 
-	list, ok := s.listsMap[id.listID]
+	listIdx, ok := s.listIdxByListID[id.listID]
 	if !ok {
 		return nil, fmt.Errorf("list %d does not exist", id.listID)
 	}
 
+	list := s.lists[listIdx]
 	r, err = list.RetrieveRule(id.ruleIdx)
 	if r != nil && s.cache != nil {
 		s.cache.Store(id, r)
