@@ -591,7 +591,7 @@ func BenchmarkDNSEngine_heapAlloc(b *testing.B) {
 	//	goarch: amd64
 	//	pkg: github.com/AdguardTeam/urlfilter
 	//	cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
-	//	BenchmarkDNSEngine_heapAlloc-16    	     112	 106002195 ns/op	  38665557 heap_after_compilation_bytes/op	  39623082 heap_after_matching_bytes/op	  17527871 heap_initial_bytes/op	32872883 B/op	  479464 allocs/op
+	//	BenchmarkDNSEngine_heapAlloc-16    	      96	 106533305 ns/op	  38822958 heap_after_compilation_bytes/op	  39655175 heap_after_matching_bytes/op	  17544021 heap_initial_bytes/op	32920993 B/op	  479565 allocs/op
 }
 
 // dnsEngineMeasurement emulates a life cycle of a DNS filtering engine.

@@ -18,9 +18,9 @@ import (
 // The idea is to keep rules in a serialized format (even original format in the
 // case of [File]) and create them in a lazy manner only when we really need
 // them.  When the filtering engine is being initialized, we need to scan the
-// rule lists once in order to fill up the lookup tables.  We use rule indexes
-// as a unique rule identifier instead of the rule itself.  The rule is created
-// (see [RuleStorage.RetrieveRule]) only when there's a chance that it's needed.
+// rule lists once in order to fill up the index.  We use rule indexes as a
+// unique rule identifier instead of the rule itself.  The rule is created (see
+// [RuleStorage.RetrieveRule]) only when there's a chance that it's needed.
 type RuleStorage struct {
 	// cache with the rules which were retrieved.  The key is the storage index
 	// and the value is the rule.  cache can be nil only in tests.

@@ -3,6 +3,7 @@ package urlfilter
 import (
 	"net/netip"
 
+	"github.com/AdguardTeam/golibs/container"
 	"github.com/AdguardTeam/golibs/syncutil"
 	"github.com/AdguardTeam/urlfilter/filterlist"
 	"github.com/AdguardTeam/urlfilter/rules"
@@ -16,8 +17,7 @@ type DNSEngine struct {
 	// ruleIndex is a map for hosts mapped to the list of rule indexes.
 	ruleIndex map[string][]filterlist.StorageID
 
-	// networkEngine is a network rules engine constructed from the network
-	// rules.
+	// networkEngine is the network engine constructed from the network rules.
 	networkEngine *NetworkEngine
 
 	// rulesStorage is the storage of all rules.
@@ -29,8 +29,8 @@ type DNSEngine struct {
 	// rulesPool contains slices of rules for reuse.
 	rulesPool *syncutil.Pool[[]*rules.HostRule]
 
-	// RulesCount is the count of rules loaded to the engine.
-	RulesCount int
+	// rulesCount is the number of rules loaded to the engine.
+	rulesCount uint64
 }
 
 // DNSRequest represents a DNS query with associated metadata.
@@ -78,35 +78,37 @@ const bytesPerRuleEst = 64
 
 // NewDNSEngine parses the specified filter lists and returns a *DNSEngine built
 // from them.  s must not be nil.
-func NewDNSEngine(s *filterlist.RuleStorage) (d *DNSEngine) {
+func NewDNSEngine(s *filterlist.RuleStorage) (e *DNSEngine) {
 	numRulesEst := s.SizeEstimate() / bytesPerRuleEst
 
-	d = &DNSEngine{
+	e = &DNSEngine{
 		rulesStorage: s,
 		ruleIndex:    make(map[string][]filterlist.StorageID, numRulesEst),
-		RulesCount:   0,
+		rulesCount:   0,
 		reqPool:      syncutil.NewPool(func() (v *rules.Request) { return &rules.Request{} }),
 		rulesPool:    syncutil.NewSlicePool[*rules.HostRule](1),
 	}
 
 	netEng := NewNetworkEngineSkipStorageScan(s)
+	set := container.NewMapSet[string]()
+
 	scanner := s.NewRuleStorageScanner()
 	for scanner.Scan() {
 		f, id := scanner.Rule()
 		switch f := f.(type) {
 		case *rules.HostRule:
-			d.addRule(f, id)
+			e.addRule(f, id)
 		case *rules.NetworkRule:
 			if f.IsHostLevelNetworkRule() {
-				netEng.AddRule(f, id)
+				netEng.addRule(f, id, set)
 			}
 		}
 	}
 
-	d.RulesCount += netEng.RulesCount
-	d.networkEngine = netEng
+	e.rulesCount += netEng.rulesCount
+	e.networkEngine = netEng
 
-	return d
+	return e
 }
 
 // Match finds a matching rule for the specified hostname.  It returns true and
@@ -115,14 +117,14 @@ func NewDNSEngine(s *filterlist.RuleStorage) (d *DNSEngine) {
 //
 //	192.168.0.1 example.local
 //	2000::1 example.local
-func (d *DNSEngine) Match(hostname string) (res *DNSResult, matched bool) {
-	return d.MatchRequest(&DNSRequest{Hostname: hostname})
+func (e *DNSEngine) Match(hostname string) (res *DNSResult, matched bool) {
+	return e.MatchRequest(&DNSRequest{Hostname: hostname})
 }
 
 // getRequestFromPool returns an instance of request from the engine's pool.
 // Fills it's properties to match the given DNS request.
-func (d *DNSEngine) getRequestFromPool(dReq *DNSRequest) (req *rules.Request) {
-	req = d.reqPool.Get()
+func (e *DNSEngine) getRequestFromPool(dReq *DNSRequest) (req *rules.Request) {
+	req = e.reqPool.Get()
 
 	req.SourceDomain = ""
 	req.SourceHostname = ""
@@ -149,15 +151,15 @@ func (d *DNSEngine) getRequestFromPool(dReq *DNSRequest) (req *rules.Request) {
 // corresponding DNSResult getters.
 //
 // TODO(a.garipov):  Refactor the result and remove the exception above.
-func (d *DNSEngine) MatchRequestInto(req *DNSRequest, res *DNSResult) (matched bool) {
+func (e *DNSEngine) MatchRequestInto(req *DNSRequest, res *DNSResult) (matched bool) {
 	if req.Hostname == "" {
 		return false
 	}
 
-	r := d.getRequestFromPool(req)
-	defer d.reqPool.Put(r)
+	r := e.getRequestFromPool(req)
+	defer e.reqPool.Put(r)
 
-	res.NetworkRules = d.networkEngine.AppendAllMatching(res.NetworkRules, r)
+	res.NetworkRules = e.networkEngine.AppendAllMatching(res.NetworkRules, r)
 	resultRule := rules.GetDNSBasicRule(res.NetworkRules)
 	if resultRule != nil {
 		res.NetworkRule = resultRule
@@ -165,10 +167,10 @@ func (d *DNSEngine) MatchRequestInto(req *DNSRequest, res *DNSResult) (matched b
 		return true
 	}
 
-	hostRulesPtr := d.rulesPool.Get()
-	defer d.rulesPool.Put(hostRulesPtr)
+	hostRulesPtr := e.rulesPool.Get()
+	defer e.rulesPool.Put(hostRulesPtr)
 
-	*hostRulesPtr = d.appendFromIndex((*hostRulesPtr)[:0], req.Hostname)
+	*hostRulesPtr = e.appendFromIndex((*hostRulesPtr)[:0], req.Hostname)
 	if len(*hostRulesPtr) == 0 {
 		return false
 	}
@@ -186,33 +188,38 @@ func (d *DNSEngine) MatchRequestInto(req *DNSRequest, res *DNSResult) (matched b
 
 // MatchRequest is like [MatchRequestInto] but returns a new result.  req must
 // not be nil.
-func (d *DNSEngine) MatchRequest(dReq *DNSRequest) (res *DNSResult, matched bool) {
+func (e *DNSEngine) MatchRequest(dReq *DNSRequest) (res *DNSResult, matched bool) {
 	res = &DNSResult{}
-	matched = d.MatchRequestInto(dReq, res)
+	matched = e.MatchRequestInto(dReq, res)
 
 	return res, matched
 }
 
 // appendFromIndex appends matching rules to matching.
-func (d *DNSEngine) appendFromIndex(
+func (e *DNSEngine) appendFromIndex(
 	matching []*rules.HostRule,
 	hostname string,
 ) (res []*rules.HostRule) {
 	res = matching
 
-	ids := d.ruleIndex[hostname]
+	ids := e.ruleIndex[hostname]
 	for _, id := range ids {
-		res = append(res, d.rulesStorage.RetrieveHostRule(id))
+		res = append(res, e.rulesStorage.RetrieveHostRule(id))
 	}
 
 	return res
 }
 
 // addRule adds rule to the index
-func (d *DNSEngine) addRule(hostRule *rules.HostRule, id filterlist.StorageID) {
+func (e *DNSEngine) addRule(hostRule *rules.HostRule, id filterlist.StorageID) {
 	for _, hostname := range hostRule.Hostnames {
-		d.ruleIndex[hostname] = append(d.ruleIndex[hostname], id)
+		e.ruleIndex[hostname] = append(e.ruleIndex[hostname], id)
 	}
 
-	d.RulesCount++
+	e.rulesCount++
+}
+
+// RulesCount returns the number of rules added to the engine.
+func (e *DNSEngine) RulesCount() (n uint64) {
+	return e.rulesCount
 }

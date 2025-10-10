@@ -1,6 +1,7 @@
 package urlfilter
 
 import (
+	"github.com/AdguardTeam/golibs/container"
 	"github.com/AdguardTeam/golibs/syncutil"
 	"github.com/AdguardTeam/urlfilter/filterlist"
 	"github.com/AdguardTeam/urlfilter/internal/lookup"
@@ -12,60 +13,96 @@ type NetworkEngine struct {
 	// ruleStorage stores network rules.
 	ruleStorage *filterlist.RuleStorage
 
+	// idsPool contains slices of storage IDs for reuse.
+	idsPool *syncutil.Pool[[]filterlist.StorageID]
+
 	// rulesPool contains slices of rules for reuse.
 	rulesPool *syncutil.Pool[[]*rules.NetworkRule]
 
-	// lookupTables speed up the matching.
-	//
-	// NOTE:  The order of lookup tables is very important, as the rules are
-	// added to the faster table first.
-	lookupTables []lookup.Table
+	// shortcutsIndex is the first index to use to speed up the lookup of rules.
+	shortcutsIndex *lookup.ShortcutIndex
 
-	// RulesCount is the count of rules added to the engine.
-	//
-	// TODO(a.garipov):  Unexport and export a getter method.
-	RulesCount int
+	// domainsIndex is the second index to use to speed up the lookup of rules.
+	domainsIndex *lookup.DomainIndex
+
+	// noIndex contains rules that did not fit into the two previous indexes.
+	noIndex []*rules.NetworkRule
+
+	// rulesCount is the number of rules added to the engine.
+	rulesCount uint64
 }
 
 // NewNetworkEngine builds an instance of the network engine.  It scans the
 // specified rule storage and adds all network rules found there to the internal
-// lookup tables.
+// indexes.
 func NewNetworkEngine(s *filterlist.RuleStorage) (engine *NetworkEngine) {
 	engine = NewNetworkEngineSkipStorageScan(s)
 	scanner := s.NewRuleStorageScanner()
 
+	set := container.NewMapSet[string]()
 	for scanner.Scan() {
 		f, id := scanner.Rule()
 		rule, ok := f.(*rules.NetworkRule)
 		if ok {
-			engine.AddRule(rule, id)
+			engine.addRule(rule, id, set)
 		}
 	}
 
 	return engine
 }
 
+// addRule adds rule to the network engine.  r and set must not be nil.
+func (e *NetworkEngine) addRule(
+	r *rules.NetworkRule,
+	id filterlist.StorageID,
+	set *container.MapSet[string],
+) {
+	added := e.shortcutsIndex.Add(r, id)
+	if added {
+		e.rulesCount++
+
+		return
+	}
+
+	added = e.domainsIndex.Add(r, id)
+	if added {
+		e.rulesCount++
+
+		return
+	}
+
+	if !added {
+		s := r.String()
+		if set.Has(s) {
+			return
+		}
+
+		e.noIndex = append(e.noIndex, r)
+		set.Add(s)
+
+		e.rulesCount++
+	}
+}
+
 // NewNetworkEngineSkipStorageScan creates a new instance of *NetworkEngine, but
 // unlike [NewNetworkEngine] it does not scan the storage.
 func NewNetworkEngineSkipStorageScan(s *filterlist.RuleStorage) (engine *NetworkEngine) {
 	return &NetworkEngine{
-		ruleStorage: s,
-		rulesPool:   syncutil.NewSlicePool[*rules.NetworkRule](1),
-		lookupTables: []lookup.Table{
-			lookup.NewShortcutsTable(s),
-			lookup.NewDomainsTable(s),
-			lookup.NewSeqScanTable(),
-		},
+		ruleStorage:    s,
+		idsPool:        syncutil.NewSlicePool[filterlist.StorageID](1),
+		rulesPool:      syncutil.NewSlicePool[*rules.NetworkRule](1),
+		shortcutsIndex: lookup.NewShortcutIndex(),
+		domainsIndex:   lookup.NewDomainIndex(),
 	}
 }
 
 // Match searches over all filtering rules loaded to the engine and returns true
 // if a match was found alongside the matching rule.  r must not be nil.
-func (n *NetworkEngine) Match(r *rules.Request) (rule *rules.NetworkRule, ok bool) {
-	rulesPtr := n.rulesPool.Get()
-	defer n.rulesPool.Put(rulesPtr)
+func (e *NetworkEngine) Match(r *rules.Request) (rule *rules.NetworkRule, ok bool) {
+	rulesPtr := e.rulesPool.Get()
+	defer e.rulesPool.Put(rulesPtr)
 
-	*rulesPtr = n.AppendAllMatching((*rulesPtr)[:0], r)
+	*rulesPtr = e.AppendAllMatching((*rulesPtr)[:0], r)
 	if len(*rulesPtr) == 0 {
 		return nil, false
 	}
@@ -81,32 +118,44 @@ func (n *NetworkEngine) Match(r *rules.Request) (rule *rules.NetworkRule, ok boo
 // nil.
 //
 // Deprecated:  Use [NetworkEngine.AppendAllMatching] instead.
-func (n *NetworkEngine) MatchAll(r *rules.Request) (res []*rules.NetworkRule) {
-	return n.AppendAllMatching(nil, r)
+func (e *NetworkEngine) MatchAll(r *rules.Request) (res []*rules.NetworkRule) {
+	return e.AppendAllMatching(nil, r)
 }
 
 // AppendAllMatching appends all rules matching the specified request,
-// regardless of the rule types, to matching.  It will find both allowlist and
+// regardless of the rule types, to orig.  It will find both allowlist and
 // blocklist rules.  r must not be nil.
-func (n *NetworkEngine) AppendAllMatching(
-	matching []*rules.NetworkRule,
+func (e *NetworkEngine) AppendAllMatching(
+	orig []*rules.NetworkRule,
 	r *rules.Request,
 ) (res []*rules.NetworkRule) {
-	res = matching
-	for _, table := range n.lookupTables {
-		res = table.AppendMatching(res, r)
+	res = orig
+
+	idsPtr := e.idsPool.Get()
+	defer e.idsPool.Put(idsPtr)
+
+	*idsPtr = (*idsPtr)[:0]
+
+	*idsPtr = e.shortcutsIndex.AppendMatching(*idsPtr, r)
+	*idsPtr = e.domainsIndex.AppendMatching(*idsPtr, r)
+
+	for _, id := range *idsPtr {
+		nr := e.ruleStorage.RetrieveNetworkRule(id)
+		if nr != nil && nr.Match(r) {
+			res = append(res, nr)
+		}
+	}
+
+	for _, nr := range e.noIndex {
+		if nr != nil && nr.Match(r) {
+			res = append(res, nr)
+		}
 	}
 
 	return res
 }
 
-// AddRule adds rule to the network engine.  r must not be nil.
-func (n *NetworkEngine) AddRule(r *rules.NetworkRule, id filterlist.StorageID) {
-	for _, table := range n.lookupTables {
-		if table.Add(r, id) {
-			n.RulesCount++
-
-			return
-		}
-	}
+// RulesCount returns the number of rules added to the engine.
+func (e *NetworkEngine) RulesCount() (n uint64) {
+	return e.rulesCount
 }

@@ -6,7 +6,6 @@ import (
 
 	"github.com/AdguardTeam/golibs/errors"
 	"github.com/AdguardTeam/urlfilter/filterlist"
-	"github.com/AdguardTeam/urlfilter/internal/lookup"
 	"github.com/AdguardTeam/urlfilter/internal/uftest"
 	"github.com/AdguardTeam/urlfilter/rules"
 	"github.com/stretchr/testify/assert"
@@ -42,11 +41,6 @@ const (
 		testRuleTextWithDomain
 )
 
-// Common URL strings for tests.
-const (
-	testURLStrNoDomain = "https://" + testDomainNoMod + "/"
-)
-
 // Common constants from the AdGuard Base Filter for tests.
 //
 // Keep in sync with ../../testdata/adguard_base_filter.txt.
@@ -76,34 +70,35 @@ func newStorage(tb testing.TB, text string) (s *filterlist.RuleStorage) {
 	return s
 }
 
-// assertMatch is a helper for matching a single rule in the table or, if
+// index is the interface for all indexes.
+type index interface {
+	Add(r *rules.NetworkRule, id filterlist.StorageID) (ok bool)
+	AppendMatching(orig []filterlist.StorageID, r *rules.Request) (res []filterlist.StorageID)
+}
+
+// assertMatch is a helper for matching a single rule in the index or, if
 // wantRuleText is empty, that no rules are returned.
-func assertMatch(
-	tb testing.TB,
-	tbl lookup.Table,
-	r *rules.Request,
-	wantRuleText string,
-) {
+func assertMatch(tb testing.TB, tbl index, r *rules.Request, wantID filterlist.StorageID) {
 	tb.Helper()
 
-	gotRules := tbl.AppendMatching(nil, r)
+	gotIDs := tbl.AppendMatching(nil, r)
 
-	if wantRuleText == "" {
-		assert.Empty(tb, gotRules)
+	if wantID == (filterlist.StorageID{}) {
+		assert.Empty(tb, gotIDs)
 
 		return
 	}
 
-	require.Len(tb, gotRules, 1)
+	require.Len(tb, gotIDs, 1)
 
-	assert.Equal(tb, wantRuleText, gotRules[0].String())
+	assert.Equal(tb, wantID, gotIDs[0])
 }
 
 // assertRuleIsAdded is a helper to assert if a single rule has been added to
 // tbl.
 func assertRuleIsAdded(
 	tb testing.TB,
-	tbl lookup.Table,
+	tbl index,
 	s *filterlist.RuleStorage,
 	want assert.BoolAssertionFunc,
 ) {
@@ -121,15 +116,15 @@ func assertRuleIsAdded(
 	assert.Equal(tb, 1, num)
 }
 
-// loadTable is a helper that loads rules from s to tbl.
-func loadTable(tb testing.TB, tbl lookup.Table, s *filterlist.RuleStorage) {
+// loadIndex is a helper that loads rules from s to idx.
+func loadIndex(tb testing.TB, idx index, s *filterlist.RuleStorage) {
 	tb.Helper()
 
 	sc := s.NewRuleStorageScanner()
 	for sc.Scan() {
 		r, id := sc.Rule()
 		if nr, ok := r.(*rules.NetworkRule); ok {
-			_ = tbl.Add(nr, id)
+			_ = idx.Add(nr, id)
 		}
 	}
 }

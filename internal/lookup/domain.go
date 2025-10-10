@@ -8,64 +8,58 @@ import (
 	"github.com/AdguardTeam/urlfilter/rules"
 )
 
-// DomainsTable is a [Table] that uses domains from the $domain modifier to
-// speed up the rules search.  Only the rules with $domain modifier are eligible
-// for this lookup table.
-type DomainsTable struct {
-	// Storage for the network filtering rules.
-	ruleStorage *filterlist.RuleStorage
-
+// DomainIndex is an index that uses domains from the $domain modifier to speed
+// up the rules search.  Only the rules with $domain modifier are eligible for
+// this index.
+type DomainIndex struct {
 	// subdomainsPool contains slices of strings to fill with subdomains.
 	subdomainsPool *syncutil.Pool[[]string]
 
-	// domainsIndex is the index of domains to rules that match them.
+	// domainsIndex is the index of domains to IDs of the rules that match them.
 	domainsIndex map[string][]filterlist.StorageID
 }
 
 // subdomainsEst is the estimate for the number of subdomains in a domain.
 const subdomainsEst = 4
 
-// NewDomainsTable creates a new instance of the DomainsTable.  rs must not be
-// nil.
-func NewDomainsTable(rs *filterlist.RuleStorage) (t *DomainsTable) {
-	return &DomainsTable{
-		ruleStorage:    rs,
+// NewDomainIndex creates a new instance of the DomainIndex.
+func NewDomainIndex() (idx *DomainIndex) {
+	return &DomainIndex{
 		subdomainsPool: syncutil.NewSlicePool[string](subdomainsEst),
 		domainsIndex:   map[string][]filterlist.StorageID{},
 	}
 }
 
-// type check
-var _ Table = (*DomainsTable)(nil)
-
-// Add implements the [Table] interface for *DomainsTable.
-func (t *DomainsTable) Add(f *rules.NetworkRule, id filterlist.StorageID) (ok bool) {
-	permittedDomains := f.GetPermittedDomains()
+// Add adds r to the index if r is eligible.  r must not be nil.
+func (idx *DomainIndex) Add(r *rules.NetworkRule, id filterlist.StorageID) (ok bool) {
+	permittedDomains := r.GetPermittedDomains()
 	if len(permittedDomains) == 0 {
 		return false
 	}
 
 	for _, domain := range permittedDomains {
-		rulesIndexes := t.domainsIndex[domain]
+		rulesIndexes := idx.domainsIndex[domain]
 		rulesIndexes = append(rulesIndexes, id)
-		t.domainsIndex[domain] = rulesIndexes
+		idx.domainsIndex[domain] = rulesIndexes
 	}
 
 	return true
 }
 
-// AppendMatching implements the [Table] interface for *DomainsTable.
-func (t *DomainsTable) AppendMatching(
-	matching []*rules.NetworkRule,
+// AppendMatching appends the IDs of the rules matching r to orig and returns
+// it.  r must not be nil.
+func (idx *DomainIndex) AppendMatching(
+	orig []filterlist.StorageID,
 	r *rules.Request,
-) (res []*rules.NetworkRule) {
-	res = matching
+) (res []filterlist.StorageID) {
+	res = orig
+
 	if r.SourceHostname == "" {
 		return res
 	}
 
-	subdomainsPtr := t.subdomainsPool.Get()
-	defer t.subdomainsPool.Put(subdomainsPtr)
+	subdomainsPtr := idx.subdomainsPool.Get()
+	defer idx.subdomainsPool.Put(subdomainsPtr)
 
 	*subdomainsPtr = appendSubdomains((*subdomainsPtr)[:0], r.SourceHostname)
 	if len(*subdomainsPtr) == 0 {
@@ -73,13 +67,7 @@ func (t *DomainsTable) AppendMatching(
 	}
 
 	for _, domain := range *subdomainsPtr {
-		matchingIDs := t.domainsIndex[domain]
-		for _, id := range matchingIDs {
-			rule := t.ruleStorage.RetrieveNetworkRule(id)
-			if rule != nil && rule.Match(r) {
-				res = append(res, rule)
-			}
-		}
+		res = append(res, idx.domainsIndex[domain]...)
 	}
 
 	return res
@@ -112,7 +100,7 @@ func appendSubdomains(sub []string, domain string) (res []string) {
 	return res
 }
 
-// Reset prepares t for reuse.
-func (t *DomainsTable) Reset() {
-	clear(t.domainsIndex)
+// Reset prepares idx for reuse.
+func (idx *DomainIndex) Reset() {
+	clear(idx.domainsIndex)
 }
