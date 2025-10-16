@@ -734,16 +734,7 @@ func (r *NetworkRule) matchRequestType(rt RequestType) (ok bool) {
 	return true
 }
 
-// setRequestType permits or forbids the specified request type.
-func (r *NetworkRule) setRequestType(requestType RequestType, permitted bool) {
-	if permitted {
-		r.permittedRequestTypes |= requestType
-	} else {
-		r.restrictedRequestTypes |= requestType
-	}
-}
-
-// setOptionEnabled enables or disables the specified option.  It return an
+// setOptionEnabled enables or disables the specified option.  It returns an
 // error if option cannot be used with this type of rules.
 func (r *NetworkRule) setOptionEnabled(option NetworkRuleOption, enabled bool) (err error) {
 	if r.Whitelist && (option&OptionBlacklistOnly) == option {
@@ -801,165 +792,191 @@ func (r *NetworkRule) loadOptions(optStr string) (err error) {
 	return nil
 }
 
-// setOption sets the specified option with its optional value.
-//
-// TODO(a.garipov):  Test and refactor.
-func (r *NetworkRule) setOption(name, value string) (err error) {
-	switch name {
+// optionHandler is used to set specific option for *NetworkRule.
+type optionHandler func(r *NetworkRule, value string) (err error)
+
+// optionHandlers is used for mapping option names to their handlers.
+var optionHandlers = map[string]optionHandler{
 	// General options.
-	case "third-party", "~first-party":
-		return r.setOptionEnabled(OptionThirdParty, true)
-	case "~third-party", "first-party":
-		return r.setOptionEnabled(OptionThirdParty, false)
-	case "match-case":
-		return r.setOptionEnabled(OptionMatchCase, true)
-	case "~match-case":
-		return r.setOptionEnabled(OptionMatchCase, false)
-	case "important":
-		return r.setOptionEnabled(OptionImportant, true)
-	case "badfilter":
-		return r.setOptionEnabled(OptionBadfilter, true)
-	// $dnstype, the DNS request record type filter.
-	case "dnstype":
-		permitted, restricted, parseErr := parseDNSTypes(value)
-		r.permittedDNSTypes = permitted
-		r.restrictedDNSTypes = restricted
-
-		return parseErr
-	// $dnsrewrite, the DNS request rewrite filter.
-	case "dnsrewrite":
-		rewrite, parseErr := parseDNSRewrite(value)
-		r.DNSRewrite = rewrite
-
-		return parseErr
-	// $domain limits the rule for selected source domains.
-	case "domain":
-		permitted, restricted, parseErr := parseDomains(value, "|")
-		r.permittedDomains = permitted
-		r.restrictedDomains = restricted
-		return parseErr
-
-	// $denyallow disables the rule for the selected request domains.
-	case "denyallow":
-		permitted, restricted, parseErr := parseDomains(value, "|")
-		if parseErr != nil {
-			return parseErr
-		}
-
-		if len(restricted) > 0 || len(permitted) == 0 {
-			return fmt.Errorf("invalid $denyallow value: %q", value)
-		}
-
-		r.denyAllowDomains = permitted
-
-		return nil
-	// $ctag limits the rule for selected client tags.
-	case "ctag":
-		permitted, restricted, parseErr := parseCTags(value, "|")
-		if parseErr == nil {
-			r.permittedClientTags = permitted
-			r.restrictedClientTags = restricted
-		}
-
-		return parseErr
-	// $client limits the rule for selected clients.
-	case "client":
-		permitted, restricted, parseErr := parseClients(value, '|')
-		if parseErr == nil {
-			r.permittedClients = permitted
-			r.restrictedClients = restricted
-		}
-
-		return parseErr
+	"third-party":  newSetOptionEnabledHandler(OptionThirdParty, true),
+	"~first-party": newSetOptionEnabledHandler(OptionThirdParty, true),
+	"~third-party": newSetOptionEnabledHandler(OptionThirdParty, false),
+	"first-party":  newSetOptionEnabledHandler(OptionThirdParty, false),
+	"match-case":   newSetOptionEnabledHandler(OptionMatchCase, true),
+	"~match-case":  newSetOptionEnabledHandler(OptionMatchCase, false),
+	"important":    newSetOptionEnabledHandler(OptionImportant, true),
+	"badfilter":    newSetOptionEnabledHandler(OptionBadfilter, true),
 	// Document-level whitelist rules.
-	case "elemhide":
-		return r.setOptionEnabled(OptionElemhide, true)
-	case "generichide":
-		return r.setOptionEnabled(OptionGenerichide, true)
-	case "genericblock":
-		return r.setOptionEnabled(OptionGenericblock, true)
-	case "jsinject":
-		return r.setOptionEnabled(OptionJsinject, true)
-	case "urlblock":
-		return r.setOptionEnabled(OptionUrlblock, true)
-	case "content":
-		return r.setOptionEnabled(OptionContent, true)
+	"elemhide":     newSetOptionEnabledHandler(OptionElemhide, true),
+	"generichide":  newSetOptionEnabledHandler(OptionGenerichide, true),
+	"genericblock": newSetOptionEnabledHandler(OptionGenericblock, true),
+	"jsinject":     newSetOptionEnabledHandler(OptionJsinject, true),
+	"urlblock":     newSetOptionEnabledHandler(OptionUrlblock, true),
+	"content":      newSetOptionEnabledHandler(OptionContent, true),
+	// Stealth mode.
+	"stealth": newSetOptionEnabledHandler(OptionStealth, true),
+	// $popup blocking options.
+	"popup": newSetOptionEnabledHandler(OptionPopup, true),
+	// $empty and $mp4.
+	// TODO(ameshkov):  Deprecate in favor of $redirect.
+	"empty": newSetOptionEnabledHandler(OptionEmpty, true),
+	"mp4":   newSetOptionEnabledHandler(OptionMp4, true),
+	// Content type options.
+	"script":          newSetRequestTypeHandler(TypeScript, true),
+	"~script":         newSetRequestTypeHandler(TypeScript, false),
+	"stylesheet":      newSetRequestTypeHandler(TypeStylesheet, true),
+	"~stylesheet":     newSetRequestTypeHandler(TypeStylesheet, false),
+	"subdocument":     newSetRequestTypeHandler(TypeSubdocument, true),
+	"~subdocument":    newSetRequestTypeHandler(TypeSubdocument, false),
+	"object":          newSetRequestTypeHandler(TypeObject, true),
+	"~object":         newSetRequestTypeHandler(TypeObject, false),
+	"image":           newSetRequestTypeHandler(TypeImage, true),
+	"~image":          newSetRequestTypeHandler(TypeImage, false),
+	"xmlhttprequest":  newSetRequestTypeHandler(TypeXmlhttprequest, true),
+	"~xmlhttprequest": newSetRequestTypeHandler(TypeXmlhttprequest, false),
+	"media":           newSetRequestTypeHandler(TypeMedia, true),
+	"~media":          newSetRequestTypeHandler(TypeMedia, false),
+	"font":            newSetRequestTypeHandler(TypeFont, true),
+	"~font":           newSetRequestTypeHandler(TypeFont, false),
+	"websocket":       newSetRequestTypeHandler(TypeWebsocket, true),
+	"~websocket":      newSetRequestTypeHandler(TypeWebsocket, false),
+	"ping":            newSetRequestTypeHandler(TypePing, true),
+	"~ping":           newSetRequestTypeHandler(TypePing, false),
+	"other":           newSetRequestTypeHandler(TypeOther, true),
+	"~other":          newSetRequestTypeHandler(TypeOther, false),
 	// $extension can be also disabled.
-	case "extension":
-		return r.setOptionEnabled(OptionExtension, true)
-	case "~extension":
-		// $document must be specified before ~extension
-		// TODO(ameshkov):  Depends on options order, this is not good.
+	"extension": newSetOptionEnabledHandler(OptionExtension, true),
+	"~extension": func(r *NetworkRule, _ string) (err error) {
 		r.enabledOptions = r.enabledOptions ^ OptionExtension
 
 		return nil
+	},
+	// $dnstype, the DNS request record type filter.
+	"dnstype": setDNSTypeOptionHandler,
+	// $dnsrewrite, the DNS request rewrite filter.
+	"dnsrewrite": setDNSRewriteOptionHandler,
+	// $domain limits the rule for selected source domains.
+	"domain": setDomainOptionHandler,
+	// $denyallow disables the rule for the selected request domains.
+	"denyallow": setDenyAllowOptionHandler,
+	"ctag":      setCTagOptionHandler,
+	"client":    setClientOptionHandler,
 	// $document.
-	case "document":
-		optErr := r.setOptionEnabled(OptionElemhide, true)
-		// Ignore others.
-		_ = r.setOptionEnabled(OptionJsinject, true)
-		_ = r.setOptionEnabled(OptionUrlblock, true)
-		_ = r.setOptionEnabled(OptionContent, true)
-		_ = r.setOptionEnabled(OptionExtension, true)
+	"document": setDocumentOptionHandler,
+}
 
-		return optErr
-	// Stealth mode.
-	case "stealth":
-		return r.setOptionEnabled(OptionStealth, true)
-	// $popup blocking options.
-	case "popup":
-		return r.setOptionEnabled(OptionPopup, true)
-	// $empty and $mp4.
-	// TODO(ameshkov):  Deprecate in favor of $redirect.
-	case "empty":
-		return r.setOptionEnabled(OptionEmpty, true)
-	case "mp4":
-		return r.setOptionEnabled(OptionMp4, true)
-	// Content type options.
-	case "script", "~script":
-		r.setRequestType(TypeScript, name[0] != '~')
+// newSetRequestTypeHandler returns new [optionHandler] that permits or forbids
+// the specified request type.
+func newSetRequestTypeHandler(requestType RequestType, permitted bool) (handler optionHandler) {
+	return func(r *NetworkRule, _ string) (err error) {
+		if permitted {
+			r.permittedRequestTypes |= requestType
+		} else {
+			r.restrictedRequestTypes |= requestType
+		}
 
 		return nil
-	case "stylesheet", "~stylesheet":
-		r.setRequestType(TypeStylesheet, name[0] != '~')
+	}
+}
 
-		return nil
-	case "subdocument", "~subdocument":
-		r.setRequestType(TypeSubdocument, name[0] != '~')
+// newSetOptionEnabledHandler returns new [optionHandler] that enables or
+// disables the specified option.  It returns an error if option cannot be used
+// with this type of rules.
+func newSetOptionEnabledHandler(option NetworkRuleOption, enabled bool) (handler optionHandler) {
+	return func(r *NetworkRule, _ string) (err error) {
+		return r.setOptionEnabled(option, enabled)
+	}
+}
 
-		return nil
-	case "object", "~object":
-		r.setRequestType(TypeObject, name[0] != '~')
+// setDNSTypeOptionHandler is an [optionHandler] that parses dnstype option
+// value and sets permitted and restricted dns types.
+func setDNSTypeOptionHandler(r *NetworkRule, value string) (err error) {
+	permitted, restricted, err := parseDNSTypes(value)
+	r.permittedDNSTypes = permitted
+	r.restrictedDNSTypes = restricted
 
-		return nil
-	case "image", "~image":
-		r.setRequestType(TypeImage, name[0] != '~')
+	return err
+}
 
-		return nil
-	case "xmlhttprequest", "~xmlhttprequest":
-		r.setRequestType(TypeXmlhttprequest, name[0] != '~')
+// setDNSRewriteOptionHandler is an [optionHandler] that parses dnsrewrite value
+// and fills [NetworkRule.DNSRewrite].
+func setDNSRewriteOptionHandler(r *NetworkRule, value string) (err error) {
+	// $dnsrewrite, the DNS request rewrite filter.
+	rewrite, err := parseDNSRewrite(value)
+	r.DNSRewrite = rewrite
 
-		return nil
-	case "media", "~media":
-		r.setRequestType(TypeMedia, name[0] != '~')
+	return err
+}
 
-		return nil
-	case "font", "~font":
-		r.setRequestType(TypeFont, name[0] != '~')
+// setDomainOptionHandler is an [optionHandler] that parses domains and sets
+// permitted and restricted domains.
+func setDomainOptionHandler(r *NetworkRule, value string) (err error) {
+	permitted, restricted, err := parseDomains(value, "|")
+	r.permittedDomains = permitted
+	r.restrictedDomains = restricted
 
-		return nil
-	case "websocket", "~websocket":
-		r.setRequestType(TypeWebsocket, name[0] != '~')
+	return err
+}
 
-		return nil
-	case "ping", "~ping":
-		r.setRequestType(TypePing, name[0] != '~')
+// setDenyallowOptionHandler is an [optionHandler] that parses domains and sets
+// [NetworkRule.denyAllowDomains].
+func setDenyAllowOptionHandler(r *NetworkRule, value string) (err error) {
+	permitted, restricted, err := parseDomains(value, "|")
+	if err != nil {
+		return err
+	}
 
-		return nil
-	case "other", "~other":
-		r.setRequestType(TypeOther, name[0] != '~')
+	if len(restricted) > 0 || len(permitted) == 0 {
+		return fmt.Errorf("invalid $denyallow value: %q", value)
+	}
 
-		return nil
+	r.denyAllowDomains = permitted
+
+	return nil
+}
+
+// setCtagOptionHandler is an [optionHandler] that parses CTags from value and
+// sets permitted and restricted client tags.
+func setCTagOptionHandler(r *NetworkRule, value string) (err error) {
+	permitted, restricted, err := parseCTags(value, "|")
+	if err == nil {
+		r.permittedClientTags = permitted
+		r.restrictedClientTags = restricted
+	}
+
+	return err
+}
+
+// setClientOptionHandler is an [optionHandler] that parses clients from value
+// and sets permitted and restricted clients.
+func setClientOptionHandler(r *NetworkRule, value string) (err error) {
+	permitted, restricted, err := parseClients(value, '|')
+	if err == nil {
+		r.permittedClients = permitted
+		r.restrictedClients = restricted
+	}
+
+	return err
+}
+
+// setDocumentOptionHandler is an [optionHandler] that enables such options as
+// jsinject, urlblock, content and extension.
+func setDocumentOptionHandler(r *NetworkRule, _ string) (err error) {
+	err = r.setOptionEnabled(OptionElemhide, true)
+	// Ignore others.
+	_ = r.setOptionEnabled(OptionJsinject, true)
+	_ = r.setOptionEnabled(OptionUrlblock, true)
+	_ = r.setOptionEnabled(OptionContent, true)
+	_ = r.setOptionEnabled(OptionExtension, true)
+
+	return err
+}
+
+// setOption sets the specified option with its optional value.
+func (r *NetworkRule) setOption(name, value string) (err error) {
+	handler, ok := optionHandlers[name]
+	if ok {
+		return handler(r, value)
 	}
 
 	return fmt.Errorf("unknown filter modifier: %q=%q", name, value)
@@ -1087,7 +1104,10 @@ func parseRuleText(ruleText string) (pattern, options string, isWhitelist bool, 
 
 		ruleText, options = ruleText[:idx], ruleText[idx+1:]
 		if hasEscaped {
-			options = regexpEscapedOptionsDelimiter.ReplaceAllString(options, string(optionsDelimiter))
+			options = regexpEscapedOptionsDelimiter.ReplaceAllString(
+				options,
+				string(optionsDelimiter),
+			)
 		}
 
 		// Exit the loop since the options delimiter has been found.

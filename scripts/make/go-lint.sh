@@ -154,8 +154,10 @@ run_linter "${GO:-go}" vet ./...
 run_linter govulncheck ./...
 
 # TODO(e.burkov): Enable for all.
-run_linter gocyclo --over 42 ./rules/
-run_linter gocyclo --over 18 ./proxy/
+run_linter gocyclo --over 18 \
+	./proxy/ \
+	./rules/ \
+	;
 run_linter gocyclo --over 10 \
 	-ignore "_test|internal/|proxy/|rules/" \
 	./ \

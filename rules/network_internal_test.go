@@ -402,6 +402,64 @@ func BenchmarkParseClients(b *testing.B) {
 	//	BenchmarkParseClients/~Mom|~Dad|"Kids"-8                                    	 2588818	       469.9 ns/op	     296 B/op	      11 allocs/op
 }
 
+func BenchmarkNetworkRule_setOption(b *testing.B) {
+	benchCases := []struct {
+		name     string
+		optName  string
+		optValue string
+	}{{
+		name:     "dnstype",
+		optName:  "dnstype",
+		optValue: "AAAA|A|MX",
+	}, {
+		name:     "dnsrewrite",
+		optName:  "dnsrewrite",
+		optValue: "example.com",
+	}, {
+		name:     "client",
+		optName:  "client",
+		optValue: "192.0.2.1|name",
+	}, {
+		name:     "domain",
+		optName:  "domain",
+		optValue: "example.com|example.org",
+	}, {
+		name:     "match-case",
+		optName:  "match-case",
+		optValue: "",
+	}, {
+		name:     "ping",
+		optName:  "~ping",
+		optValue: "",
+	}}
+
+	for _, bc := range benchCases {
+		b.Run(bc.name, func(b *testing.B) {
+			var err error
+			rule := &NetworkRule{}
+
+			b.ReportAllocs()
+			for b.Loop() {
+				err = rule.setOption(bc.optName, bc.optValue)
+			}
+
+			require.NoError(b, err)
+		})
+	}
+
+	// Most recent results:
+	// goos: darwin
+	// pkg: github.com/AdguardTeam/urlfilter/rules
+	// goarch: arm64
+	// cpu: Apple M3
+	// BenchmarkNetworkRule_setOption/dnstype-8         	11901484	        99.91 ns/op	      56 B/op	       2 allocs/op
+	// BenchmarkNetworkRule_setOption/dnsrewrite-8      	11174571	       106.6 ns/op	      96 B/op	       2 allocs/op
+	// BenchmarkNetworkRule_setOption/client-8          	 4485160	       281.2 ns/op	     176 B/op	       8 allocs/op
+	// BenchmarkNetworkRule_setOption/domain-8          	10514790	       115.1 ns/op	      80 B/op	       3 allocs/op
+	// BenchmarkNetworkRule_setOption/match-case-8      	161167903	       7.443 ns/op	       0 B/op	       0 allocs/op
+	// BenchmarkNetworkRule_setOption/ping-8            	175328119	       6.873 ns/op	       0 B/op	       0 allocs/op
+}
+
 func TestParseClients_invalid(t *testing.T) {
 	t.Parallel()
 
