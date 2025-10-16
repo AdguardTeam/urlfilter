@@ -1,4 +1,4 @@
-package urlfilter
+package urlfilter_test
 
 import (
 	"net/netip"
@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/AdguardTeam/golibs/testutil"
+	"github.com/AdguardTeam/urlfilter"
 	"github.com/AdguardTeam/urlfilter/filterlist"
 	"github.com/AdguardTeam/urlfilter/internal/uftest"
 	"github.com/AdguardTeam/urlfilter/rules"
@@ -22,7 +23,7 @@ func TestDNSEnginePriority(t *testing.T) {
 `
 
 	ruleStorage := newTestRuleStorage(t, uftest.ListID1, rulesText)
-	dnsEngine := NewDNSEngine(ruleStorage)
+	dnsEngine := urlfilter.NewDNSEngine(ruleStorage)
 	assert.NotNil(t, dnsEngine)
 
 	r, ok := dnsEngine.Match("example.org")
@@ -48,7 +49,7 @@ func TestDNSEngineMatchHostname(t *testing.T) {
 ::2 v4and6.com
 `
 	ruleStorage := newTestRuleStorage(t, uftest.ListID1, rulesText)
-	dnsEngine := NewDNSEngine(ruleStorage)
+	dnsEngine := urlfilter.NewDNSEngine(ruleStorage)
 	require.NotNil(t, dnsEngine)
 
 	r, ok := dnsEngine.Match("example.org")
@@ -96,7 +97,7 @@ func TestDNSEngineMatchHostname(t *testing.T) {
 func TestHostLevelNetworkRuleWithProtocol(t *testing.T) {
 	rulesText := "://example.org"
 	ruleStorage := newTestRuleStorage(t, uftest.ListID1, rulesText)
-	dnsEngine := NewDNSEngine(ruleStorage)
+	dnsEngine := urlfilter.NewDNSEngine(ruleStorage)
 	assert.NotNil(t, dnsEngine)
 
 	r, ok := dnsEngine.Match("example.org")
@@ -107,14 +108,14 @@ func TestHostLevelNetworkRuleWithProtocol(t *testing.T) {
 func TestRegexp(t *testing.T) {
 	text := "/^stats?\\./"
 	ruleStorage := newTestRuleStorage(t, uftest.ListID1, text)
-	dnsEngine := NewDNSEngine(ruleStorage)
+	dnsEngine := urlfilter.NewDNSEngine(ruleStorage)
 
 	res, ok := dnsEngine.Match("stats.test.com")
 	assert.True(t, ok && res.NetworkRule.Text() == text)
 
 	text = "@@/^stats?\\./"
 	ruleStorage = newTestRuleStorage(t, uftest.ListID1, "||stats.test.com^\n"+text)
-	dnsEngine = NewDNSEngine(ruleStorage)
+	dnsEngine = urlfilter.NewDNSEngine(ruleStorage)
 
 	res, ok = dnsEngine.Match("stats.test.com")
 	assert.True(t, ok && res.NetworkRule.Text() == text && res.NetworkRule.Whitelist)
@@ -124,7 +125,7 @@ func TestMultipleIPPerHost(t *testing.T) {
 	text := `1.1.1.1 example.org
 2.2.2.2 example.org`
 	ruleStorage := newTestRuleStorage(t, uftest.ListID1, text)
-	dnsEngine := NewDNSEngine(ruleStorage)
+	dnsEngine := urlfilter.NewDNSEngine(ruleStorage)
 
 	res, ok := dnsEngine.Match("example.org")
 	require.True(t, ok)
@@ -146,11 +147,11 @@ func TestClientTags(t *testing.T) {
 ||host7^$ctag=~pc,badfilter
 `
 	ruleStorage := newTestRuleStorage(t, uftest.ListID1, rulesText)
-	dnsEngine := NewDNSEngine(ruleStorage)
+	dnsEngine := urlfilter.NewDNSEngine(ruleStorage)
 	assert.NotNil(t, dnsEngine)
 
 	// global rule
-	res, ok := dnsEngine.MatchRequest(&DNSRequest{
+	res, ok := dnsEngine.MatchRequest(&urlfilter.DNSRequest{
 		Hostname:         "host1",
 		SortedClientTags: []string{"phone"},
 	})
@@ -159,7 +160,7 @@ func TestClientTags(t *testing.T) {
 	assert.Equal(t, "||host1^", res.NetworkRule.Text())
 
 	// $ctag rule overrides global rule
-	res, ok = dnsEngine.MatchRequest(&DNSRequest{
+	res, ok = dnsEngine.MatchRequest(&urlfilter.DNSRequest{
 		Hostname:         "host1",
 		SortedClientTags: []string{"pc"},
 	})
@@ -168,7 +169,7 @@ func TestClientTags(t *testing.T) {
 	assert.Equal(t, "||host1^$ctag=pc|printer", res.NetworkRule.Text())
 
 	// 1 tag matches
-	res, ok = dnsEngine.MatchRequest(&DNSRequest{
+	res, ok = dnsEngine.MatchRequest(&urlfilter.DNSRequest{
 		Hostname:         "host2",
 		SortedClientTags: []string{"phone", "printer"},
 	})
@@ -177,21 +178,21 @@ func TestClientTags(t *testing.T) {
 	assert.Equal(t, "||host2^$ctag=pc|printer", res.NetworkRule.Text())
 
 	// tags don't match
-	_, ok = dnsEngine.MatchRequest(&DNSRequest{
+	_, ok = dnsEngine.MatchRequest(&urlfilter.DNSRequest{
 		Hostname:         "host2",
 		SortedClientTags: []string{"phone"},
 	})
 	assert.False(t, ok)
 
 	// tags don't match
-	_, ok = dnsEngine.MatchRequest(&DNSRequest{
+	_, ok = dnsEngine.MatchRequest(&urlfilter.DNSRequest{
 		Hostname:         "host2",
 		SortedClientTags: []string{},
 	})
 	assert.False(t, ok)
 
 	// 1 tag matches (exclusion)
-	res, ok = dnsEngine.MatchRequest(&DNSRequest{
+	res, ok = dnsEngine.MatchRequest(&urlfilter.DNSRequest{
 		Hostname:         "host3",
 		SortedClientTags: []string{"phone", "printer"},
 	})
@@ -200,7 +201,7 @@ func TestClientTags(t *testing.T) {
 	assert.Equal(t, "||host3^$ctag=~pc|~router", res.NetworkRule.Text())
 
 	// 1 tag matches (exclusion)
-	res, ok = dnsEngine.MatchRequest(&DNSRequest{
+	res, ok = dnsEngine.MatchRequest(&urlfilter.DNSRequest{
 		Hostname:         "host4",
 		SortedClientTags: []string{"phone", "router"},
 	})
@@ -209,28 +210,28 @@ func TestClientTags(t *testing.T) {
 	assert.Equal(t, "||host4^$ctag=~pc|router", res.NetworkRule.Text())
 
 	// tags don't match (exclusion)
-	_, ok = dnsEngine.MatchRequest(&DNSRequest{
+	_, ok = dnsEngine.MatchRequest(&urlfilter.DNSRequest{
 		Hostname:         "host3",
 		SortedClientTags: []string{"pc"},
 	})
 	assert.False(t, ok)
 
 	// tags don't match (exclusion)
-	_, ok = dnsEngine.MatchRequest(&DNSRequest{
+	_, ok = dnsEngine.MatchRequest(&urlfilter.DNSRequest{
 		Hostname:         "host4",
 		SortedClientTags: []string{"pc", "router"},
 	})
 	assert.False(t, ok)
 
 	// tags match but it's a $badfilter
-	_, ok = dnsEngine.MatchRequest(&DNSRequest{
+	_, ok = dnsEngine.MatchRequest(&urlfilter.DNSRequest{
 		Hostname:         "host5",
 		SortedClientTags: []string{"pc"},
 	})
 	assert.False(t, ok)
 
 	// tags match and $badfilter rule disables global rule
-	res, ok = dnsEngine.MatchRequest(&DNSRequest{
+	res, ok = dnsEngine.MatchRequest(&urlfilter.DNSRequest{
 		Hostname:         "host6",
 		SortedClientTags: []string{"pc"},
 	})
@@ -239,7 +240,7 @@ func TestClientTags(t *testing.T) {
 	assert.Equal(t, "||host6^$ctag=pc|printer", res.NetworkRule.Text())
 
 	// tags match (exclusion) but it's a $badfilter
-	_, ok = dnsEngine.MatchRequest(&DNSRequest{
+	_, ok = dnsEngine.MatchRequest(&urlfilter.DNSRequest{
 		Hostname:         "host7",
 		SortedClientTags: []string{"phone"},
 	})
@@ -261,107 +262,107 @@ func TestClient(t *testing.T) {
 		"||host10^$client=::",
 	}
 	ruleStorage := newTestRuleStorage(t, uftest.ListID1, strings.Join(ruleTexts, "\n"))
-	dnsEngine := NewDNSEngine(ruleStorage)
+	dnsEngine := urlfilter.NewDNSEngine(ruleStorage)
 	assert.NotNil(t, dnsEngine)
 
 	testCases := []struct {
-		req     *DNSRequest
+		req     *urlfilter.DNSRequest
 		wantRes string
 		name    string
 	}{{
-		req:     &DNSRequest{Hostname: "host0", ClientIP: testIPv4},
+		req:     &urlfilter.DNSRequest{Hostname: "host0", ClientIP: testIPv4},
 		wantRes: ruleTexts[0],
 		name:    "match_ipv4",
 	}, {
-		req:     &DNSRequest{Hostname: "host0", ClientIP: anotherIPv4},
+		req:     &urlfilter.DNSRequest{Hostname: "host0", ClientIP: anotherIPv4},
 		wantRes: "",
 		name:    "mismatch_ipv4",
 	}, {
-		req:     &DNSRequest{Hostname: "host1", ClientIP: testIPv4},
+		req:     &urlfilter.DNSRequest{Hostname: "host1", ClientIP: testIPv4},
 		wantRes: "",
 		name:    "restricted_ipv4",
 	}, {
-		req:     &DNSRequest{Hostname: "host1", ClientIP: anotherIPv4},
+		req:     &urlfilter.DNSRequest{Hostname: "host1", ClientIP: anotherIPv4},
 		wantRes: ruleTexts[1],
 		name:    "non_restricted_ipv4",
 	}, {
-		req:     &DNSRequest{Hostname: "host2", ClientIP: netip.MustParseAddr("2001::c0:ffee")},
+		req:     &urlfilter.DNSRequest{Hostname: "host2", ClientIP: netip.MustParseAddr("2001::c0:ffee")},
 		wantRes: ruleTexts[2],
 		name:    "match_ipv6",
 	}, {
-		req:     &DNSRequest{Hostname: "host2", ClientIP: netip.MustParseAddr("2001::c0:ffef")},
+		req:     &urlfilter.DNSRequest{Hostname: "host2", ClientIP: netip.MustParseAddr("2001::c0:ffef")},
 		wantRes: "",
 		name:    "mismatch_ipv6",
 	}, {
-		req:     &DNSRequest{Hostname: "host3", ClientIP: netip.MustParseAddr("2001::c0:ffee")},
+		req:     &urlfilter.DNSRequest{Hostname: "host3", ClientIP: netip.MustParseAddr("2001::c0:ffee")},
 		wantRes: "",
 		name:    "restricted_ipv6",
 	}, {
-		req:     &DNSRequest{Hostname: "host3", ClientIP: netip.MustParseAddr("2001::c0:ffef")},
+		req:     &urlfilter.DNSRequest{Hostname: "host3", ClientIP: netip.MustParseAddr("2001::c0:ffef")},
 		wantRes: ruleTexts[3],
 		name:    "non_restricted_ipv6",
 	}, {
-		req:     &DNSRequest{Hostname: "host4", ClientIP: netip.MustParseAddr("127.0.0.254")},
+		req:     &urlfilter.DNSRequest{Hostname: "host4", ClientIP: netip.MustParseAddr("127.0.0.254")},
 		wantRes: ruleTexts[4],
 		name:    "match_ipv4_subnet",
 	}, {
-		req:     &DNSRequest{Hostname: "host4", ClientIP: netip.MustParseAddr("127.0.1.1")},
+		req:     &urlfilter.DNSRequest{Hostname: "host4", ClientIP: netip.MustParseAddr("127.0.1.1")},
 		wantRes: "",
 		name:    "mismatch_ipv4_subnet",
 	}, {
-		req:     &DNSRequest{Hostname: "host5", ClientIP: netip.MustParseAddr("127.0.0.254")},
+		req:     &urlfilter.DNSRequest{Hostname: "host5", ClientIP: netip.MustParseAddr("127.0.0.254")},
 		wantRes: "",
 		name:    "restricted_ipv4_subnet",
 	}, {
-		req:     &DNSRequest{Hostname: "host5", ClientIP: netip.MustParseAddr("127.0.1.1")},
+		req:     &urlfilter.DNSRequest{Hostname: "host5", ClientIP: netip.MustParseAddr("127.0.1.1")},
 		wantRes: ruleTexts[5],
 		name:    "non_restricted_ipv4_subnet",
 	}, {
-		req:     &DNSRequest{Hostname: "host6", ClientIP: netip.MustParseAddr("2001::c0:ff07")},
+		req:     &urlfilter.DNSRequest{Hostname: "host6", ClientIP: netip.MustParseAddr("2001::c0:ff07")},
 		wantRes: ruleTexts[6],
 		name:    "match_ipv6_subnet",
 	}, {
-		req:     &DNSRequest{Hostname: "host6", ClientIP: netip.MustParseAddr("2001::c0:feee")},
+		req:     &urlfilter.DNSRequest{Hostname: "host6", ClientIP: netip.MustParseAddr("2001::c0:feee")},
 		wantRes: "",
 		name:    "mismatch_ipv6_subnet",
 	}, {
-		req:     &DNSRequest{Hostname: "host7", ClientIP: netip.MustParseAddr("2001::c0:ff07")},
+		req:     &urlfilter.DNSRequest{Hostname: "host7", ClientIP: netip.MustParseAddr("2001::c0:ff07")},
 		wantRes: "",
 		name:    "restricted_ipv6_subnet",
 	}, {
-		req:     &DNSRequest{Hostname: "host7", ClientIP: netip.MustParseAddr("2001::c0:feee")},
+		req:     &urlfilter.DNSRequest{Hostname: "host7", ClientIP: netip.MustParseAddr("2001::c0:feee")},
 		wantRes: ruleTexts[7],
 		name:    "non_restricted_ipv6_subnet",
 	}, {
-		req:     &DNSRequest{Hostname: "host8", ClientName: "Frank's laptop"},
+		req:     &urlfilter.DNSRequest{Hostname: "host8", ClientName: "Frank's laptop"},
 		wantRes: ruleTexts[8],
 		name:    "match_name",
 	}, {
-		req:     &DNSRequest{Hostname: "host8", ClientName: "Franks laptop"},
+		req:     &urlfilter.DNSRequest{Hostname: "host8", ClientName: "Franks laptop"},
 		wantRes: "",
 		name:    "mismatch_name",
 	}, {
-		req:     &DNSRequest{Hostname: "host9", ClientIP: netip.IPv4Unspecified()},
+		req:     &urlfilter.DNSRequest{Hostname: "host9", ClientIP: netip.IPv4Unspecified()},
 		wantRes: ruleTexts[9],
 		name:    "match_unspecified_ipv4",
 	}, {
-		req:     &DNSRequest{Hostname: "host9", ClientIP: testIPv4},
+		req:     &urlfilter.DNSRequest{Hostname: "host9", ClientIP: testIPv4},
 		wantRes: "",
 		name:    "mismatch_unspecified_ipv4",
 	}, {
-		req:     &DNSRequest{Hostname: "host10"},
+		req:     &urlfilter.DNSRequest{Hostname: "host10"},
 		wantRes: "",
 		name:    "no_ipv4",
 	}, {
-		req:     &DNSRequest{Hostname: "host10", ClientIP: netip.IPv6Unspecified()},
+		req:     &urlfilter.DNSRequest{Hostname: "host10", ClientIP: netip.IPv6Unspecified()},
 		wantRes: ruleTexts[10],
 		name:    "match_unspecified_ipv6",
 	}, {
-		req:     &DNSRequest{Hostname: "host10", ClientIP: testIPv6},
+		req:     &urlfilter.DNSRequest{Hostname: "host10", ClientIP: testIPv6},
 		wantRes: "",
 		name:    "mismatch_unspecified_ipv6",
 	}, {
-		req:     &DNSRequest{Hostname: "host10"},
+		req:     &urlfilter.DNSRequest{Hostname: "host10"},
 		wantRes: "",
 		name:    "no_ipv6",
 	}}
@@ -381,7 +382,7 @@ func TestClient(t *testing.T) {
 func TestBadfilterRules(t *testing.T) {
 	rulesText := "||example.org^\n||example.org^$badfilter"
 	ruleStorage := newTestRuleStorage(t, uftest.ListID1, rulesText)
-	dnsEngine := NewDNSEngine(ruleStorage)
+	dnsEngine := urlfilter.NewDNSEngine(ruleStorage)
 	assert.NotNil(t, dnsEngine)
 
 	r, ok := dnsEngine.Match("example.org")
@@ -403,11 +404,11 @@ func TestDNSEngine_MatchRequest_dnsType(t *testing.T) {
 `
 
 	ruleStorage := newTestRuleStorage(t, uftest.ListID1, rulesText)
-	dnsEngine := NewDNSEngine(ruleStorage)
+	dnsEngine := urlfilter.NewDNSEngine(ruleStorage)
 	assert.NotNil(t, dnsEngine)
 
 	t.Run("simple", func(t *testing.T) {
-		r := &DNSRequest{Hostname: "simple", DNSType: dns.TypeAAAA}
+		r := &urlfilter.DNSRequest{Hostname: "simple", DNSType: dns.TypeAAAA}
 		_, ok := dnsEngine.MatchRequest(r)
 		assert.True(t, ok)
 
@@ -417,7 +418,7 @@ func TestDNSEngine_MatchRequest_dnsType(t *testing.T) {
 	})
 
 	t.Run("simple_case", func(t *testing.T) {
-		r := &DNSRequest{Hostname: "simple_case", DNSType: dns.TypeAAAA}
+		r := &urlfilter.DNSRequest{Hostname: "simple_case", DNSType: dns.TypeAAAA}
 		_, ok := dnsEngine.MatchRequest(r)
 		assert.True(t, ok)
 
@@ -427,7 +428,7 @@ func TestDNSEngine_MatchRequest_dnsType(t *testing.T) {
 	})
 
 	t.Run("reverse", func(t *testing.T) {
-		r := &DNSRequest{Hostname: "reverse", DNSType: dns.TypeAAAA}
+		r := &urlfilter.DNSRequest{Hostname: "reverse", DNSType: dns.TypeAAAA}
 		_, ok := dnsEngine.MatchRequest(r)
 		assert.False(t, ok)
 
@@ -437,7 +438,7 @@ func TestDNSEngine_MatchRequest_dnsType(t *testing.T) {
 	})
 
 	t.Run("multiple", func(t *testing.T) {
-		r := &DNSRequest{Hostname: "multiple", DNSType: dns.TypeAAAA}
+		r := &urlfilter.DNSRequest{Hostname: "multiple", DNSType: dns.TypeAAAA}
 		_, ok := dnsEngine.MatchRequest(r)
 		assert.True(t, ok)
 
@@ -451,7 +452,7 @@ func TestDNSEngine_MatchRequest_dnsType(t *testing.T) {
 	})
 
 	t.Run("multiple_reverse", func(t *testing.T) {
-		r := &DNSRequest{
+		r := &urlfilter.DNSRequest{
 			Hostname: "multiple_reverse",
 			DNSType:  dns.TypeAAAA,
 		}
@@ -470,7 +471,7 @@ func TestDNSEngine_MatchRequest_dnsType(t *testing.T) {
 
 	t.Run("multiple_different", func(t *testing.T) {
 		// Should be the same as simple.
-		r := &DNSRequest{
+		r := &urlfilter.DNSRequest{
 			Hostname: "multiple_different",
 			DNSType:  dns.TypeAAAA,
 		}
@@ -488,7 +489,7 @@ func TestDNSEngine_MatchRequest_dnsType(t *testing.T) {
 	})
 
 	t.Run("simple_client", func(t *testing.T) {
-		r := &DNSRequest{
+		r := &urlfilter.DNSRequest{
 			Hostname: "simple_client",
 			DNSType:  dns.TypeAAAA,
 			ClientIP: testIPv4,
@@ -497,7 +498,7 @@ func TestDNSEngine_MatchRequest_dnsType(t *testing.T) {
 		_, ok := dnsEngine.MatchRequest(r)
 		assert.True(t, ok)
 
-		r = &DNSRequest{
+		r = &urlfilter.DNSRequest{
 			Hostname: "simple_client",
 			DNSType:  dns.TypeAAAA,
 			ClientIP: anotherIPv4,
@@ -505,7 +506,7 @@ func TestDNSEngine_MatchRequest_dnsType(t *testing.T) {
 		_, ok = dnsEngine.MatchRequest(r)
 		assert.False(t, ok)
 
-		r = &DNSRequest{
+		r = &urlfilter.DNSRequest{
 			Hostname: "simple_client",
 			DNSType:  dns.TypeA,
 			ClientIP: testIPv4,
@@ -515,7 +516,7 @@ func TestDNSEngine_MatchRequest_dnsType(t *testing.T) {
 	})
 
 	t.Run("priority", func(t *testing.T) {
-		r := &DNSRequest{
+		r := &urlfilter.DNSRequest{
 			Hostname: "priority",
 			DNSType:  dns.TypeAAAA,
 			ClientIP: testIPv4,
@@ -525,7 +526,7 @@ func TestDNSEngine_MatchRequest_dnsType(t *testing.T) {
 		assert.True(t, ok)
 		assert.Contains(t, res.NetworkRule.Text(), "dnstype=")
 
-		r = &DNSRequest{
+		r = &urlfilter.DNSRequest{
 			Hostname: "priority",
 			DNSType:  dns.TypeA,
 			ClientIP: testIPv4,
@@ -538,7 +539,7 @@ func TestDNSEngine_MatchRequest_dnsType(t *testing.T) {
 
 func TestSlash(t *testing.T) {
 	ruleStorage := newTestRuleStorage(t, uftest.ListID1, "/$client=127.0.0.1")
-	dnsEngine := NewDNSEngine(ruleStorage)
+	dnsEngine := urlfilter.NewDNSEngine(ruleStorage)
 	assert.NotNil(t, dnsEngine)
 
 	r, ok := dnsEngine.Match("example.org")
@@ -546,7 +547,7 @@ func TestSlash(t *testing.T) {
 	assert.True(t, r.NetworkRule == nil && r.HostRulesV4 == nil && r.HostRulesV6 == nil)
 }
 
-func assertMatchRuleText(t *testing.T, rulesText string, rules *DNSResult, ok bool) {
+func assertMatchRuleText(t *testing.T, rulesText string, rules *urlfilter.DNSResult, ok bool) {
 	assert.True(t, ok)
 	if ok {
 		assert.NotNil(t, rules.NetworkRule)
@@ -609,12 +610,12 @@ func (m *dnsEngineMeasurement) run(tb testing.TB, s *filterlist.RuleStorage, hos
 
 	m.initialSum += heapAlloc(tb)
 
-	dnsEngine := NewDNSEngine(s)
+	dnsEngine := urlfilter.NewDNSEngine(s)
 
 	m.afterCompilationSum += heapAlloc(tb)
 
-	req := &DNSRequest{}
-	res := &DNSResult{}
+	req := &urlfilter.DNSRequest{}
+	res := &urlfilter.DNSResult{}
 
 	var ok bool
 	for _, reqHostname := range hostnames {
@@ -635,10 +636,10 @@ func BenchmarkDNSEngine_Match(b *testing.B) {
 	ruleStorage := newRuleStorage(b)
 	testutil.CleanupAndRequireSuccess(b, ruleStorage.Close)
 
-	dnsEngine := NewDNSEngine(ruleStorage)
+	dnsEngine := urlfilter.NewDNSEngine(ruleStorage)
 
 	// Warmup to fill the pools.
-	var r *DNSResult
+	var r *urlfilter.DNSResult
 	var match bool
 	for _, reqHostname := range reqHostnames {
 		r, match = dnsEngine.Match(reqHostname)
@@ -668,11 +669,11 @@ func BenchmarkDNSEngine_MatchRequestInto(b *testing.B) {
 	ruleStorage := newRuleStorage(b)
 	testutil.CleanupAndRequireSuccess(b, ruleStorage.Close)
 
-	dnsEngine := NewDNSEngine(ruleStorage)
+	dnsEngine := urlfilter.NewDNSEngine(ruleStorage)
 
 	var match bool
-	req := &DNSRequest{}
-	res := &DNSResult{}
+	req := &urlfilter.DNSRequest{}
+	res := &urlfilter.DNSResult{}
 
 	// Warmup to fill the structs and the pools.
 	for _, reqHostname := range reqHostnames {
@@ -734,7 +735,7 @@ func FuzzDNSEngine_Match(f *testing.F) {
 
 	testutil.CleanupAndRequireSuccess(f, ruleStorage.Close)
 
-	dnsEngine := NewDNSEngine(ruleStorage)
+	dnsEngine := urlfilter.NewDNSEngine(ruleStorage)
 
 	f.Fuzz(func(t *testing.T, hostname string) {
 		assert.NotPanics(t, func() {

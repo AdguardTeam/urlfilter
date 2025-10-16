@@ -1,10 +1,11 @@
-package urlfilter
+package urlfilter_test
 
 import (
 	"net/netip"
 	"path"
 	"testing"
 
+	"github.com/AdguardTeam/urlfilter"
 	"github.com/AdguardTeam/urlfilter/internal/uftest"
 	"github.com/AdguardTeam/urlfilter/rules"
 	"github.com/miekg/dns"
@@ -71,7 +72,7 @@ func TestDNSResult_DNSRewrites(t *testing.T) {
 `
 
 	ruleStorage := newTestRuleStorage(t, uftest.ListID1, rulesText)
-	dnsEngine := NewDNSEngine(ruleStorage)
+	dnsEngine := urlfilter.NewDNSEngine(ruleStorage)
 	assert.NotNil(t, dnsEngine)
 
 	t.Run("disable-one", func(t *testing.T) {
@@ -303,7 +304,7 @@ func TestDNSEngine_MatchRequest_dnsRewrite(t *testing.T) {
 `
 
 	ruleStorage := newTestRuleStorage(t, uftest.ListID1, rulesText)
-	dnsEngine := NewDNSEngine(ruleStorage)
+	dnsEngine := urlfilter.NewDNSEngine(ruleStorage)
 	assert.NotNil(t, dnsEngine)
 
 	ipv4p1 := testIPv4
@@ -582,7 +583,7 @@ func TestDNSEngine_MatchRequest_dnsRewrite(t *testing.T) {
 	})
 
 	t.Run("https-type", func(t *testing.T) {
-		r := &DNSRequest{
+		r := &urlfilter.DNSRequest{
 			Hostname: path.Base(t.Name()),
 			DNSType:  dns.TypeHTTPS,
 		}
@@ -596,7 +597,7 @@ func TestDNSEngine_MatchRequest_dnsRewrite(t *testing.T) {
 		nr := dnsr[0]
 		assert.Equal(t, dns.RcodeRefused, nr.DNSRewrite.RCode)
 
-		r = &DNSRequest{
+		r = &urlfilter.DNSRequest{
 			Hostname: "https-type",
 			DNSType:  dns.TypeA,
 		}

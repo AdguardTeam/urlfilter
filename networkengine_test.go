@@ -1,4 +1,4 @@
-package urlfilter
+package urlfilter_test
 
 import (
 	"os"
@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/AdguardTeam/golibs/testutil"
+	"github.com/AdguardTeam/urlfilter"
 	"github.com/AdguardTeam/urlfilter/filterlist"
 	"github.com/AdguardTeam/urlfilter/internal/uftest"
 	"github.com/AdguardTeam/urlfilter/rules"
@@ -21,7 +22,7 @@ const (
 
 func TestEmptyNetworkEngine(t *testing.T) {
 	ruleStorage := newTestRuleStorage(t, uftest.ListID1, "")
-	engine := NewNetworkEngine(ruleStorage)
+	engine := urlfilter.NewNetworkEngine(ruleStorage)
 	r := rules.NewRequest("http://example.org/", "", rules.TypeOther)
 	rule, ok := engine.Match(r)
 	assert.False(t, ok)
@@ -33,7 +34,7 @@ func TestMatchWhitelistRule(t *testing.T) {
 	r2 := "@@http://example.org^"
 	rulesText := strings.Join([]string{r1, r2}, "\n")
 	ruleStorage := newTestRuleStorage(t, uftest.ListID1, rulesText)
-	engine := NewNetworkEngine(ruleStorage)
+	engine := urlfilter.NewNetworkEngine(ruleStorage)
 
 	r := rules.NewRequest("http://example.org/", "", rules.TypeScript)
 	rule, ok := engine.Match(r)
@@ -48,7 +49,7 @@ func TestMatchImportantRule(t *testing.T) {
 	r3 := "||test1.example.org^"
 	rulesText := strings.Join([]string{r1, r2, r3}, "\n")
 	ruleStorage := newTestRuleStorage(t, uftest.ListID1, rulesText)
-	engine := NewNetworkEngine(ruleStorage)
+	engine := urlfilter.NewNetworkEngine(ruleStorage)
 
 	r := rules.NewRequest("http://example.org/", "", rules.TypeOther)
 	rule, ok := engine.Match(r)
@@ -72,7 +73,7 @@ func TestMatchImportantRule(t *testing.T) {
 func TestMatchSourceRule(t *testing.T) {
 	ruleText := "|https://$image,media,script,third-party,domain=~feedback.pornhub.com|pornhub.com|redtube.com|redtube.com.br|tube8.com|tube8.es|tube8.fr|youporn.com|youporngay.com"
 	ruleStorage := newTestRuleStorage(t, uftest.ListID1, ruleText)
-	engine := NewNetworkEngine(ruleStorage)
+	engine := urlfilter.NewNetworkEngine(ruleStorage)
 
 	url := "https://ci.phncdn.com/videos/201809/25/184777011/original/(m=ecuKGgaaaa)(mh=VSmV9NL_iouBcWJJ)4.jpg"
 	sourceURL := "https://www.pornhub.com/view_video.php?viewkey=ph5be89d11de4b0"
@@ -87,7 +88,7 @@ func TestMatchSimplePattern(t *testing.T) {
 	// Simple pattern rule
 	ruleText := "_prebid_"
 	ruleStorage := newTestRuleStorage(t, uftest.ListID1, ruleText)
-	engine := NewNetworkEngine(ruleStorage)
+	engine := urlfilter.NewNetworkEngine(ruleStorage)
 
 	url := "https://ap.lijit.com/rtb/bid?src=prebid_prebid_1.35.0"
 	sourceURL := "https://www.drudgereport.com/"
@@ -221,7 +222,7 @@ func FuzzNetworkEngine_Match(f *testing.F) {
 
 	testutil.CleanupAndRequireSuccess(f, ruleStorage.Close)
 
-	engine := NewNetworkEngine(ruleStorage)
+	engine := urlfilter.NewNetworkEngine(ruleStorage)
 
 	f.Fuzz(func(t *testing.T, host string) {
 		assert.NotPanics(t, func() {
@@ -230,9 +231,9 @@ func FuzzNetworkEngine_Match(f *testing.F) {
 	})
 }
 
-// newTestNetworkEngine returns a new NetworkEngine initialized with the rules
-// from filterPath.
-func newTestNetworkEngine(tb testing.TB) (engine *NetworkEngine) {
+// newTestNetworkEngine returns a new *NetworkEngine initialized with the rules
+// from EasyList.
+func newTestNetworkEngine(tb testing.TB) (engine *urlfilter.NetworkEngine) {
 	tb.Helper()
 
 	filterBytes, err := os.ReadFile(filterPath)
@@ -246,20 +247,24 @@ func newTestNetworkEngine(tb testing.TB) (engine *NetworkEngine) {
 		}),
 	}
 
-	ruleStorage, err := filterlist.NewRuleStorage(lists)
+	s, err := filterlist.NewRuleStorage(lists)
 	require.NoError(tb, err)
 
-	return NewNetworkEngine(ruleStorage)
+	return urlfilter.NewNetworkEngine(s)
 }
 
-func newTestRuleStorage(t *testing.T, id rules.ListID, text string) (s *filterlist.RuleStorage) {
+// newTestRuleStorage is a helper that returns a new rule storage based on the
+// given list ID and rule text.
+func newTestRuleStorage(tb testing.TB, id rules.ListID, text string) (s *filterlist.RuleStorage) {
+	tb.Helper()
+
 	list := filterlist.NewString(&filterlist.StringConfig{
 		RulesText: text,
 		ID:        id,
 	})
 
 	s, err := filterlist.NewRuleStorage([]filterlist.Interface{list})
-	require.NoError(t, err)
+	require.NoError(tb, err)
 
 	return s
 }
