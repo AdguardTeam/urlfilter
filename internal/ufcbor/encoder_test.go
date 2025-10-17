@@ -350,7 +350,7 @@ func BenchmarkEncoder(b *testing.B) {
 	require.True(b, b.Run("EncodeArrayStart", func(b *testing.B) {
 		enc := ufcbor.NewEncoder()
 
-		// Warmup to fill the slice
+		// Warmup to fill the slice.
 		data := enc.EncodeArrayStart(nil, testUint64)
 
 		b.ReportAllocs()
@@ -362,7 +362,7 @@ func BenchmarkEncoder(b *testing.B) {
 	require.True(b, b.Run("EncodeInt64", func(b *testing.B) {
 		enc := ufcbor.NewEncoder()
 
-		// Warmup to fill the slice
+		// Warmup to fill the slice.
 		data := enc.EncodeInt64(nil, testInt64)
 
 		b.ReportAllocs()
@@ -374,7 +374,7 @@ func BenchmarkEncoder(b *testing.B) {
 	require.True(b, b.Run("EncodeMapStart", func(b *testing.B) {
 		enc := ufcbor.NewEncoder()
 
-		// Warmup to fill the slice
+		// Warmup to fill the slice.
 		data := enc.EncodeMapStart(nil, testUint64)
 
 		b.ReportAllocs()
@@ -386,7 +386,7 @@ func BenchmarkEncoder(b *testing.B) {
 	require.True(b, b.Run("EncodeUint64", func(b *testing.B) {
 		enc := ufcbor.NewEncoder()
 
-		// Warmup to fill the slice
+		// Warmup to fill the slice.
 		data := enc.EncodeUint64(nil, testUint64)
 
 		b.ReportAllocs()
@@ -429,7 +429,7 @@ func BenchmarkEncoder_EncodeBytes(b *testing.B) {
 			enc := ufcbor.NewEncoder()
 			byteString := bytes.Repeat([]byte("a"), bc.len)
 
-			// Warmup to fill the slice
+			// Warmup to fill the slice.
 			data := enc.EncodeBytes(nil, byteString)
 
 			b.ReportAllocs()

@@ -12,8 +12,6 @@ import (
 // TODO(a.garipov):  Consider turning into functions.
 //
 // TODO(a.garipov):  Move to golibs/cborutil.
-//
-// TODO(a.garipov):  Use.
 type Encoder struct{}
 
 // NewEncoder returns a new properly initialized Encoder.

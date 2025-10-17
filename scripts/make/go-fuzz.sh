@@ -32,131 +32,41 @@ fi
 readonly race_flags
 
 go="${GO:-go}"
+readonly go
 
 count_flags='--count=1'
+fuzztime_flags="${FUZZTIME_FLAGS:---fuzztime=20s}"
+run_flags='--run=^$'
 shuffle_flags='--shuffle=on'
 timeout_flags="${TIMEOUT_FLAGS:---timeout=30s}"
-fuzztime_flags="${FUZZTIME_FLAGS:---fuzztime=20s}"
 
-readonly go count_flags shuffle_flags timeout_flags fuzztime_flags
+readonly count_flags fuzztime_flags shuffle_flags timeout_flags
 
 # TODO(a.garipov): File an issue about using --fuzz with multiple packages.
-"$go" test \
-	"$count_flags" \
-	"$shuffle_flags" \
-	"$race_flags" \
-	"$timeout_flags" \
-	"$x_flags" \
-	"$v_flags" \
-	"$fuzztime_flags" \
-	--fuzz='FuzzCosmeticEngine_Match' \
-	. \
-	;
-
-"$go" test \
-	"$count_flags" \
-	"$shuffle_flags" \
-	"$race_flags" \
-	"$timeout_flags" \
-	"$x_flags" \
-	"$v_flags" \
-	"$fuzztime_flags" \
-	--fuzz='FuzzDNSEngine_Match' \
-	. \
-	;
-
-"$go" test \
-	"$count_flags" \
-	"$shuffle_flags" \
-	"$race_flags" \
-	"$timeout_flags" \
-	"$x_flags" \
-	"$v_flags" \
-	"$fuzztime_flags" \
-	--fuzz='FuzzNewEngine' \
-	. \
-	;
-
-"$go" test \
-	"$count_flags" \
-	"$shuffle_flags" \
-	"$race_flags" \
-	"$timeout_flags" \
-	"$x_flags" \
-	"$v_flags" \
-	"$fuzztime_flags" \
-	--fuzz='FuzzNetworkEngine_Match' \
-	. \
-	;
-
-"$go" test \
-	"$count_flags" \
-	"$shuffle_flags" \
-	"$race_flags" \
-	"$timeout_flags" \
-	"$x_flags" \
-	"$v_flags" \
-	"$fuzztime_flags" \
-	--fuzz='FuzzExtractHostname' \
-	./internal/ufnet/ \
-	;
-
-"$go" test \
-	"$count_flags" \
-	"$shuffle_flags" \
-	"$race_flags" \
-	"$timeout_flags" \
-	"$x_flags" \
-	"$v_flags" \
-	"$fuzztime_flags" \
-	--fuzz='FuzzNewRule' \
-	./rules/ \
-	;
-
-"$go" test \
-	"$count_flags" \
-	"$shuffle_flags" \
-	"$race_flags" \
-	"$timeout_flags" \
-	"$x_flags" \
-	"$v_flags" \
-	"$fuzztime_flags" \
-	--fuzz='FuzzCosmeticRule_Match' \
-	./rules/ \
-	;
-
-"$go" test \
-	"$count_flags" \
-	"$shuffle_flags" \
-	"$race_flags" \
-	"$timeout_flags" \
-	"$x_flags" \
-	"$v_flags" \
-	"$fuzztime_flags" \
-	--fuzz='FuzzHostRule_Match' \
-	./rules/ \
-	;
-
-"$go" test \
-	"$count_flags" \
-	"$shuffle_flags" \
-	"$race_flags" \
-	"$timeout_flags" \
-	"$x_flags" \
-	"$v_flags" \
-	"$fuzztime_flags" \
-	--fuzz='FuzzNetworkRule_Match' \
-	./rules/ \
-	;
-
-"$go" test \
-	"$count_flags" \
-	"$shuffle_flags" \
-	"$race_flags" \
-	"$timeout_flags" \
-	"$x_flags" \
-	"$v_flags" \
-	"$fuzztime_flags" \
-	--fuzz='FuzzIsDomainName' \
-	./internal/ufnet/ \
-	;
+while read -r pkg fuzzname; do
+	"$go" test \
+		"$count_flags" \
+		"$shuffle_flags" \
+		"$race_flags" \
+		"$run_flags" \
+		"$timeout_flags" \
+		"$x_flags" \
+		"$v_flags" \
+		"$fuzztime_flags" \
+		"--fuzz=${fuzzname}" \
+		"$pkg" \
+		;
+done <<-'EOF'
+	.                 FuzzCosmeticEngine_Match
+	.                 FuzzCosmeticRule_Match
+	.                 FuzzDNSEngine_Match
+	.                 FuzzNewEngine
+	./internal/ufcbor FuzzDecoder$
+	./internal/ufcbor FuzzDecoder_panic
+	./internal/ufnet  FuzzExtractHostname
+	./internal/ufnet  FuzzIsDomainName
+	./rules           FuzzHostRule_Match
+	./rules           FuzzNetworkEngine_Match
+	./rules           FuzzNetworkRule_Match
+	./rules           FuzzNewRule
+EOF
