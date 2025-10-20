@@ -1,12 +1,15 @@
 package urlfilter_test
 
 import (
+	"bufio"
 	"net/netip"
 	"os"
+	"regexp"
 	"runtime"
 	"strings"
 	"testing"
 
+	"github.com/AdguardTeam/golibs/netutil"
 	"github.com/AdguardTeam/golibs/testutil"
 	"github.com/AdguardTeam/urlfilter"
 	"github.com/AdguardTeam/urlfilter/filterlist"
@@ -570,29 +573,160 @@ func assertMatchRuleText(t *testing.T, rulesText string, rules *urlfilter.DNSRes
 // to get a better picture of the real changes in performance and discard the
 // first warmup run.
 func BenchmarkDNSEngine_heapAlloc(b *testing.B) {
-	s := newRuleStorage(b)
+	s := newDNSRuleStorage(b)
 	testutil.CleanupAndRequireSuccess(b, s.Close)
 
-	hostnames := uftest.RequestHostnames(b)
-	m := &dnsEngineMeasurement{}
+	matchingHostnames := parseAdGuardSDNHostnames(b)
 
-	b.ReportAllocs()
-	for b.Loop() {
-		m.run(b, s, hostnames)
+	nonMatchingHostnames := []string{"non-matching.example"}
+
+	benchCases := []struct {
+		name           string
+		wantAllMatched require.BoolAssertionFunc
+		hostnames      []string
+		numIter        int
+	}{{
+		name:           "1_matching",
+		wantAllMatched: require.True,
+		hostnames:      matchingHostnames,
+		numIter:        1,
+	}, {
+		name:           "10_matching",
+		wantAllMatched: require.True,
+		hostnames:      matchingHostnames,
+		numIter:        10,
+	}, {
+		name:           "100_matching",
+		wantAllMatched: require.True,
+		hostnames:      matchingHostnames,
+		numIter:        100,
+	}, {
+		name:           "1_non_matching",
+		wantAllMatched: require.False,
+		hostnames:      nonMatchingHostnames,
+		numIter:        1,
+	}, {
+		name:           "10_non_matching",
+		wantAllMatched: require.False,
+		hostnames:      nonMatchingHostnames,
+		numIter:        10,
+	}, {
+		name:           "100_non_matching",
+		wantAllMatched: require.False,
+		hostnames:      nonMatchingHostnames,
+		numIter:        100,
+	}}
+
+	for _, bc := range benchCases {
+		b.Run(bc.name, func(b *testing.B) {
+			m := &dnsEngineMeasurement{}
+
+			allMatched := false
+			b.ReportAllocs()
+			for b.Loop() {
+				allMatched = m.run(s, bc.hostnames, bc.numIter)
+			}
+
+			bc.wantAllMatched(b, allMatched)
+
+			n := float64(b.N)
+
+			b.ReportMetric(m.initialSum/n, "heap_initial_bytes/op")
+			b.ReportMetric(m.afterCompilationSum/n, "heap_after_compilation_bytes/op")
+			b.ReportMetric(m.afterMatchingSum/n, "heap_after_matching_bytes/op")
+		})
 	}
-
-	n := float64(b.N)
-
-	b.ReportMetric(m.initialSum/n, "heap_initial_bytes/op")
-	b.ReportMetric(m.afterCompilationSum/n, "heap_after_compilation_bytes/op")
-	b.ReportMetric(m.afterMatchingSum/n, "heap_after_matching_bytes/op")
 
 	// Most recent results:
 	//	goos: linux
 	//	goarch: amd64
 	//	pkg: github.com/AdguardTeam/urlfilter
 	//	cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
-	//	BenchmarkDNSEngine_heapAlloc-16    	      96	 106533305 ns/op	  38822958 heap_after_compilation_bytes/op	  39655175 heap_after_matching_bytes/op	  17544021 heap_initial_bytes/op	32920993 B/op	  479565 allocs/op
+	//	BenchmarkDNSEngine_heapAlloc/1_matching-16         	      28	 378749850 ns/op	 173674214 heap_after_compilation_bytes/op	 176133575 heap_after_matching_bytes/op	 141605243 heap_initial_bytes/op	34528331 B/op	  533792 allocs/op
+	//	BenchmarkDNSEngine_heapAlloc/10_matching-16        	       4	2641216112 ns/op	 173484944 heap_after_compilation_bytes/op	 197221932 heap_after_matching_bytes/op	 141591632 heap_initial_bytes/op	55630300 B/op	 1277698 allocs/op
+	//	BenchmarkDNSEngine_heapAlloc/100_matching-16       	       1	25081752219 ns/op	 173766144 heap_after_compilation_bytes/op	 283283240 heap_after_matching_bytes/op	 141553136 heap_initial_bytes/op	268869168 B/op	 8716858 allocs/op
+	//	BenchmarkDNSEngine_heapAlloc/1_non_matching-16     	     152	  79486993 ns/op	 173501243 heap_after_compilation_bytes/op	 173508723 heap_after_matching_bytes/op	 141566519 heap_initial_bytes/op	31942207 B/op	  450720 allocs/op
+	//	BenchmarkDNSEngine_heapAlloc/10_non_matching-16    	     156	  77002422 ns/op	 173520815 heap_after_compilation_bytes/op	 173528583 heap_after_matching_bytes/op	 141570125 heap_initial_bytes/op	31958469 B/op	  450730 allocs/op
+	//	BenchmarkDNSEngine_heapAlloc/100_non_matching-16   	     153	  81478424 ns/op	 173521682 heap_after_compilation_bytes/op	 173532330 heap_after_matching_bytes/op	 141573571 heap_initial_bytes/op	31958763 B/op	  450820 allocs/op
+}
+
+// DNS filter paths for tests.
+const (
+	networkFilterPath = testResourcesDir + "/adguard_sdn_filter.txt"
+	hostsPath         = testResourcesDir + "/hosts"
+)
+
+// newDNSRuleStorage returns new properly initialized rules storage with test
+// data from the AdGuard SDN filter.
+func newDNSRuleStorage(tb testing.TB) (ruleStorage *filterlist.RuleStorage) {
+	tb.Helper()
+
+	filterRuleList := ruleListFromPath(tb, networkFilterPath, uftest.ListID1)
+	hostsRuleList := ruleListFromPath(tb, hostsPath, uftest.ListID2)
+	ruleStorage, err := filterlist.NewRuleStorage([]filterlist.Interface{
+		filterRuleList,
+		hostsRuleList,
+	})
+	require.NoError(tb, err)
+
+	return ruleStorage
+}
+
+// adBlockRegexp is the regular expression used to extract a matching hostname
+// from a simple AdBlock rule.
+var adBlockRegexp = regexp.MustCompilePOSIX(`^\|\|([^^]+)\^$`)
+
+// parseAdGuardSDNHostnames returns hostnames that can be used for matching the
+// AdGuard Simplified Domain Names (SDN) filter.
+func parseAdGuardSDNHostnames(tb testing.TB) (hostnames []string) {
+	tb.Helper()
+
+	// Firstly, extract some hostnames that can be easily checked against from
+	// the SDN filter.
+	netFile, err := os.Open(networkFilterPath)
+	require.NoError(tb, err)
+	// Do not use [testutil.CleanupAndRequireSuccess], because the file should
+	// be closed by the end of this function.
+	defer func() { require.NoError(tb, netFile.Close()) }()
+
+	sc := bufio.NewScanner(netFile)
+	for sc.Scan() {
+		line := sc.Text()
+		matches := adBlockRegexp.FindStringSubmatch(line)
+		if matches == nil {
+			continue
+		}
+
+		require.Len(tb, matches, 2)
+		require.NotEmpty(tb, matches[1])
+
+		hostnames = append(hostnames, matches[1])
+	}
+
+	require.NoError(tb, sc.Err())
+
+	// Secondly, extract some hostnames from the hosts file.
+	hostsFile, err := os.Open(hostsPath)
+	require.NoError(tb, err)
+	defer func() { require.NoError(tb, hostsFile.Close()) }()
+
+	sc = bufio.NewScanner(hostsFile)
+	for sc.Scan() {
+		line := sc.Text()
+		if strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		_, hostname, ok := strings.Cut(line, " ")
+		if ok && netutil.IsValidHostname(hostname) {
+			hostnames = append(hostnames, hostname)
+		}
+	}
+
+	require.NoError(tb, sc.Err())
+	require.NotEmpty(tb, hostnames)
+
+	return hostnames
 }
 
 // dnsEngineMeasurement emulates a life cycle of a DNS filtering engine.
@@ -602,38 +736,44 @@ type dnsEngineMeasurement struct {
 	afterMatchingSum    float64
 }
 
-// run performs a DNS engine life cycle.  s must not be nil.
-func (m *dnsEngineMeasurement) run(tb testing.TB, s *filterlist.RuleStorage, hostnames []string) {
-	tb.Helper()
-
+// run performs a DNS engine life cycle.  s must not be nil.  numIter should be
+// greater than zero.
+func (m *dnsEngineMeasurement) run(
+	s *filterlist.RuleStorage,
+	hostnames []string,
+	numIter int,
+) (allMatched bool) {
 	runtime.GC()
 
-	m.initialSum += heapAlloc(tb)
+	m.initialSum += heapAlloc()
 
 	dnsEngine := urlfilter.NewDNSEngine(s)
 
-	m.afterCompilationSum += heapAlloc(tb)
+	m.afterCompilationSum += heapAlloc()
 
 	req := &urlfilter.DNSRequest{}
 	res := &urlfilter.DNSResult{}
 
-	var ok bool
-	for _, reqHostname := range hostnames {
-		req.Hostname = reqHostname
-		res.Reset()
+	allMatched = true
+	for range numIter {
+		for _, reqHostname := range hostnames {
+			req.Hostname = reqHostname
+			res.Reset()
 
-		ok = dnsEngine.MatchRequestInto(req, res)
+			ok := dnsEngine.MatchRequestInto(req, res)
+			allMatched = allMatched && ok
+		}
 	}
 
-	m.afterMatchingSum += heapAlloc(tb)
+	m.afterMatchingSum += heapAlloc()
 
-	require.True(tb, ok)
+	return allMatched
 }
 
 func BenchmarkDNSEngine_Match(b *testing.B) {
 	reqHostnames := uftest.RequestHostnames(b)
 
-	ruleStorage := newRuleStorage(b)
+	ruleStorage := newDNSRuleStorage(b)
 	testutil.CleanupAndRequireSuccess(b, ruleStorage.Close)
 
 	dnsEngine := urlfilter.NewDNSEngine(ruleStorage)
@@ -666,7 +806,7 @@ func BenchmarkDNSEngine_Match(b *testing.B) {
 func BenchmarkDNSEngine_MatchRequestInto(b *testing.B) {
 	reqHostnames := uftest.RequestHostnames(b)
 
-	ruleStorage := newRuleStorage(b)
+	ruleStorage := newDNSRuleStorage(b)
 	testutil.CleanupAndRequireSuccess(b, ruleStorage.Close)
 
 	dnsEngine := urlfilter.NewDNSEngine(ruleStorage)
@@ -756,27 +896,4 @@ func ruleListFromPath(tb testing.TB, path string, id rules.ListID) (l *filterlis
 		ID:             id,
 		IgnoreCosmetic: true,
 	})
-}
-
-const (
-	networkFilterPath = testResourcesDir + "/adguard_sdn_filter.txt"
-	hostsPath         = testResourcesDir + "/hosts"
-)
-
-// newRuleStorage returns new properly initialized rules storage with test data.
-func newRuleStorage(tb testing.TB) (ruleStorage *filterlist.RuleStorage) {
-	tb.Helper()
-
-	filterRuleList := ruleListFromPath(tb, networkFilterPath, uftest.ListID1)
-	hostsRuleList := ruleListFromPath(tb, hostsPath, uftest.ListID2)
-
-	ruleLists := []filterlist.Interface{
-		filterRuleList,
-		hostsRuleList,
-	}
-
-	ruleStorage, err := filterlist.NewRuleStorage(ruleLists)
-	require.NoError(tb, err)
-
-	return ruleStorage
 }
