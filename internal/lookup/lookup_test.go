@@ -51,9 +51,6 @@ const (
 	testURLStrBaseFilterDomain = "https://googleads.g.doubleclick.net/ads/preferences/"
 )
 
-// baseFilterData is the data from AdGuard Base Filter.
-var baseFilterData = errors.Must(os.ReadFile("../../testdata/adguard_base_filter.txt"))
-
 // newStorage is a helper that creates a rule storage for tests with the given
 // rule text.
 func newStorage(tb testing.TB, text string) (s *filterlist.RuleStorage) {
@@ -61,7 +58,26 @@ func newStorage(tb testing.TB, text string) (s *filterlist.RuleStorage) {
 
 	l := filterlist.NewString(&filterlist.StringConfig{
 		RulesText: text,
-		ID:        1,
+		ID:        uftest.ListID1,
+	})
+
+	s, err := filterlist.NewRuleStorage([]filterlist.Interface{l})
+	require.NoError(tb, err)
+
+	return s
+}
+
+// testBaseFilterData is the data from AdGuard Base Filter.
+var testBaseFilterData = errors.Must(os.ReadFile("../../testdata/adguard_base_filter.txt"))
+
+// newBaseFilterStorage is a helper that creates a rule storage for tests with
+// the data from AdGuard Base Filter.
+func newBaseFilterStorage(tb testing.TB) (s *filterlist.RuleStorage) {
+	tb.Helper()
+
+	l := filterlist.NewBytes(&filterlist.BytesConfig{
+		RulesText: testBaseFilterData,
+		ID:        uftest.ListID2,
 	})
 
 	s, err := filterlist.NewRuleStorage([]filterlist.Interface{l})
@@ -95,10 +111,10 @@ func assertMatch(tb testing.TB, tbl index, r *rules.Request, wantID filterlist.S
 }
 
 // assertRuleIsAdded is a helper to assert if a single rule has been added to
-// tbl.
+// idx.
 func assertRuleIsAdded(
 	tb testing.TB,
-	tbl index,
+	idx index,
 	s *filterlist.RuleStorage,
 	want assert.BoolAssertionFunc,
 ) {
@@ -110,7 +126,7 @@ func assertRuleIsAdded(
 		num++
 
 		r, id := sc.Rule()
-		want(tb, tbl.Add(r.(*rules.NetworkRule), id))
+		want(tb, idx.Add(r.(*rules.NetworkRule), id))
 	}
 
 	assert.Equal(tb, 1, num)

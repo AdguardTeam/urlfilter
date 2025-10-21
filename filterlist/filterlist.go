@@ -9,23 +9,8 @@ import (
 	"github.com/c2h5oh/datasize"
 )
 
-// StorageID is a compound identifier of a single rule.
-type StorageID struct {
-	listID  rules.ListID
-	ruleIdx int64
-}
-
-// NewStorageID converts a pair of a [rules.ListID] and rule-list index into a
-// StorageID.  ruleIdx must not be negative.
-func NewStorageID(listID rules.ListID, ruleIdx int64) (id StorageID) {
-	return StorageID{
-		listID:  listID,
-		ruleIdx: ruleIdx,
-	}
-}
-
-// On Linux the size of the data block is usually 4KB.  So it makes sense to use
-// 4KB.
+// On Linux the size of the data block is usually 4KiB.  So it makes sense to
+// use 4KiB.
 const readerBufferSize = 4 * datasize.KB
 
 // ErrRuleRetrieval signals that the rule cannot be retrieved by the specified

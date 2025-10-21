@@ -1,10 +1,16 @@
 package lookup
 
 import (
+	"encoding"
+	"fmt"
+	"maps"
+	"slices"
 	"strings"
 
 	"github.com/AdguardTeam/golibs/syncutil"
 	"github.com/AdguardTeam/urlfilter/filterlist"
+	"github.com/AdguardTeam/urlfilter/internal/ufcbor"
+	"github.com/AdguardTeam/urlfilter/internal/ufencoding"
 	"github.com/AdguardTeam/urlfilter/rules"
 )
 
@@ -44,6 +50,52 @@ func (idx *DomainIndex) Add(r *rules.NetworkRule, id filterlist.StorageID) (ok b
 	}
 
 	return true
+}
+
+// type check
+var _ encoding.BinaryAppender = (*DomainIndex)(nil)
+
+// AppendBinary implements the [encoding.BinaryAppender] interface for
+// *DomainIndex.  The only guarantee with regards to the backwards compatibility
+// is the following: when the result of AppendBinary is fed into
+// [DomainIndex.UnmarshalBinary] of an empty or reset *DomainIndex, the results
+// of [DomainIndex.AppendMatching] of this new table are the same as those of
+// the original one; all of this being within one version of the module.
+func (idx *DomainIndex) AppendBinary(orig []byte) (res []byte, err error) {
+	// Pseudo-JSON of the CBOR output:
+	//	{
+	//	  "domain1.example": [
+	//	    [ 1, 0 ],
+	//	    [ 1, 1 ],
+	//	    // …
+	//	  ],
+	//	  "domain2.example": [
+	//	    [ 1, 1 ],
+	//	    [ 1, 2 ],
+	//	    // …
+	//	  ],
+	//	  // …
+	//	}
+
+	res = orig
+
+	enc := ufcbor.NewEncoder()
+
+	res = enc.EncodeMapStart(res, uint64(len(idx.domainsIndex)))
+	for _, domain := range slices.Sorted(maps.Keys(idx.domainsIndex)) {
+		res = enc.EncodeBytes(res, []byte(domain))
+
+		ids := idx.domainsIndex[domain]
+		res = enc.EncodeArrayStart(res, uint64(len(ids)))
+		for i, id := range ids {
+			res, err = id.AppendBinary(res)
+			if err != nil {
+				return res, fmt.Errorf("domain %q: encoding id at index %d: %w", domain, i, err)
+			}
+		}
+	}
+
+	return res, nil
 }
 
 // AppendMatching appends the IDs of the rules matching r to orig and returns
@@ -103,4 +155,58 @@ func appendSubdomains(sub []string, domain string) (res []string) {
 // Reset prepares idx for reuse.
 func (idx *DomainIndex) Reset() {
 	clear(idx.domainsIndex)
+}
+
+// type check
+var _ encoding.BinaryUnmarshaler = (*DomainIndex)(nil)
+
+// UnmarshalBinary implements the [encoding.BinaryUnmarshaler] interface for
+// *DomainIndex.  b should be data that has been encoded by
+// [DomainIndex.AppendBinary].
+func (idx *DomainIndex) UnmarshalBinary(b []byte) (err error) {
+	_, err = idx.UnmarshalBinaryRest(b)
+
+	return err
+}
+
+// type check
+var _ ufencoding.BinaryUnmarshalerRest = (*DomainIndex)(nil)
+
+// UnmarshalBinaryRest implements the [ufencoding.BinaryUnmarshalerRest]
+// interface for *DomainIndex.  b should be data that has been encoded by
+// [DomainIndex.AppendBinary].
+func (idx *DomainIndex) UnmarshalBinaryRest(b []byte) (rest []byte, err error) {
+	rest = b
+	dec := ufcbor.NewDecoder()
+
+	l, rest := dec.DecodeMapStart(rest)
+
+	var keyBuffer []byte
+	idx.domainsIndex = make(map[string][]filterlist.StorageID, l)
+	for range l {
+		keyBuffer, rest = dec.AppendBytes(keyBuffer[:0], rest)
+
+		var idsLen uint64
+		idsLen, rest = dec.DecodeArrayStart(rest)
+
+		ids := make([]filterlist.StorageID, 0, idsLen)
+		for i := range idsLen {
+			var id filterlist.StorageID
+			rest, err = id.UnmarshalBinaryRest(rest)
+			if err != nil {
+				return b, fmt.Errorf("decoding domain %q: id at index %d: %w", keyBuffer, i, err)
+			}
+
+			ids = append(ids, id)
+		}
+
+		idx.domainsIndex[string(keyBuffer)] = ids
+	}
+
+	err = dec.Err()
+	if err != nil {
+		return b, err
+	}
+
+	return rest, nil
 }
