@@ -353,7 +353,7 @@ var dnsRewriteRRHandlers = map[RRType]dnsRewriteRRHandler{
 		if !netutil.IsValidIPString(valStr) {
 			return nil, fmt.Errorf("%q is not a valid ipv4", valStr)
 		} else if ip, err = netip.ParseAddr(valStr); err != nil {
-			// Don't wrap the error since it's informative enough as is.
+			// Don't wrap the error, because it's informative enough as is.
 			return nil, err
 		} else if !ip.Is4() {
 			return nil, fmt.Errorf("%q is not a valid ipv4", valStr)
@@ -371,7 +371,7 @@ var dnsRewriteRRHandlers = map[RRType]dnsRewriteRRHandler{
 		if !netutil.IsValidIPString(valStr) {
 			return nil, fmt.Errorf("%q is not a valid ipv6", valStr)
 		} else if ip, err = netip.ParseAddr(valStr); err != nil {
-			// Don't wrap the error since it's informative enough as is.
+			// Don't wrap the error, because it's informative enough as is.
 			return nil, err
 		} else if !ip.Is6() {
 			return nil, fmt.Errorf("%q is an ipv4, not an ipv6", valStr)

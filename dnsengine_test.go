@@ -574,8 +574,6 @@ func assertMatchRuleText(t *testing.T, rulesText string, rules *urlfilter.DNSRes
 // first warmup run.
 func BenchmarkDNSEngine_heapAlloc(b *testing.B) {
 	s := newDNSRuleStorage(b)
-	testutil.CleanupAndRequireSuccess(b, s.Close)
-
 	matchingHostnames := parseAdGuardSDNHostnames(b)
 
 	nonMatchingHostnames := []string{"non-matching.example"}
@@ -657,7 +655,8 @@ const (
 )
 
 // newDNSRuleStorage returns new properly initialized rules storage with test
-// data from the AdGuard SDN filter.
+// data from the AdGuard SDN filter.  It also adds its Close method to tb's
+// cleanup.
 func newDNSRuleStorage(tb testing.TB) (ruleStorage *filterlist.RuleStorage) {
 	tb.Helper()
 
@@ -668,6 +667,8 @@ func newDNSRuleStorage(tb testing.TB) (ruleStorage *filterlist.RuleStorage) {
 		hostsRuleList,
 	})
 	require.NoError(tb, err)
+
+	testutil.CleanupAndRequireSuccess(tb, ruleStorage.Close)
 
 	return ruleStorage
 }
@@ -774,8 +775,6 @@ func BenchmarkDNSEngine_Match(b *testing.B) {
 	reqHostnames := uftest.RequestHostnames(b)
 
 	ruleStorage := newDNSRuleStorage(b)
-	testutil.CleanupAndRequireSuccess(b, ruleStorage.Close)
-
 	dnsEngine := urlfilter.NewDNSEngine(ruleStorage)
 
 	// Warmup to fill the pools.
@@ -807,8 +806,6 @@ func BenchmarkDNSEngine_MatchRequestInto(b *testing.B) {
 	reqHostnames := uftest.RequestHostnames(b)
 
 	ruleStorage := newDNSRuleStorage(b)
-	testutil.CleanupAndRequireSuccess(b, ruleStorage.Close)
-
 	dnsEngine := urlfilter.NewDNSEngine(ruleStorage)
 
 	var match bool
@@ -863,18 +860,7 @@ func FuzzDNSEngine_Match(f *testing.F) {
 ::1 v4and6.com
 `
 
-	lists := []filterlist.Interface{
-		filterlist.NewString(&filterlist.StringConfig{
-			RulesText: rulesText,
-			ID:        uftest.ListID1,
-		}),
-	}
-
-	ruleStorage, err := filterlist.NewRuleStorage(lists)
-	require.NoError(f, err)
-
-	testutil.CleanupAndRequireSuccess(f, ruleStorage.Close)
-
+	ruleStorage := newTestRuleStorage(f, uftest.ListID1, rulesText)
 	dnsEngine := urlfilter.NewDNSEngine(ruleStorage)
 
 	f.Fuzz(func(t *testing.T, hostname string) {

@@ -3,11 +3,8 @@ package urlfilter_test
 import (
 	"testing"
 
-	"github.com/AdguardTeam/golibs/testutil"
 	"github.com/AdguardTeam/urlfilter"
-	"github.com/AdguardTeam/urlfilter/filterlist"
 	"github.com/AdguardTeam/urlfilter/internal/uftest"
-	"github.com/stretchr/testify/require"
 
 	"github.com/AdguardTeam/urlfilter/rules"
 
@@ -65,17 +62,5 @@ func FuzzNewEngine(f *testing.F) {
 func newTestEngine(tb testing.TB, rulesText string) (engine *urlfilter.Engine) {
 	tb.Helper()
 
-	lists := []filterlist.Interface{
-		filterlist.NewString(&filterlist.StringConfig{
-			RulesText: rulesText,
-			ID:        uftest.ListID1,
-		}),
-	}
-
-	ruleStorage, err := filterlist.NewRuleStorage(lists)
-	require.NoError(tb, err)
-
-	testutil.CleanupAndRequireSuccess(tb, ruleStorage.Close)
-
-	return urlfilter.NewEngine(ruleStorage)
+	return urlfilter.NewEngine(newTestRuleStorage(tb, uftest.ListID1, rulesText))
 }

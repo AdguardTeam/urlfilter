@@ -312,19 +312,3 @@ func newTestNetworkEngine(tb testing.TB) (engine *urlfilter.NetworkEngine) {
 
 	return urlfilter.NewNetworkEngine(s)
 }
-
-// newTestRuleStorage is a helper that returns a new rule storage based on the
-// given list ID and rule text.
-func newTestRuleStorage(tb testing.TB, id rules.ListID, text string) (s *filterlist.RuleStorage) {
-	tb.Helper()
-
-	list := filterlist.NewString(&filterlist.StringConfig{
-		RulesText: text,
-		ID:        id,
-	})
-
-	s, err := filterlist.NewRuleStorage([]filterlist.Interface{list})
-	require.NoError(tb, err)
-
-	return s
-}

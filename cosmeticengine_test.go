@@ -3,9 +3,7 @@ package urlfilter_test
 import (
 	"testing"
 
-	"github.com/AdguardTeam/golibs/testutil"
 	"github.com/AdguardTeam/urlfilter"
-	"github.com/AdguardTeam/urlfilter/filterlist"
 	"github.com/AdguardTeam/urlfilter/internal/uftest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -106,17 +104,7 @@ func newTestCosmeticEngine(tb testing.TB) (eng *urlfilter.CosmeticEngine) {
 example.org##banner_specific
 example.org#@#banner_generic_disabled`
 
-	lists := []filterlist.Interface{
-		filterlist.NewString(&filterlist.StringConfig{
-			RulesText: rulesText,
-			ID:        uftest.ListID1,
-		}),
-	}
-
-	ruleStorage, err := filterlist.NewRuleStorage(lists)
-	require.NoError(tb, err)
-
-	testutil.CleanupAndRequireSuccess(tb, ruleStorage.Close)
+	ruleStorage := newTestRuleStorage(tb, uftest.ListID1, rulesText)
 
 	return urlfilter.NewCosmeticEngine(ruleStorage)
 }
