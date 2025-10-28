@@ -27,8 +27,8 @@ func (e *Engine) MatchRequest(r *rules.Request) (res *rules.MatchingResult) {
 
 	// TODO(a.garipov):  Use pools.
 	networkRules = e.networkEngine.AppendAllMatching(nil, r)
-	if r.SourceURL != "" {
-		sourceRequest := rules.NewRequest(r.SourceURL, "", rules.TypeDocument)
+	if r.SourceURL != nil {
+		sourceRequest := rules.NewRequest(r.SourceURL, nil, rules.TypeDocument)
 
 		// TODO(a.garipov):  Use pools.
 		sourceRules = e.networkEngine.AppendAllMatching(nil, sourceRequest)

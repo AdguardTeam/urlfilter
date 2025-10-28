@@ -7,6 +7,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/AdguardTeam/golibs/netutil/urlutil"
 	"github.com/AdguardTeam/urlfilter/rules"
 )
 
@@ -60,9 +61,17 @@ type Session struct {
 func NewSession(id string, req *http.Request) *Session {
 	requestType := assumeRequestType(req, nil)
 
+	var sourceURL *url.URL
+	if req.Referer() != "" {
+		sourceURL = &url.URL{
+			Scheme: urlutil.SchemeHTTP,
+			Host:   req.Referer(),
+		}
+	}
+
 	s := Session{
 		ID:          id,
-		Request:     rules.NewRequest(req.URL.String(), req.Referer(), requestType),
+		Request:     rules.NewRequest(req.URL, sourceURL, requestType),
 		HTTPRequest: req,
 	}
 

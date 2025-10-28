@@ -3,12 +3,12 @@ package lookup_test
 import (
 	"bufio"
 	"bytes"
+	"net/url"
 	"regexp"
 	"testing"
 
 	"github.com/AdguardTeam/urlfilter/filterlist"
 	"github.com/AdguardTeam/urlfilter/internal/lookup"
-	"github.com/AdguardTeam/urlfilter/internal/uftest"
 	"github.com/AdguardTeam/urlfilter/rules"
 	"github.com/fxamacker/cbor/v2"
 	"github.com/stretchr/testify/assert"
@@ -123,7 +123,7 @@ func parseAdGuardBaseDomainRequests(tb testing.TB) (requests []*rules.Request) {
 		}
 
 		requests = append(requests, &rules.Request{
-			Hostname:       hostname,
+			Domain:         hostname,
 			SourceHostname: srcHostname,
 		})
 	}
@@ -142,32 +142,32 @@ func TestDomainIndex_AppendMatching(t *testing.T) {
 	loadIndex(t, idx, s)
 
 	testCases := []struct {
-		name      string
-		urlStr    string
-		srcURLStr string
-		wantID    filterlist.StorageID
+		url    *url.URL
+		srcURL *url.URL
+		name   string
+		wantID filterlist.StorageID
 	}{{
-		name:      "no_src",
-		urlStr:    uftest.URLStrHostSub,
-		srcURLStr: "",
-		wantID:    filterlist.StorageID{},
+		name:   "no_src",
+		url:    testURLWithSubdomain,
+		srcURL: nil,
+		wantID: filterlist.StorageID{},
 	}, {
-		name:      "match_domain",
-		urlStr:    uftest.URLStrHostSub,
-		srcURLStr: uftest.URLStrHost,
-		wantID:    filterlist.NewStorageID(1, 54),
+		name:   "match_domain",
+		url:    testURLWithSubdomain,
+		srcURL: testURLWithDomain,
+		wantID: filterlist.NewStorageID(1, 54),
 	}, {
-		name:      "match_subdomain",
-		urlStr:    uftest.URLStrHostSub,
-		srcURLStr: uftest.URLStrHostSub,
-		wantID:    filterlist.NewStorageID(1, 54),
+		name:   "match_subdomain",
+		url:    testURLWithSubdomain,
+		srcURL: testURLWithSubdomain,
+		wantID: filterlist.NewStorageID(1, 54),
 	}}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			r := rules.NewRequest(tc.urlStr, tc.srcURLStr, rules.TypeOther)
+			r := rules.NewRequest(tc.url, tc.srcURL, rules.TypeOther)
 			assertMatch(t, idx, r, tc.wantID)
 		})
 	}
@@ -178,7 +178,7 @@ func BenchmarkDomainIndex_AppendMatching(b *testing.B) {
 	idx := lookup.NewDomainIndex()
 	loadIndex(b, idx, s)
 
-	r := rules.NewRequest(uftest.URLStrHostSub, uftest.URLStrHost, rules.TypeOther)
+	r := rules.NewRequest(testURLWithSubdomain, testURLWithDomain, rules.TypeOther)
 
 	var gotIDs []filterlist.StorageID
 
@@ -193,11 +193,11 @@ func BenchmarkDomainIndex_AppendMatching(b *testing.B) {
 	require.Len(b, gotIDs, 1)
 
 	// Most recent results:
-	//	goos: linux
-	//	goarch: amd64
+	//	goos: darwin
+	//	goarch: arm64
 	//	pkg: github.com/AdguardTeam/urlfilter/internal/lookup
-	//	cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
-	//	BenchmarkDomainIndex_AppendMatching-16     	18093811	     65.43 ns/op	       0 B/op	       0 allocs/op
+	//	cpu: Apple M1 Pro
+	//	BenchmarkDomainIndex_AppendMatching-8   	31089458	        42.42 ns/op	       0 B/op	       0 allocs/op
 }
 
 func BenchmarkDomainIndex_AppendMatching_baseFilter(b *testing.B) {
@@ -205,7 +205,7 @@ func BenchmarkDomainIndex_AppendMatching_baseFilter(b *testing.B) {
 	idx := lookup.NewDomainIndex()
 	loadIndex(b, idx, s)
 
-	r := rules.NewRequest(testURLStrBaseFilterDomain, testURLStrBaseFilterDomain, rules.TypeOther)
+	r := rules.NewRequest(testURLBaseFilterDomain, testURLBaseFilterDomain, rules.TypeOther)
 
 	var gotIDs []filterlist.StorageID
 
@@ -223,11 +223,11 @@ func BenchmarkDomainIndex_AppendMatching_baseFilter(b *testing.B) {
 	assert.Equal(b, filterlist.NewStorageID(2, 6615547), gotIDs[1])
 
 	// Most recent results:
-	//	goos: linux
-	//	goarch: amd64
+	//	goos: darwin
+	//	goarch: arm64
 	//	pkg: github.com/AdguardTeam/urlfilter/internal/lookup
-	//	cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
-	//	BenchmarkDomainIndex_AppendMatching_baseFilter-16     	11390737	     105.9 ns/op	       0 B/op	       0 allocs/op
+	//	cpu: Apple M1 Pro
+	//	BenchmarkDomainIndex_AppendMatching_baseFilter-8   	16337264	        73.54 ns/op	       0 B/op	       0 allocs/op
 }
 
 func BenchmarkDomainIndex_init_baseFilter(b *testing.B) {
@@ -263,10 +263,10 @@ func BenchmarkDomainIndex_init_baseFilter(b *testing.B) {
 	}))
 
 	// Most recent results:
-	//	goos: linux
-	//	goarch: amd64
+	//	goos: darwin
+	//	goarch: arm64
 	//	pkg: github.com/AdguardTeam/urlfilter/internal/lookup
-	//	cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
-	//	BenchmarkDomainIndex_init_baseFilter/add-16  	      15	  74477428 ns/op	59832396 B/op	  763929 allocs/op
-	//	BenchmarkDomainIndex_init_baseFilter/unmarshal_binary-16         	    1180	   1004302 ns/op	  725402 B/op	   13025 allocs/op
+	//	cpu: Apple M1 Pro
+	//	BenchmarkDomainIndex_init_baseFilter/add-8         	      25	  46656342 ns/op	59846479 B/op	  763939 allocs/op
+	//	BenchmarkDomainIndex_init_baseFilter/unmarshal_binary-8         	    1893	    626544 ns/op	  725922 B/op	   13025 allocs/op
 }

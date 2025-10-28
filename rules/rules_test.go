@@ -12,16 +12,16 @@ const (
 	testHostnameLongTLD = "example.org.uk"
 )
 
-// Common hostnames and URL strings for tests.
-const (
-	testURLStrDoubleTLD = urlutil.SchemeHTTP + "://" + testHostnameLongTLD
-)
-
 // Common URLs for tests.
 var (
 	testURL = &url.URL{
 		Scheme: urlutil.SchemeHTTP,
 		Host:   uftest.Host,
+	}
+
+	testURLDoubleTLD = &url.URL{
+		Scheme: urlutil.SchemeHTTP,
+		Host:   testHostnameLongTLD,
 	}
 
 	testURLSub = &url.URL{

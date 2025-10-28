@@ -3,12 +3,13 @@ package lookup_test
 import (
 	"bufio"
 	"bytes"
+	"net/url"
 	"regexp"
 	"testing"
 
+	"github.com/AdguardTeam/golibs/netutil/urlutil"
 	"github.com/AdguardTeam/urlfilter/filterlist"
 	"github.com/AdguardTeam/urlfilter/internal/lookup"
-	"github.com/AdguardTeam/urlfilter/internal/uftest"
 	"github.com/AdguardTeam/urlfilter/rules"
 	"github.com/fxamacker/cbor/v2"
 	"github.com/stretchr/testify/assert"
@@ -119,7 +120,11 @@ func parseAdGuardBaseShortcutRequests(tb testing.TB) (requests []*rules.Request)
 		hostname := matches[1]
 		require.NotEmpty(tb, hostname)
 
-		r := &rules.Request{}
+		r := &rules.Request{
+			URL: &url.URL{
+				Scheme: urlutil.SchemeHTTP,
+			},
+		}
 		rules.FillRequestForHostname(r, hostname)
 
 		requests = append(requests, r)
@@ -139,16 +144,16 @@ func TestShortcutIndex_AppendMatching(t *testing.T) {
 	loadIndex(t, idx, s)
 
 	testCases := []struct {
+		url    *url.URL
 		name   string
-		urlStr string
 		wantID filterlist.StorageID
 	}{{
 		name:   "no_match",
-		urlStr: uftest.URLStrHostOther,
+		url:    testURLNoMatch,
 		wantID: filterlist.StorageID{},
 	}, {
 		name:   "match",
-		urlStr: uftest.URLStrHost,
+		url:    testURLWithDomain,
 		wantID: filterlist.NewStorageID(1, 0),
 	}}
 
@@ -156,7 +161,7 @@ func TestShortcutIndex_AppendMatching(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			r := rules.NewRequest(tc.urlStr, tc.urlStr, rules.TypeOther)
+			r := rules.NewRequest(tc.url, tc.url, rules.TypeOther)
 			assertMatch(t, idx, r, tc.wantID)
 		})
 	}
@@ -167,7 +172,7 @@ func BenchmarkShortcutIndex_AppendMatching(b *testing.B) {
 	idx := lookup.NewShortcutIndex()
 	loadIndex(b, idx, s)
 
-	r := rules.NewRequest(uftest.URLStrHost, uftest.URLStrHost, rules.TypeOther)
+	r := rules.NewRequest(testURLWithDomain, testURLWithDomain, rules.TypeOther)
 
 	var gotIDs []filterlist.StorageID
 
@@ -184,11 +189,11 @@ func BenchmarkShortcutIndex_AppendMatching(b *testing.B) {
 	assertMatch(b, idx, r, filterlist.NewStorageID(1, 0))
 
 	// Most recent results:
-	//	goos: linux
-	//	goarch: amd64
+	//	goos: darwin
+	//	goarch: arm64
 	//	pkg: github.com/AdguardTeam/urlfilter/internal/lookup
-	//	cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
-	//	BenchmarkShortcutIndex_AppendMatching-16  	 6299392	       191.3 ns/op	       0 B/op	       0 allocs/op
+	//	cpu: Apple M1 Pro
+	//	BenchmarkShortcutIndex_AppendMatching-8   	 6955702	       166.2 ns/op	       0 B/op	       0 allocs/op
 }
 
 func BenchmarkShortcutIndex_AppendMatching_baseFilter(b *testing.B) {
@@ -196,7 +201,7 @@ func BenchmarkShortcutIndex_AppendMatching_baseFilter(b *testing.B) {
 	idx := lookup.NewShortcutIndex()
 	loadIndex(b, idx, s)
 
-	r := rules.NewRequest(testURLStrBaseFilterDomain, testURLStrBaseFilterDomain, rules.TypeOther)
+	r := rules.NewRequest(testURLBaseFilterDomain, testURLBaseFilterDomain, rules.TypeOther)
 
 	var gotIDs []filterlist.StorageID
 
@@ -218,11 +223,11 @@ func BenchmarkShortcutIndex_AppendMatching_baseFilter(b *testing.B) {
 	assert.True(b, matched)
 
 	// Most recent results:
-	//	goos: linux
-	//	goarch: amd64
+	//	goos: darwin
+	//	goarch: arm64
 	//	pkg: github.com/AdguardTeam/urlfilter/internal/lookup
-	//	cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
-	//	BenchmarkShortcutIndex_AppendMatching_baseFilter-16  	 1000000	      1039 ns/op	       0 B/op	       0 allocs/op
+	//	cpu: Apple M1 Pro
+	//	BenchmarkShortcutIndex_AppendMatching_baseFilter-8   	 1482379	       810.8 ns/op	       0 B/op	       0 allocs/op
 }
 
 func BenchmarkShortcutIndex_init_baseFilter(b *testing.B) {
@@ -258,10 +263,10 @@ func BenchmarkShortcutIndex_init_baseFilter(b *testing.B) {
 	}))
 
 	// Most recent results:
-	//	goos: linux
-	//	goarch: amd64
+	//	goos: darwin
+	//	goarch: arm64
 	//	pkg: github.com/AdguardTeam/urlfilter/internal/lookup
-	//	cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
-	//	BenchmarkShortcutIndex_init_baseFilter/add-16                    	      12	  95937651 ns/op	60541030 B/op	  820519 allocs/op
-	//	BenchmarkShortcutIndex_init_baseFilter/unmarshal_binary-16       	     100	  11775669 ns/op	 7743815 B/op	  132933 allocs/op
+	//	cpu: Apple M1 Pro
+	//	BenchmarkShortcutIndex_init_baseFilter/add-8         	      18	  63896690 ns/op	60612069 B/op	  820547 allocs/op
+	//	BenchmarkShortcutIndex_init_baseFilter/unmarshal_binary-8         	     211	   5597618 ns/op	 7743849 B/op	  132933 allocs/op
 }

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/netip"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/AdguardTeam/golibs/netutil/urlutil"
@@ -185,11 +186,11 @@ func TestNetworkRule_Match_simpleBasicRules(t *testing.T) {
 
 	// Simple matching rule.
 	r := uftest.NewNetworkRule(t, uftest.RuleHost)
-	req := rules.NewRequest(uftest.URLStrHost, "", rules.TypeOther)
+	req := rules.NewRequest(testURL, nil, rules.TypeOther)
 	assert.True(t, r.Match(req))
 
 	r = uftest.NewNetworkRule(t, "||"+uftest.Host+"/*")
-	req = rules.NewRequest(uftest.URLStrHost, "", rules.TypeOther)
+	req = rules.NewRequest(testURL, nil, rules.TypeOther)
 	assert.True(t, r.Match(req))
 
 	// Subdomains / domains.
@@ -202,16 +203,20 @@ func TestNetworkRule_Match_simpleBasicRules(t *testing.T) {
 
 	// Simple regex rule.
 	r = uftest.NewNetworkRule(t, `/host\.example/`)
-	req = rules.NewRequest(uftest.URLStrHost, "", rules.TypeOther)
+	req = rules.NewRequest(testURL, nil, rules.TypeOther)
 	assert.True(t, r.Match(req))
 
 	// Simple pattern rule.
 	r = uftest.NewNetworkRule(t, "_prebid_")
-	req = rules.NewRequest(
-		"https://ap.lijit.com/rtb/bid?src=prebid_prebid_1.35.0",
-		"https://www.drudgereport.com/",
-		rules.TypeXmlhttprequest,
-	)
+	req = rules.NewRequest(&url.URL{
+		Scheme:   urlutil.SchemeHTTPS,
+		Host:     "ap.lijit.com",
+		Path:     "/rtb/bid",
+		RawQuery: "src=prebid_prebid_1.35.0",
+	}, &url.URL{
+		Scheme: urlutil.SchemeHTTPS,
+		Host:   "www.drudgereport.com",
+	}, rules.TypeXmlhttprequest)
 	assert.True(t, r.Match(req))
 }
 
@@ -237,10 +242,13 @@ func TestNetworkRule_Match_case(t *testing.T) {
 	t.Parallel()
 
 	r := uftest.NewNetworkRule(t, uftest.RuleHost+"$match-case")
-	req := rules.NewRequest(uftest.URLStrHost, "", rules.TypeOther)
+	req := rules.NewRequest(testURL, nil, rules.TypeOther)
 	assert.True(t, r.Match(req))
 
-	req = rules.NewRequest("https://EXAMPLE.org/", "", rules.TypeOther)
+	req = rules.NewRequest(&url.URL{
+		Scheme: urlutil.SchemeHTTP,
+		Host:   strings.ToUpper(uftest.Host),
+	}, nil, rules.TypeOther)
 	assert.False(t, r.Match(req))
 }
 
@@ -250,29 +258,29 @@ func TestNetworkRule_Match_thirdParty(t *testing.T) {
 	r := uftest.NewNetworkRule(t, uftest.RuleHost+"$third-party")
 
 	// First-party 1.
-	req := rules.NewRequest(uftest.URLStrHost, "", rules.TypeOther)
+	req := rules.NewRequest(testURL, nil, rules.TypeOther)
 	assert.False(t, r.Match(req))
 
 	// First-party 2.
-	req = rules.NewRequest(uftest.URLStrHostSub, uftest.URLStrHost, rules.TypeOther)
+	req = rules.NewRequest(testURLSub, testURL, rules.TypeOther)
 	assert.False(t, r.Match(req))
 
 	// Third-party.
-	req = rules.NewRequest(uftest.URLStrHost, uftest.URLStrHostOther, rules.TypeOther)
+	req = rules.NewRequest(testURL, testURLOther, rules.TypeOther)
 	assert.True(t, r.Match(req))
 
 	r = uftest.NewNetworkRule(t, uftest.RuleHost+"$first-party")
 
 	// First-party 1.
-	req = rules.NewRequest(uftest.URLStrHost, "", rules.TypeOther)
+	req = rules.NewRequest(testURL, nil, rules.TypeOther)
 	assert.True(t, r.Match(req))
 
 	// First-party.
-	req = rules.NewRequest(uftest.URLStrHostSub, uftest.URLStrHost, rules.TypeOther)
+	req = rules.NewRequest(testURLSub, testURL, rules.TypeOther)
 	assert.True(t, r.Match(req))
 
 	// Third-party.
-	req = rules.NewRequest(uftest.URLStrHost, uftest.URLStrHostOther, rules.TypeOther)
+	req = rules.NewRequest(testURL, testURLOther, rules.TypeOther)
 	assert.False(t, r.Match(req))
 }
 
@@ -281,32 +289,32 @@ func TestNetworkRule_Match_contentType(t *testing.T) {
 
 	// $script.
 	r := uftest.NewNetworkRule(t, uftest.RuleHost+"$script")
-	req := rules.NewRequest(uftest.URLStrHost, "", rules.TypeScript)
+	req := rules.NewRequest(testURL, nil, rules.TypeScript)
 	assert.True(t, r.Match(req))
 
-	req = rules.NewRequest(uftest.URLStrHost, "", rules.TypeDocument)
+	req = rules.NewRequest(testURL, nil, rules.TypeDocument)
 	assert.False(t, r.Match(req))
 
 	// $script and $stylesheet.
 	r = uftest.NewNetworkRule(t, uftest.RuleHost+"$script,stylesheet")
-	req = rules.NewRequest(uftest.URLStrHost, "", rules.TypeScript)
+	req = rules.NewRequest(testURL, nil, rules.TypeScript)
 	assert.True(t, r.Match(req))
 
-	req = rules.NewRequest(uftest.URLStrHost, "", rules.TypeStylesheet)
+	req = rules.NewRequest(testURL, nil, rules.TypeStylesheet)
 	assert.True(t, r.Match(req))
 
-	req = rules.NewRequest(uftest.URLStrHost, "", rules.TypeDocument)
+	req = rules.NewRequest(testURL, nil, rules.TypeDocument)
 	assert.False(t, r.Match(req))
 
 	// Everything except $script and $stylesheet.
 	r = uftest.NewNetworkRule(t, "@@"+uftest.RuleHost+"$~script,~stylesheet")
-	req = rules.NewRequest(uftest.URLStrHost, "", rules.TypeScript)
+	req = rules.NewRequest(testURL, nil, rules.TypeScript)
 	assert.False(t, r.Match(req))
 
-	req = rules.NewRequest(uftest.URLStrHost, "", rules.TypeStylesheet)
+	req = rules.NewRequest(testURL, nil, rules.TypeStylesheet)
 	assert.False(t, r.Match(req))
 
-	req = rules.NewRequest(uftest.URLStrHost, "", rules.TypeDocument)
+	req = rules.NewRequest(testURL, nil, rules.TypeDocument)
 	assert.True(t, r.Match(req))
 }
 
@@ -315,40 +323,40 @@ func TestNetworkRule_Match_domainRestrictions(t *testing.T) {
 
 	// Just one permitted domain.
 	r := uftest.NewNetworkRule(t, uftest.RuleHost+"$domain="+uftest.Host)
-	req := rules.NewRequest(uftest.URLStrHost, "", rules.TypeScript)
+	req := rules.NewRequest(testURL, nil, rules.TypeScript)
 	assert.False(t, r.Match(req))
 
-	req = rules.NewRequest(uftest.URLStrHost, uftest.URLStrHost, rules.TypeScript)
+	req = rules.NewRequest(testURL, testURL, rules.TypeScript)
 	assert.True(t, r.Match(req))
 
-	req = rules.NewRequest(uftest.URLStrHost, uftest.URLStrHostSub, rules.TypeScript)
+	req = rules.NewRequest(testURL, testURLSub, rules.TypeScript)
 	assert.True(t, r.Match(req))
 
 	// One permitted, subdomain restricted.
 	r = uftest.NewNetworkRule(t, uftest.RuleHost+"$domain="+uftest.Host+"|~"+uftest.HostSub)
-	req = rules.NewRequest(uftest.URLStrHost, "", rules.TypeScript)
+	req = rules.NewRequest(testURL, nil, rules.TypeScript)
 	assert.False(t, r.Match(req))
 
-	req = rules.NewRequest(uftest.URLStrHost, uftest.URLStrHost, rules.TypeScript)
+	req = rules.NewRequest(testURL, testURL, rules.TypeScript)
 	assert.True(t, r.Match(req))
 
-	req = rules.NewRequest(uftest.URLStrHost, uftest.URLStrHostSub, rules.TypeScript)
+	req = rules.NewRequest(testURL, testURLSub, rules.TypeScript)
 	assert.False(t, r.Match(req))
 
 	// One restricted.
 	r = uftest.NewNetworkRule(t, uftest.RuleHost+"$domain=~"+uftest.Host)
-	req = rules.NewRequest(uftest.URLStrHost, "", rules.TypeScript)
+	req = rules.NewRequest(testURL, nil, rules.TypeScript)
 	assert.True(t, r.Match(req))
 
-	req = rules.NewRequest(uftest.URLStrHost, uftest.URLStrHost, rules.TypeScript)
+	req = rules.NewRequest(testURL, testURL, rules.TypeScript)
 	assert.False(t, r.Match(req))
 
-	req = rules.NewRequest(uftest.URLStrHost, uftest.URLStrHostSub, rules.TypeScript)
+	req = rules.NewRequest(testURL, testURLSub, rules.TypeScript)
 	assert.False(t, r.Match(req))
 
 	// Wide restricted.
 	r = uftest.NewNetworkRule(t, "$domain="+uftest.Host)
-	req = rules.NewRequest(uftest.URLStrHostOther, uftest.URLStrHost, rules.TypeScript)
+	req = rules.NewRequest(testURLOther, testURL, rules.TypeScript)
 	assert.True(t, r.Match(req))
 }
 
@@ -461,18 +469,7 @@ func TestNetworkRule_Match_denyallow(t *testing.T) {
 				return
 			}
 
-			reqURLStr := ""
-			if tc.requestURL != nil {
-				reqURLStr = tc.requestURL.String()
-			}
-
-			sourceURLStr := ""
-			if tc.sourceURL != nil {
-				sourceURLStr = tc.sourceURL.String()
-			}
-
-			// TODO(d.kolyshev): Make NewRequest accept *url.URL.
-			req := rules.NewRequest(reqURLStr, sourceURLStr, rules.TypeScript)
+			req := rules.NewRequest(tc.requestURL, tc.sourceURL, rules.TypeScript)
 			req.IsHostnameRequest = tc.requestForHostname
 
 			tc.want(t, r.Match(req))
@@ -539,13 +536,7 @@ func TestNetworkRule_Match_wildcardTLDRestrictions(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			sourceURLStr := ""
-			if tc.sourceURL != nil {
-				sourceURLStr = tc.sourceURL.String()
-			}
-
-			// TODO(d.kolyshev): Make NewRequest accept *url.URL.
-			req := rules.NewRequest(requestURL.String(), sourceURLStr, rules.TypeScript)
+			req := rules.NewRequest(requestURL, tc.sourceURL, rules.TypeScript)
 			tc.want(t, r.Match(req))
 		})
 	}
@@ -739,11 +730,13 @@ func TestNetworkRule_IsHigherPriority(t *testing.T) {
 func TestNetworkRule_Match_source(t *testing.T) {
 	t.Parallel()
 
-	urlStr := "https://ci.phncdn.com/videos/201809/25/184777011/original/" +
-		"(m=ecuKGgaaaa)(mh=VSmV9NL_iouBcWJJ)4.jpg"
-	sourceURLStr := "https://www.pornhub.com/view_video.php?viewkey=ph5be89d11de4b0"
+	u, err := url.Parse("https://ci.phncdn.com/videos/201809/25/184777011/original/(m=ecuKGgaaaa)(mh=VSmV9NL_iouBcWJJ)4.jpg")
+	require.NoError(t, err)
 
-	req := rules.NewRequest(urlStr, sourceURLStr, rules.TypeImage)
+	sourceURL, err := url.Parse("https://www.pornhub.com/view_video.php?viewkey=ph5be89d11de4b0")
+	require.NoError(t, err)
+
+	req := rules.NewRequest(u, sourceURL, rules.TypeImage)
 	ruleText := "|https://$image,media,script,third-party,domain=" +
 		"~feedback.pornhub.com|pornhub.com|redtube.com|redtube.com.br|tube8.com|" +
 		"tube8.es|tube8.fr|youporn.com|youporngay.com"
@@ -787,7 +780,7 @@ func TestNetworkRule_invalidRule(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, r)
 
-	req := rules.NewRequest(uftest.URLStrHost, "", rules.TypeOther)
+	req := rules.NewRequest(testURL, nil, rules.TypeOther)
 	req.ClientIP = netip.MustParseAddr("127.0.0.1")
 	assert.True(t, r.Match(req))
 }

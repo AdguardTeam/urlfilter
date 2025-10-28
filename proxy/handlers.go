@@ -24,7 +24,7 @@ func (s *Server) onRequest(sess *gomitmproxy.Session) (*http.Request, *http.Resp
 		return nil, nil
 	}
 
-	if session.Request.Hostname == s.InjectionHost {
+	if session.Request.URL.Hostname() == s.InjectionHost {
 		return r, s.buildContentScript(session)
 	}
 

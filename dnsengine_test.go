@@ -795,11 +795,11 @@ func BenchmarkDNSEngine_Match(b *testing.B) {
 	assert.True(b, match)
 
 	// Most recent results:
-	//	goos: linux
-	//	goarch: amd64
+	//	goos: darwin
+	//	goarch: arm64
 	//	pkg: github.com/AdguardTeam/urlfilter
-	//	cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
-	//	BenchmarkDNSEngine_Match-16    	      20	  61072490 ns/op	 3193156 B/op	   68918 allocs/op
+	//	cpu: Apple M1 Pro
+	//	BenchmarkDNSEngine_Match-8   	      19	  58246607 ns/op	 7566559 B/op	   96903 allocs/op
 }
 
 func BenchmarkDNSEngine_MatchRequestInto(b *testing.B) {
@@ -833,11 +833,11 @@ func BenchmarkDNSEngine_MatchRequestInto(b *testing.B) {
 	assert.True(b, match)
 
 	// Most recent results:
-	//	goos: linux
-	//	goarch: amd64
+	//	goos: darwin
+	//	goarch: arm64
 	//	pkg: github.com/AdguardTeam/urlfilter
-	//	cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
-	//	BenchmarkDNSEngine_MatchRequestInto-16    	      22	  50762008 ns/op	  814592 B/op	   27969 allocs/op
+	//	cpu: Apple M1 Pro
+	//	BenchmarkDNSEngine_MatchRequestInto-8   	      20	  57013300 ns/op	 5191933 B/op	   55950 allocs/op
 }
 
 func FuzzDNSEngine_Match(f *testing.F) {

@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"bytes"
 	"fmt"
 	"math/bits"
 	"net/netip"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/AdguardTeam/golibs/mathutil"
 	"github.com/AdguardTeam/golibs/netutil"
+	"github.com/AdguardTeam/golibs/syncutil"
 )
 
 // Parts of rules.
@@ -301,6 +303,9 @@ func (r *NetworkRule) String() (s string) {
 	return r.text
 }
 
+// urlBytesPool is a pool of byte slices used to store URLs.
+var urlBytesPool = syncutil.NewSlicePool[byte](MaxURLLength)
+
 // Match checks if this filtering rule matches the specified request.  req must
 // not be nil.
 func (r *NetworkRule) Match(req *Request) (ok bool) {
@@ -310,7 +315,7 @@ func (r *NetworkRule) Match(req *Request) (ok bool) {
 		r.IsOptionEnabled(OptionThirdParty) && !req.ThirdParty,
 		r.IsOptionDisabled(OptionThirdParty) && req.ThirdParty,
 		!r.matchRequestType(req.RequestType),
-		!r.matchRequestDomain(req.Hostname, req.IsHostnameRequest),
+		!r.matchRequestDomain(req.URL.Hostname(), req.IsHostnameRequest),
 		!r.matchSourceDomain(req.SourceHostname),
 		!r.matchDNSType(req.DNSType),
 		!r.matchClientTags(req.SortedClientTags),
@@ -527,10 +532,15 @@ func (r *NetworkRule) matchPattern(req *Request) (matched bool) {
 	}
 
 	if r.shouldMatchHostname(req) {
-		return r.regexp.MatchString(req.Hostname)
+		return r.regexp.MatchString(req.URL.Hostname())
 	}
 
-	return r.regexp.MatchString(req.URL)
+	bufPtr := urlBytesPool.Get()
+	defer urlBytesPool.Put(bufPtr)
+
+	*bufPtr = req.AppendURLData((*bufPtr)[:0], false)
+
+	return r.regexp.Match(*bufPtr)
 }
 
 // shouldMatchHostname checks if we should match hostname and not the URL.  This
@@ -570,9 +580,20 @@ func (r *NetworkRule) shouldMatchHostname(req *Request) (ok bool) {
 	return true
 }
 
-// matchShortcut simply checks if shortcut is a substring of the URL.
+// matchShortcut simply checks if shortcut is a substring of the given request
+// URL.
 func (r *NetworkRule) matchShortcut(req *Request) (ok bool) {
-	return strings.Contains(req.URLLowerCase, r.Shortcut)
+	bufPtr := urlBytesPool.Get()
+	defer urlBytesPool.Put(bufPtr)
+
+	*bufPtr = req.AppendURLData((*bufPtr)[:0], true)
+
+	scPtr := urlBytesPool.Get()
+	defer urlBytesPool.Put(scPtr)
+
+	*scPtr = append((*scPtr)[:0], r.Shortcut...)
+
+	return bytes.Contains(*bufPtr, *scPtr)
 }
 
 // matchRequestDomain checks if the filtering rule is allowed to match this

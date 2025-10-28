@@ -2,8 +2,10 @@ package urlfilter
 
 import (
 	"net/netip"
+	"net/url"
 
 	"github.com/AdguardTeam/golibs/container"
+	"github.com/AdguardTeam/golibs/netutil/urlutil"
 	"github.com/AdguardTeam/golibs/syncutil"
 	"github.com/AdguardTeam/urlfilter/filterlist"
 	"github.com/AdguardTeam/urlfilter/rules"
@@ -126,9 +128,12 @@ func (e *DNSEngine) Match(hostname string) (res *DNSResult, matched bool) {
 func (e *DNSEngine) getRequestFromPool(dReq *DNSRequest) (req *rules.Request) {
 	req = e.reqPool.Get()
 
+	req.URL = &url.URL{
+		Scheme: urlutil.SchemeHTTP,
+	}
 	req.SourceDomain = ""
 	req.SourceHostname = ""
-	req.SourceURL = ""
+	req.SourceURL = nil
 
 	req.SortedClientTags = dReq.SortedClientTags
 	req.ClientIP = dReq.ClientIP

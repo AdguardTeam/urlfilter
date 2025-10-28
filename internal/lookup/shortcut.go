@@ -37,6 +37,9 @@ type ShortcutIndex struct {
 	// shortcutsPool contains slices of shortcuts for reuse.
 	shortcutsPool *syncutil.Pool[[]shortcut]
 
+	// urlBytesPool contains bytes for reuse.
+	urlBytesPool *syncutil.Pool[[]byte]
+
 	// shortcuts is the index of a shortcut to its data.
 	shortcuts map[shortcut][]filterlist.StorageID
 }
@@ -49,6 +52,7 @@ const shortcutsInARuleEst = 16
 func NewShortcutIndex() (idx *ShortcutIndex) {
 	return &ShortcutIndex{
 		shortcutsPool: syncutil.NewSlicePool[shortcut](shortcutsInARuleEst),
+		urlBytesPool:  syncutil.NewSlicePool[byte](rules.MaxURLLength),
 		shortcuts:     map[shortcut][]filterlist.StorageID{},
 	}
 }
@@ -180,13 +184,18 @@ func (idx *ShortcutIndex) AppendMatching(
 ) (res []filterlist.StorageID) {
 	res = orig
 
-	l := len(r.URLLowerCase)
+	bufPtr := idx.urlBytesPool.Get()
+	defer idx.urlBytesPool.Put(bufPtr)
+
+	*bufPtr = r.AppendURLData((*bufPtr)[:0], true)
+
+	l := len(*bufPtr)
 	if l < shortcutLength {
 		return res
 	}
 
 	for i := range l - shortcutLength {
-		sc := shortcut(r.URLLowerCase[i : i+shortcutLength])
+		sc := shortcut((*bufPtr)[i : i+shortcutLength])
 		ids := idx.shortcuts[sc]
 		if len(ids) == 0 {
 			continue

@@ -3,20 +3,14 @@ package rules
 import (
 	"math/bits"
 	"net/netip"
+	"net/url"
 	"strings"
+	"unicode"
 
-	"github.com/AdguardTeam/urlfilter/internal/ufnet"
+	"github.com/AdguardTeam/golibs/netutil"
+	"github.com/AdguardTeam/golibs/netutil/urlutil"
 	"golang.org/x/net/publicsuffix"
 )
-
-// maxURLLength limits the URL length by 4 KiB.  It appears that there can be
-// URLs longer than a megabyte, and it makes no sense to go through the whole
-// URL.
-//
-// TODO(a.garipov):  Reinspect.
-//
-// TODO(a.garipov):  Use [datasize.B]?
-const maxURLLength = 4 * 1024
 
 // RequestType is a bitset of the types of a request to be filtered.
 //
@@ -79,24 +73,18 @@ type Request struct {
 	// ClientIP is the IP address to match against $client modifiers, if any.
 	ClientIP netip.Addr
 
+	// SourceURL is the full URL of the source.
+	SourceURL *url.URL
+
+	// URL is the full request URL.  It must not be nil.
+	URL *url.URL
+
 	// ClientName is the name to match against $client modifiers, if any.
 	ClientName string
-
-	// URL is the full request URL.
-	URL string
-
-	// URLLowerCase is the full request URL in lower case.
-	URLLowerCase string
-
-	// Hostname is the hostname to filter.
-	Hostname string
 
 	// Domain is the effective top-level domain of the request with an
 	// additional label.
 	Domain string
-
-	// SourceURL is the full URL of the source.
-	SourceURL string
 
 	// SourceHostname is the hostname of the source.
 	SourceHostname string
@@ -107,6 +95,12 @@ type Request struct {
 
 	// SortedClientTags is the list of tags to match against $ctag modifiers.
 	SortedClientTags []string
+
+	// urlData is the bytes of this request URL.
+	urlData []byte
+
+	// urlDataLower is the bytes of this request URL in lowercase.
+	urlDataLower []byte
 
 	// RequestType is the type of the filtering request.
 	RequestType RequestType
@@ -126,31 +120,24 @@ type Request struct {
 	IsHostnameRequest bool
 }
 
-// NewRequest returns a properly initialized *Request.
-func NewRequest(url, sourceURL string, requestType RequestType) (r *Request) {
-	if len(url) > maxURLLength {
-		url = url[:maxURLLength]
-	}
-	if len(sourceURL) > maxURLLength {
-		sourceURL = sourceURL[:maxURLLength]
-	}
-
+// NewRequest returns a properly initialized *Request.  u must not be nil.
+func NewRequest(u, sourceURL *url.URL, requestType RequestType) (r *Request) {
 	r = &Request{
+		SourceURL:   netutil.CloneURL(sourceURL),
+		URL:         netutil.CloneURL(u),
 		RequestType: requestType,
-
-		URL:          url,
-		URLLowerCase: strings.ToLower(url),
-		Hostname:     ufnet.ExtractHostname(url),
-
-		SourceURL:      sourceURL,
-		SourceHostname: ufnet.ExtractHostname(sourceURL),
 	}
 
-	domain := effectiveTLDPlusOne(r.Hostname)
+	if r.SourceURL != nil {
+		r.SourceHostname = r.SourceURL.Hostname()
+	}
+
+	hostname := r.URL.Hostname()
+	domain := effectiveTLDPlusOne(hostname)
 	if domain != "" {
 		r.Domain = domain
 	} else {
-		r.Domain = r.Hostname
+		r.Domain = hostname
 	}
 
 	sourceDomain := effectiveTLDPlusOne(r.SourceHostname)
@@ -168,38 +155,74 @@ func NewRequest(url, sourceURL string, requestType RequestType) (r *Request) {
 }
 
 // NewRequestForHostname creates a new instance of Request for matching the
-// hostname.  It uses "http://" as a protocol and [TypeDocument] as a request
-// type.
+// hostname.  It uses [urlutil.SchemeHTTP] as a protocol and [TypeDocument] as a
+// request type.
 func NewRequestForHostname(hostname string) (r *Request) {
-	r = &Request{}
+	r = &Request{
+		URL: &url.URL{
+			Scheme: urlutil.SchemeHTTP,
+		},
+	}
+
 	FillRequestForHostname(r, hostname)
 
 	return r
 }
 
 // FillRequestForHostname fills the given instance of request r for matching the
-// hostname.  It uses "http://" as a protocol for request URL and [TypeDocument]
-// as request type.
+// hostname.  r must not be nil.
 func FillRequestForHostname(r *Request, hostname string) {
-	// Do not use fmt.Sprintf or url.URL to achieve better performance.
-	// Hostname validation should be performed by the function caller.
-	urlStr := "http://" + hostname
+	r.URL.Host = hostname
 
-	// TODO(d.kolyshev): Make r.URL to be [url.URL], then [url.AppendBinary]
-	// on usages.
-	r.URL = urlStr
-	r.URLLowerCase = urlStr
-	r.Hostname = hostname
+	r.urlData = r.urlData[:0]
+	r.urlDataLower = r.urlDataLower[:0]
 
 	r.RequestType = TypeDocument
 	r.ThirdParty = false
 	r.IsHostnameRequest = true
 
-	if domain := effectiveTLDPlusOne(r.Hostname); domain != "" {
+	if domain := effectiveTLDPlusOne(hostname); domain != "" {
 		r.Domain = domain
 	} else {
-		r.Domain = r.Hostname
+		r.Domain = hostname
 	}
+}
+
+// MaxURLLength limits the URL length by 4 KiB.  It appears that there can be
+// URLs longer than a megabyte, and it makes no sense to go through the whole
+// URL.
+//
+// TODO(a.garipov):  Reinspect.
+//
+// TODO(a.garipov):  Use [datasize.B]?
+const MaxURLLength = 4 * 1024
+
+// AppendURLData fills this request URL data fields, then appends the data to
+// the given slice.  If lower is true, the data is appended in lowercase.
+//
+// TODO(d.kolyshev):  Limit the URL length by 4 KiB. It appears that there
+// can be URLs longer than a megabyte, and it makes no sense to go through
+// the whole URL.
+func (r *Request) AppendURLData(orig []byte, lower bool) (data []byte) {
+	if len(r.urlData) == 0 {
+		r.urlData, _ = r.URL.AppendBinary(r.urlData[:0])
+	}
+
+	if len(r.urlData) > MaxURLLength {
+		r.urlData = r.urlData[:MaxURLLength]
+	}
+
+	if !lower {
+		return append(orig, r.urlData...)
+	}
+
+	if len(r.urlDataLower) == 0 {
+		for _, b := range r.urlData {
+			r.urlDataLower = append(r.urlDataLower, byte(unicode.ToLower(rune(b))))
+		}
+	}
+
+	return append(orig, r.urlDataLower...)
 }
 
 // effectiveTLDPlusOne is a faster version of [publicsuffix.EffectiveTLDPlusOne]

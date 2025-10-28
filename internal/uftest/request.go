@@ -6,19 +6,19 @@ import (
 	"bytes"
 	_ "embed"
 	"encoding/json"
-	"strings"
+	"net/url"
 	"testing"
 
 	"github.com/AdguardTeam/golibs/errors"
-	"github.com/AdguardTeam/urlfilter/internal/ufnet"
+	"github.com/AdguardTeam/golibs/netutil/urlutil"
 	"github.com/stretchr/testify/require"
 )
 
 // Request contains data for a filtering request for tests.
 type Request struct {
-	URL         string `json:"url"`
-	FrameURL    string `json:"frameUrl"`
-	RequestType string `json:"cpt"`
+	URL         *urlutil.URL `json:"url"`
+	FrameURL    *urlutil.URL `json:"frameUrl"`
+	RequestType string       `json:"cpt"`
 }
 
 // RequestHostnames returns a slice of test hostnames taken from the result of
@@ -27,7 +27,7 @@ func RequestHostnames(tb testing.TB) (hostnames []string) {
 	tb.Helper()
 
 	for _, req := range ParseRequests(tb) {
-		h := ufnet.ExtractHostname(req.URL)
+		h := req.URL.Hostname()
 		if h != "" {
 			hostnames = append(hostnames, h)
 		}
@@ -67,7 +67,8 @@ func ParseRequests(tb testing.TB) (requests []*Request) {
 		err = json.Unmarshal(line, req)
 		require.NoError(tb, err)
 
-		if isSupportedURL(req.URL) && isSupportedURL(req.FrameURL) {
+		// TODO(d.kolyshev): !! Support empty URLs.
+		if isSupportedURL(&req.URL.URL) && isSupportedURL(&req.FrameURL.URL) {
 			requests = append(requests, req)
 		}
 	}
@@ -77,8 +78,11 @@ func ParseRequests(tb testing.TB) (requests []*Request) {
 	return requests
 }
 
-// isSupportedURL returns true if s contains a URL that is supported by module
-// urlfilter.
-func isSupportedURL(s string) (ok bool) {
-	return s != "" && (strings.HasPrefix(s, "http") || strings.HasPrefix(s, "ws"))
+// isSupportedURL returns true if the given url is a supported for tests.
+func isSupportedURL(u *url.URL) bool {
+	if u == nil {
+		return false
+	}
+
+	return u.Scheme == urlutil.SchemeHTTP || u.Scheme == "ws"
 }

@@ -1,10 +1,12 @@
 package lookup_test
 
 import (
+	"net/url"
 	"os"
 	"testing"
 
 	"github.com/AdguardTeam/golibs/errors"
+	"github.com/AdguardTeam/golibs/netutil/urlutil"
 	"github.com/AdguardTeam/urlfilter/filterlist"
 	"github.com/AdguardTeam/urlfilter/internal/uftest"
 	"github.com/AdguardTeam/urlfilter/rules"
@@ -47,8 +49,33 @@ const (
 const (
 	testRuleBaseFilterDomain = "@@||googleads.g.doubleclick.net/ads/preferences/" +
 		"$domain=googleads.g.doubleclick.net"
+)
 
-	testURLStrBaseFilterDomain = "https://googleads.g.doubleclick.net/ads/preferences/"
+// Common URLs from the AdGuard Base Filter for tests.
+//
+// Keep in sync with ../../testdata/adguard_base_filter.txt.
+var testURLBaseFilterDomain = &url.URL{
+	Scheme: urlutil.SchemeHTTPS,
+	Host:   "googleads.g.doubleclick.net",
+	Path:   "/ads/preferences/",
+}
+
+// Common URLs for tests.
+var (
+	testURLNoMatch = &url.URL{
+		Scheme: urlutil.SchemeHTTPS,
+		Host:   "no-match.example",
+	}
+
+	testURLWithDomain = &url.URL{
+		Scheme: urlutil.SchemeHTTPS,
+		Host:   uftest.Host,
+	}
+
+	testURLWithSubdomain = &url.URL{
+		Scheme: urlutil.SchemeHTTPS,
+		Host:   uftest.HostSub,
+	}
 )
 
 // newStorage is a helper that creates a rule storage for tests with the given

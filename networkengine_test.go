@@ -1,11 +1,13 @@
 package urlfilter_test
 
 import (
+	"net/url"
 	"os"
 	"runtime"
 	"strings"
 	"testing"
 
+	"github.com/AdguardTeam/golibs/netutil/urlutil"
 	"github.com/AdguardTeam/golibs/testutil"
 	"github.com/AdguardTeam/urlfilter"
 	"github.com/AdguardTeam/urlfilter/filterlist"
@@ -20,10 +22,16 @@ const (
 	filterPath       = testResourcesDir + "/easylist.txt"
 )
 
+// testURL is a URL used for testing.
+var testURL = &url.URL{
+	Scheme: urlutil.SchemeHTTP,
+	Host:   "example.org",
+}
+
 func TestEmptyNetworkEngine(t *testing.T) {
 	ruleStorage := newTestRuleStorage(t, uftest.ListID1, "")
 	engine := urlfilter.NewNetworkEngine(ruleStorage)
-	r := rules.NewRequest("http://example.org/", "", rules.TypeOther)
+	r := rules.NewRequest(testURL, nil, rules.TypeOther)
 	rule, ok := engine.Match(r)
 	assert.False(t, ok)
 	assert.Nil(t, rule)
@@ -36,7 +44,7 @@ func TestMatchWhitelistRule(t *testing.T) {
 	ruleStorage := newTestRuleStorage(t, uftest.ListID1, rulesText)
 	engine := urlfilter.NewNetworkEngine(ruleStorage)
 
-	r := rules.NewRequest("http://example.org/", "", rules.TypeScript)
+	r := rules.NewRequest(testURL, nil, rules.TypeScript)
 	rule, ok := engine.Match(r)
 	assert.True(t, ok)
 	assert.NotNil(t, rule)
@@ -51,19 +59,25 @@ func TestMatchImportantRule(t *testing.T) {
 	ruleStorage := newTestRuleStorage(t, uftest.ListID1, rulesText)
 	engine := urlfilter.NewNetworkEngine(ruleStorage)
 
-	r := rules.NewRequest("http://example.org/", "", rules.TypeOther)
+	r := rules.NewRequest(testURL, nil, rules.TypeOther)
 	rule, ok := engine.Match(r)
 	assert.True(t, ok)
 	assert.NotNil(t, rule)
 	assert.Equal(t, r2, rule.String())
 
-	r = rules.NewRequest("http://test1.example.org/", "", rules.TypeOther)
+	r = rules.NewRequest(&url.URL{
+		Scheme: urlutil.SchemeHTTP,
+		Host:   "test1.example.org",
+	}, nil, rules.TypeOther)
 	rule, ok = engine.Match(r)
 	assert.True(t, ok)
 	assert.NotNil(t, rule)
 	assert.Equal(t, r2, rule.String())
 
-	r = rules.NewRequest("http://test2.example.org/", "", rules.TypeOther)
+	r = rules.NewRequest(&url.URL{
+		Scheme: urlutil.SchemeHTTP,
+		Host:   "test2.example.org",
+	}, nil, rules.TypeOther)
 	rule, ok = engine.Match(r)
 	assert.True(t, ok)
 	assert.NotNil(t, rule)
@@ -75,10 +89,19 @@ func TestMatchSourceRule(t *testing.T) {
 	ruleStorage := newTestRuleStorage(t, uftest.ListID1, ruleText)
 	engine := urlfilter.NewNetworkEngine(ruleStorage)
 
-	url := "https://ci.phncdn.com/videos/201809/25/184777011/original/(m=ecuKGgaaaa)(mh=VSmV9NL_iouBcWJJ)4.jpg"
-	sourceURL := "https://www.pornhub.com/view_video.php?viewkey=ph5be89d11de4b0"
+	reqURL := &url.URL{
+		Scheme: urlutil.SchemeHTTPS,
+		Host:   "ci.phncdn.com",
+		Path:   "videos/201809/25/184777011/original/(m=ecuKGgaaaa)(mh=VSmV9NL_iouBcWJJ)4.jpg",
+	}
+	sourceURL := &url.URL{
+		Scheme:   urlutil.SchemeHTTPS,
+		Host:     "www.pornhub.com",
+		Path:     "view_video.php",
+		RawQuery: "viewkey=ph5be89d11de4b0",
+	}
 
-	r := rules.NewRequest(url, sourceURL, rules.TypeImage)
+	r := rules.NewRequest(reqURL, sourceURL, rules.TypeImage)
 	rule, ok := engine.Match(r)
 	assert.True(t, ok)
 	assert.NotNil(t, rule)
@@ -90,10 +113,18 @@ func TestMatchSimplePattern(t *testing.T) {
 	ruleStorage := newTestRuleStorage(t, uftest.ListID1, ruleText)
 	engine := urlfilter.NewNetworkEngine(ruleStorage)
 
-	url := "https://ap.lijit.com/rtb/bid?src=prebid_prebid_1.35.0"
-	sourceURL := "https://www.drudgereport.com/"
+	reqURL := &url.URL{
+		Scheme:   urlutil.SchemeHTTPS,
+		Host:     "ap.lijit.com",
+		Path:     "/rtb/bid",
+		RawQuery: "src=prebid_prebid_1.35.0",
+	}
+	sourceURL := &url.URL{
+		Scheme: urlutil.SchemeHTTPS,
+		Host:   "www.drudgereport.com",
+	}
 
-	r := rules.NewRequest(url, sourceURL, rules.TypeXmlhttprequest)
+	r := rules.NewRequest(reqURL, sourceURL, rules.TypeXmlhttprequest)
 	rule, ok := engine.Match(r)
 	assert.True(t, ok)
 	assert.NotNil(t, rule)
@@ -116,7 +147,7 @@ func BenchmarkNetworkEngine_heapAlloc(b *testing.B) {
 	var matchingRequests []*rules.Request
 	easyListRequests := uftest.ParseRequests(b)
 	for _, req := range easyListRequests {
-		req := rules.NewRequest(req.URL, req.FrameURL, reqTypeToInternal(req.RequestType))
+		req := rules.NewRequest(&req.URL.URL, &req.FrameURL.URL, reqTypeToInternal(req.RequestType))
 		matchingRequests = append(matchingRequests, req)
 	}
 
