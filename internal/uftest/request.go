@@ -17,8 +17,9 @@ import (
 // Request contains data for a filtering request for tests.
 type Request struct {
 	URL         *urlutil.URL `json:"url"`
-	FrameURL    *urlutil.URL `json:"frameUrl"`
-	RequestType string       `json:"cpt"`
+	FrameURL    *url.URL
+	FrameURLStr string `json:"frameUrl"`
+	RequestType string `json:"cpt"`
 }
 
 // RequestHostnames returns a slice of test hostnames taken from the result of
@@ -65,10 +66,16 @@ func ParseRequests(tb testing.TB) (requests []*Request) {
 
 		req := &Request{}
 		err = json.Unmarshal(line, req)
-		require.NoError(tb, err)
+		if err != nil {
+			continue
+		}
 
-		// TODO(d.kolyshev): !! Support empty URLs.
-		if isSupportedURL(&req.URL.URL) && isSupportedURL(&req.FrameURL.URL) {
+		if req.FrameURLStr != "" {
+			req.FrameURL, err = url.Parse(req.FrameURLStr)
+			require.NoError(tb, err)
+		}
+
+		if isSupportedURL(&req.URL.URL) && isSupportedURL(req.FrameURL) {
 			requests = append(requests, req)
 		}
 	}
@@ -78,10 +85,11 @@ func ParseRequests(tb testing.TB) (requests []*Request) {
 	return requests
 }
 
-// isSupportedURL returns true if the given url is a supported for tests.
-func isSupportedURL(u *url.URL) bool {
+// isSupportedURL returns true if the given URL is supported for tests.  Returns
+// true if u is nil.
+func isSupportedURL(u *url.URL) (ok bool) {
 	if u == nil {
-		return false
+		return true
 	}
 
 	return u.Scheme == urlutil.SchemeHTTP || u.Scheme == "ws"
