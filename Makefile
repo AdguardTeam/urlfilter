@@ -1,20 +1,18 @@
-# Keep the Makefile POSIX-compliant.  We currently allow hyphens in
-# target names, but that may change in the future.
+# Keep the Makefile POSIX-compliant.  We currently allow hyphens in target
+# names, but that may change in the future.
 #
 # See https://pubs.opengroup.org/onlinepubs/9799919799/utilities/make.html.
 .POSIX:
 
-# This comment is used to simplify checking local copies of the
-# Makefile.  Bump this number every time a significant change is made to
-# this Makefile.
+# This comment is used to simplify checking local copies of the Makefile.  Bump
+# this number every time a significant change is made to this Makefile.
 #
-# AdGuard-Project-Version: 10
+# AdGuard-Project-Version: 11
 
-# Don't name these macros "GO" etc., because GNU Make apparently makes
-# them exported environment variables with the literal value of
-# "${GO:-go}" and so on, which is not what we need.  Use a dot in the
-# name to make sure that users don't have an environment variable with
-# the same name.
+# Don't name these macros "GO" etc., because GNU Make apparently makes them
+# exported environment variables with the literal value of "${GO:-go}" and so
+# on, which is not what we need.  Use a dot in the name to make sure that users
+# don't have an environment variable with the same name.
 #
 # See https://unix.stackexchange.com/q/646255/105635.
 GO.MACRO = $${GO:-go}
@@ -24,7 +22,7 @@ BRANCH = $${BRANCH:-$$(git rev-parse --abbrev-ref HEAD)}
 GOAMD64 = v1
 GOPROXY = https://proxy.golang.org|direct
 GOTELEMETRY = off
-GOTOOLCHAIN = go1.25.1
+GOTOOLCHAIN = go1.25.3
 RACE = 0
 REVISION = $${REVISION:-$$(git rev-parse --short HEAD)}
 VERSION = 0
