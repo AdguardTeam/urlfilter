@@ -7,9 +7,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 
 	"github.com/AdguardTeam/golibs/errors"
+	"github.com/AdguardTeam/golibs/syncutil"
 	"github.com/AdguardTeam/golibs/validate"
 	"github.com/AdguardTeam/urlfilter/rules"
 	"github.com/c2h5oh/datasize"
@@ -29,20 +29,11 @@ type FileConfig struct {
 
 // File is an [Interface] implementation which stores rules within a file.
 type File struct {
-	// mu protects all the fields.
-	//
-	// TODO(a.garipov):  This mutex is not sufficient; File and scanners should
-	// be reimplemented with [io.ReaderAt] in mind.
-	mu *sync.Mutex
-
 	// file is the file with rules.
 	file *os.File
 
-	// builder used to construct strings.
-	builder *strings.Builder
-
-	// buffer used for reading from the file.
-	buffer []byte
+	// bytesPool reuses byte buffers for copying responses.
+	bytesPool *syncutil.Pool[[]byte]
 
 	// id is the rule list ID.
 	id rules.ListID
@@ -58,15 +49,14 @@ type File struct {
 // NewFile creates a new file-based rule list with the given configuration.
 func NewFile(conf *FileConfig) (f *File, err error) {
 	f = &File{
-		mu:             &sync.Mutex{},
 		id:             conf.ID,
-		builder:        &strings.Builder{},
-		buffer:         make([]byte, readerBufferSize),
+		bytesPool:      syncutil.NewSlicePool[byte](int(readerBufferSize)),
 		ignoreCosmetic: conf.IgnoreCosmetic,
 	}
 
 	f.file, err = os.Open(filepath.Clean(conf.Path))
 	if err != nil {
+		// Don't wrap the error, because it's informative enough as is.
 		return nil, err
 	}
 	defer func() {
@@ -99,7 +89,8 @@ func (f *File) ListID() (id rules.ListID) {
 	return f.id
 }
 
-// NewScanner creates a new rules scanner that reads the list contents.
+// NewScanner creates a new rules scanner that reads the list contents.  The
+// returned scanner should not be used concurrently with RetrieveRule.
 func (f *File) NewScanner() (sc *RuleScanner) {
 	_, _ = f.file.Seek(0, io.SeekStart)
 
@@ -107,20 +98,13 @@ func (f *File) NewScanner() (sc *RuleScanner) {
 }
 
 // RetrieveRule finds and deserializes rule by its index.  If there's no rule by
-// that index or rule is invalid, it will return an error.
+// that index or rule is invalid, it will return an error.  It should not be
+// used concurrently with the scanner returned from NewScanner.
 func (f *File) RetrieveRule(ruleIdx int64) (r rules.Rule, err error) {
 	errors.Check(validate.NotNegative("ruleIdx", ruleIdx))
 
-	f.mu.Lock()
-	defer f.mu.Unlock()
-
-	_, err = f.file.Seek(ruleIdx, io.SeekStart)
-	if err != nil {
-		return nil, err
-	}
-
 	// Read line from the file.
-	line, err := f.readLine()
+	line, err := f.readLine(ruleIdx)
 	if err == io.EOF {
 		err = nil
 	}
@@ -143,30 +127,30 @@ func (f *File) SizeEstimate() (est datasize.ByteSize) {
 	return f.size
 }
 
-// readLine reads from the reader until '\n'.  r is the reader to read from.  b
-// is the buffer to use (the idea is to reuse the same buffer when it's
-// possible).
+// readLine reads from the reader with the given offset until '\n'.  r is the
+// reader to read from.  b is the buffer to use (the idea is to reuse the same
+// buffer when it's possible).
 //
 // TODO(a.garipov):  Consider ways of using [bufio.Reader] here.
-func (f *File) readLine() (line string, err error) {
-	f.builder.Reset()
+func (f *File) readLine(offset int64) (line string, err error) {
+	bufPtr := f.bytesPool.Get()
+	defer f.bytesPool.Put(bufPtr)
 
 	var n int
+	var read int
 	for {
-		n, err = f.file.Read(f.buffer)
+		n, err = f.file.ReadAt((*bufPtr)[read:], offset+int64(n))
 		if n == 0 {
-			return f.builder.String(), err
+			return string(*bufPtr), err
 		}
 
-		idx := bytes.IndexByte(f.buffer[:n], '\n')
+		idx := bytes.IndexByte((*bufPtr)[read:read+n], '\n')
 		if idx == -1 {
-			_, _ = f.builder.Write(f.buffer[:n])
+			read += n
 
 			continue
 		}
 
-		_, _ = f.builder.Write(f.buffer[:idx])
-
-		return f.builder.String(), nil
+		return string((*bufPtr)[:read+idx]), nil
 	}
 }

@@ -81,13 +81,13 @@ func BenchmarkFile_RetrieveRule(b *testing.B) {
 		r, err = f.RetrieveRule(0)
 	}
 
-	assert.Nil(b, err)
-	assert.NotZero(b, r)
+	require.NoError(b, err)
+	assert.NotNil(b, r)
 
 	// Most recent results:
-	//	goos: linux
-	//	goarch: amd64
+	//	goos: darwin
+	//	goarch: arm64
 	//	pkg: github.com/AdguardTeam/urlfilter/filterlist
-	//	cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
-	//	BenchmarkFile_RetrieveRule-16  	  527451	      2989 ns/op	     448 B/op	       4 allocs/op
+	//	cpu: Apple M1 Pro
+	//  BenchmarkFile_RetrieveRule-8   	  970134	      1218 ns/op	     448 B/op	       4 allocs/op
 }
