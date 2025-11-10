@@ -199,13 +199,11 @@ const MaxURLLength = 4 * 1024
 
 // AppendURLData fills this request URL data fields, then appends the data to
 // the given slice.  If lower is true, the data is appended in lowercase.
-//
-// TODO(d.kolyshev):  Limit the URL length by 4 KiB. It appears that there
-// can be URLs longer than a megabyte, and it makes no sense to go through
-// the whole URL.
+// Limits the URL length by 4 KiB. It appears that there can be URLs longer than
+// a megabyte, and it makes no sense to go through the whole URL.
 func (r *Request) AppendURLData(orig []byte, lower bool) (data []byte) {
 	if len(r.urlData) == 0 {
-		r.urlData, _ = r.URL.AppendBinary(r.urlData[:0])
+		r.urlData, _ = r.URL.AppendBinary(r.urlData)
 	}
 
 	if len(r.urlData) > MaxURLLength {
