@@ -96,7 +96,7 @@ func isSupportedURL(u *url.URL) (ok bool) {
 
 	// TODO(a.garipov):  Add websocket schemes to golibs.
 	return scheme == urlutil.SchemeHTTP ||
-		u.Scheme == urlutil.SchemeHTTPS ||
+		scheme == urlutil.SchemeHTTPS ||
 		scheme == "ws" ||
 		scheme == "wss"
 }
