@@ -73,11 +73,11 @@ func TestNetworkRule_Match_dnsRewrite(t *testing.T) {
 		in:   "||test.example^$dnsrewrite=noerror;;",
 	}}
 
-	req := rules.NewRequestForHostname("test.example")
-
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
+
+			req := rules.NewRequestForHostname("test.example")
 
 			r := uftest.NewNetworkRule(t, tc.in)
 			assert.True(t, r.Match(req))
