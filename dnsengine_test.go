@@ -673,9 +673,9 @@ func newDNSRuleStorage(tb testing.TB) (ruleStorage *filterlist.RuleStorage) {
 	return ruleStorage
 }
 
-// adBlockRegexp is the regular expression used to extract a matching hostname
-// from a simple AdBlock rule.
-var adBlockRegexp = regexp.MustCompilePOSIX(`^\|\|([^^]+)\^$`)
+// adBlockRegexp is the regular expression used to extract a matching supported
+// hostname from a simple AdBlock rule.
+var adBlockRegexp = regexp.MustCompilePOSIX(`^\|\|([a-zA-Z0-9_.-]+)\^$`)
 
 // parseAdGuardSDNHostnames returns hostnames that can be used for matching the
 // AdGuard Simplified Domain Names (SDN) filter.
