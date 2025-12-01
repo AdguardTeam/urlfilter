@@ -7,6 +7,12 @@ cloud.google.com/go/compute/metadata v0.9.0/go.mod h1:E0bWwX5wTnLPedCKqk3pJmVgCB
 github.com/AdguardTeam/golibs v0.4.0/go.mod h1:skKsDKIBB7kkFflLJBpfGX+G8QFTx0WKUzB6TIgtUj4=
 github.com/AdguardTeam/golibs v0.35.0 h1:O990+tbZ5W5yB0ybtaUJy4FUb0bXxyzeUC7t8cr1pCg=
 github.com/AdguardTeam/golibs v0.35.0/go.mod h1:y552twxCtvOD8KKQ7ESjo10KZBAE+HSj24yAuAvz9IA=
+github.com/AdguardTeam/golibs v0.35.3-0.20251121091733-0d81a09380dd h1:y3IYbyVP1sxgV4yG/ohaXZTHg+OvHMBta8phDJZOhss=
+github.com/AdguardTeam/golibs v0.35.3-0.20251121091733-0d81a09380dd/go.mod h1:9Y0yqUpwDNyHxCv4AaI42x5+qxYc7k5DWAfxtFOTn8o=
+github.com/AdguardTeam/golibs v0.35.3-0.20251124140502-94fec3d67982 h1:+rmJpt+x3YUKmFg3+2hmaO4NLKpj7ovESM7q50helb0=
+github.com/AdguardTeam/golibs v0.35.3-0.20251124140502-94fec3d67982/go.mod h1:9Y0yqUpwDNyHxCv4AaI42x5+qxYc7k5DWAfxtFOTn8o=
+github.com/AdguardTeam/golibs v0.35.3 h1:DI0ffHyL3tFZ2UBEji3Aah7IvFwM5nY5yZoGvs1bnPY=
+github.com/AdguardTeam/golibs v0.35.3/go.mod h1:9Y0yqUpwDNyHxCv4AaI42x5+qxYc7k5DWAfxtFOTn8o=
 github.com/AdguardTeam/gomitmproxy v0.2.1 h1:p9gr8Er1TYvf+7ic81Ax1sZ62UNCsMTZNbm7tC59S9o=
 github.com/AdguardTeam/gomitmproxy v0.2.1/go.mod h1:Qdv0Mktnzer5zpdpi5rAwixNJzW2FN91LjKJCkVbYGU=
 github.com/BurntSushi/toml v1.5.0 h1:W5quZX/G/csjUnuI8SUYlsHs9M38FC7znL0lIO+DvMg=

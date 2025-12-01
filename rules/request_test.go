@@ -21,7 +21,7 @@ func TestNewRequest(t *testing.T) {
 	}{{
 		want: &rules.Request{
 			ClientIP:          netip.Addr{},
-			ClientName:        "",
+			ClientIdentifiers: nil,
 			URL:               uftest.URLStrHost,
 			URLLowerCase:      uftest.URLStrHost,
 			Hostname:          uftest.Host,
@@ -29,7 +29,7 @@ func TestNewRequest(t *testing.T) {
 			SourceURL:         "",
 			SourceHostname:    "",
 			SourceDomain:      "",
-			SortedClientTags:  nil,
+			ClientTags:        nil,
 			RequestType:       rules.TypeOther,
 			DNSType:           0,
 			ThirdParty:        false,
@@ -41,7 +41,7 @@ func TestNewRequest(t *testing.T) {
 	}, {
 		want: &rules.Request{
 			ClientIP:          netip.Addr{},
-			ClientName:        "",
+			ClientIdentifiers: nil,
 			URL:               uftest.URLStrHost,
 			URLLowerCase:      uftest.URLStrHost,
 			Hostname:          uftest.Host,
@@ -49,7 +49,7 @@ func TestNewRequest(t *testing.T) {
 			SourceURL:         uftest.URLStrHostSub,
 			SourceHostname:    uftest.HostSub,
 			SourceDomain:      uftest.Host,
-			SortedClientTags:  nil,
+			ClientTags:        nil,
 			RequestType:       rules.TypeOther,
 			DNSType:           0,
 			ThirdParty:        false,
@@ -61,7 +61,7 @@ func TestNewRequest(t *testing.T) {
 	}, {
 		want: &rules.Request{
 			ClientIP:          netip.Addr{},
-			ClientName:        "",
+			ClientIdentifiers: nil,
 			URL:               testURLStrDoubleTLD,
 			URLLowerCase:      testURLStrDoubleTLD,
 			Hostname:          testHostnameLongTLD,
@@ -69,7 +69,7 @@ func TestNewRequest(t *testing.T) {
 			SourceURL:         "",
 			SourceHostname:    "",
 			SourceDomain:      "",
-			SortedClientTags:  nil,
+			ClientTags:        nil,
 			RequestType:       rules.TypeOther,
 			DNSType:           0,
 			ThirdParty:        false,
@@ -81,7 +81,7 @@ func TestNewRequest(t *testing.T) {
 	}, {
 		want: &rules.Request{
 			ClientIP:          netip.Addr{},
-			ClientName:        "",
+			ClientIdentifiers: nil,
 			URL:               uftest.URLStrHost,
 			URLLowerCase:      uftest.URLStrHost,
 			Hostname:          uftest.Host,
@@ -89,7 +89,7 @@ func TestNewRequest(t *testing.T) {
 			SourceURL:         testURLStrDoubleTLD,
 			SourceHostname:    testHostnameLongTLD,
 			SourceDomain:      testHostnameLongTLD,
-			SortedClientTags:  nil,
+			ClientTags:        nil,
 			RequestType:       rules.TypeOther,
 			DNSType:           0,
 			ThirdParty:        true,
@@ -147,7 +147,7 @@ func TestFillRequestForHostname(t *testing.T) {
 	rules.FillRequestForHostname(req, uftest.Host)
 	assert.Equal(t, &rules.Request{
 		ClientIP:          netip.Addr{},
-		ClientName:        "",
+		ClientIdentifiers: nil,
 		URL:               uftest.URLStrHost,
 		URLLowerCase:      uftest.URLStrHost,
 		Hostname:          uftest.Host,
@@ -155,7 +155,7 @@ func TestFillRequestForHostname(t *testing.T) {
 		SourceURL:         "",
 		SourceHostname:    "",
 		SourceDomain:      "",
-		SortedClientTags:  nil,
+		ClientTags:        nil,
 		RequestType:       rules.TypeDocument,
 		DNSType:           0,
 		ThirdParty:        false,
@@ -173,7 +173,7 @@ func BenchmarkFillRequestForHostname(b *testing.B) {
 
 	assert.Equal(b, &rules.Request{
 		ClientIP:          netip.Addr{},
-		ClientName:        "",
+		ClientIdentifiers: nil,
 		URL:               uftest.URLStrHost,
 		URLLowerCase:      uftest.URLStrHost,
 		Hostname:          uftest.Host,
@@ -181,7 +181,7 @@ func BenchmarkFillRequestForHostname(b *testing.B) {
 		SourceURL:         "",
 		SourceHostname:    "",
 		SourceDomain:      "",
-		SortedClientTags:  nil,
+		ClientTags:        nil,
 		RequestType:       rules.TypeDocument,
 		DNSType:           0,
 		ThirdParty:        false,

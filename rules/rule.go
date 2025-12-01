@@ -2,9 +2,9 @@ package rules
 
 import (
 	"fmt"
-	"slices"
 	"strings"
 
+	"github.com/AdguardTeam/golibs/container"
 	"github.com/AdguardTeam/golibs/errors"
 	"github.com/AdguardTeam/urlfilter/internal/ufnet"
 	"github.com/miekg/dns"
@@ -168,38 +168,39 @@ func isValidCTag(s string) (ok bool) {
 }
 
 // parseCTags parses tags from the $ctag modifier.  sep is the separator
-// character; for network rules it is '|'.  permittedCTags and restrictedCTags
-// are sorted.
-func parseCTags(value, sep string) (permittedCTags, restrictedCTags []string, err error) {
+// character; for network rules it is '|'.
+func parseCTags(value, sep string) (permittedSet, restrictedSet *container.SortedSliceSet[string], err error) {
 	if value == "" {
 		return nil, nil, errors.ErrEmptyValue
 	}
 
+	var restricted, permitted []string
 	list := strings.Split(value, sep)
 	for i := range list {
 		d := list[i]
-		restricted := false
+		isRestricted := false
 		if strings.HasPrefix(d, "~") {
-			restricted = true
+			isRestricted = true
 			d = d[1:]
 		}
 
 		if !isValidCTag(d) {
-			return permittedCTags, restrictedCTags, fmt.Errorf("invalid ctag specified: %q", value)
+			err = fmt.Errorf("invalid ctag specified: %q", value)
+
+			break
 		}
 
-		if restricted {
-			restrictedCTags = append(restrictedCTags, d)
+		if isRestricted {
+			restricted = append(restricted, d)
 		} else {
-			permittedCTags = append(permittedCTags, d)
+			permitted = append(permitted, d)
 		}
 	}
 
-	// Sorting tags so that we could use binary search
-	slices.Sort(permittedCTags)
-	slices.Sort(restrictedCTags)
+	permittedSet = container.NewSortedSliceSet(permitted...)
+	restrictedSet = container.NewSortedSliceSet(restricted...)
 
-	return permittedCTags, restrictedCTags, nil
+	return permittedSet, restrictedSet, err
 }
 
 // parseClients parses the client modifier string with the specified separator

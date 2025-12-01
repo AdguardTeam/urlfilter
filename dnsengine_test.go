@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/AdguardTeam/golibs/container"
 	"github.com/AdguardTeam/golibs/netutil"
 	"github.com/AdguardTeam/golibs/testutil"
 	"github.com/AdguardTeam/urlfilter"
@@ -155,8 +156,8 @@ func TestClientTags(t *testing.T) {
 
 	// global rule
 	res, ok := dnsEngine.MatchRequest(&urlfilter.DNSRequest{
-		Hostname:         "host1",
-		SortedClientTags: []string{"phone"},
+		Hostname:   "host1",
+		ClientTags: container.NewSortedSliceSet("phone"),
 	})
 	assert.True(t, ok)
 	assert.NotNil(t, res.NetworkRule)
@@ -164,8 +165,8 @@ func TestClientTags(t *testing.T) {
 
 	// $ctag rule overrides global rule
 	res, ok = dnsEngine.MatchRequest(&urlfilter.DNSRequest{
-		Hostname:         "host1",
-		SortedClientTags: []string{"pc"},
+		Hostname:   "host1",
+		ClientTags: container.NewSortedSliceSet("pc"),
 	})
 	assert.True(t, ok)
 	assert.NotNil(t, res.NetworkRule)
@@ -173,8 +174,8 @@ func TestClientTags(t *testing.T) {
 
 	// 1 tag matches
 	res, ok = dnsEngine.MatchRequest(&urlfilter.DNSRequest{
-		Hostname:         "host2",
-		SortedClientTags: []string{"phone", "printer"},
+		Hostname:   "host2",
+		ClientTags: container.NewSortedSliceSet("phone", "printer"),
 	})
 	assert.True(t, ok)
 	assert.NotNil(t, res.NetworkRule)
@@ -182,22 +183,22 @@ func TestClientTags(t *testing.T) {
 
 	// tags don't match
 	_, ok = dnsEngine.MatchRequest(&urlfilter.DNSRequest{
-		Hostname:         "host2",
-		SortedClientTags: []string{"phone"},
+		Hostname:   "host2",
+		ClientTags: container.NewSortedSliceSet("phone"),
 	})
 	assert.False(t, ok)
 
 	// tags don't match
 	_, ok = dnsEngine.MatchRequest(&urlfilter.DNSRequest{
-		Hostname:         "host2",
-		SortedClientTags: []string{},
+		Hostname:   "host2",
+		ClientTags: container.NewSortedSliceSet[string](),
 	})
 	assert.False(t, ok)
 
 	// 1 tag matches (exclusion)
 	res, ok = dnsEngine.MatchRequest(&urlfilter.DNSRequest{
-		Hostname:         "host3",
-		SortedClientTags: []string{"phone", "printer"},
+		Hostname:   "host3",
+		ClientTags: container.NewSortedSliceSet("phone", "printer"),
 	})
 	assert.True(t, ok)
 	assert.NotNil(t, res.NetworkRule)
@@ -205,8 +206,8 @@ func TestClientTags(t *testing.T) {
 
 	// 1 tag matches (exclusion)
 	res, ok = dnsEngine.MatchRequest(&urlfilter.DNSRequest{
-		Hostname:         "host4",
-		SortedClientTags: []string{"phone", "router"},
+		Hostname:   "host4",
+		ClientTags: container.NewSortedSliceSet("phone", "router"),
 	})
 	assert.True(t, ok)
 	assert.NotNil(t, res.NetworkRule)
@@ -214,29 +215,29 @@ func TestClientTags(t *testing.T) {
 
 	// tags don't match (exclusion)
 	_, ok = dnsEngine.MatchRequest(&urlfilter.DNSRequest{
-		Hostname:         "host3",
-		SortedClientTags: []string{"pc"},
+		Hostname:   "host3",
+		ClientTags: container.NewSortedSliceSet("pc"),
 	})
 	assert.False(t, ok)
 
 	// tags don't match (exclusion)
 	_, ok = dnsEngine.MatchRequest(&urlfilter.DNSRequest{
-		Hostname:         "host4",
-		SortedClientTags: []string{"pc", "router"},
+		Hostname:   "host4",
+		ClientTags: container.NewSortedSliceSet("pc", "router"),
 	})
 	assert.False(t, ok)
 
 	// tags match but it's a $badfilter
 	_, ok = dnsEngine.MatchRequest(&urlfilter.DNSRequest{
-		Hostname:         "host5",
-		SortedClientTags: []string{"pc"},
+		Hostname:   "host5",
+		ClientTags: container.NewSortedSliceSet("pc"),
 	})
 	assert.False(t, ok)
 
 	// tags match and $badfilter rule disables global rule
 	res, ok = dnsEngine.MatchRequest(&urlfilter.DNSRequest{
-		Hostname:         "host6",
-		SortedClientTags: []string{"pc"},
+		Hostname:   "host6",
+		ClientTags: container.NewSortedSliceSet("pc"),
 	})
 	assert.True(t, ok)
 	assert.NotNil(t, res.NetworkRule)
@@ -244,8 +245,8 @@ func TestClientTags(t *testing.T) {
 
 	// tags match (exclusion) but it's a $badfilter
 	_, ok = dnsEngine.MatchRequest(&urlfilter.DNSRequest{
-		Hostname:         "host7",
-		SortedClientTags: []string{"phone"},
+		Hostname:   "host7",
+		ClientTags: container.NewSortedSliceSet("phone"),
 	})
 	assert.False(t, ok)
 }
@@ -337,11 +338,17 @@ func TestClient(t *testing.T) {
 		wantRes: ruleTexts[7],
 		name:    "non_restricted_ipv6_subnet",
 	}, {
-		req:     &urlfilter.DNSRequest{Hostname: "host8", ClientName: "Frank's laptop"},
+		req: &urlfilter.DNSRequest{
+			Hostname:          "host8",
+			ClientIdentifiers: container.NewSortedSliceSet("Frank's laptop"),
+		},
 		wantRes: ruleTexts[8],
 		name:    "match_name",
 	}, {
-		req:     &urlfilter.DNSRequest{Hostname: "host8", ClientName: "Franks laptop"},
+		req: &urlfilter.DNSRequest{
+			Hostname:          "host8",
+			ClientIdentifiers: container.NewSortedSliceSet("Franks laptop"),
+		},
 		wantRes: "",
 		name:    "mismatch_name",
 	}, {
@@ -636,16 +643,16 @@ func BenchmarkDNSEngine_heapAlloc(b *testing.B) {
 	}
 
 	// Most recent results:
-	//	goos: linux
-	//	goarch: amd64
+	//	goos: darwin
+	//	goarch: arm64
 	//	pkg: github.com/AdguardTeam/urlfilter
-	//	cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
-	//	BenchmarkDNSEngine_heapAlloc/1_matching-16         	      28	 378749850 ns/op	 173674214 heap_after_compilation_bytes/op	 176133575 heap_after_matching_bytes/op	 141605243 heap_initial_bytes/op	34528331 B/op	  533792 allocs/op
-	//	BenchmarkDNSEngine_heapAlloc/10_matching-16        	       4	2641216112 ns/op	 173484944 heap_after_compilation_bytes/op	 197221932 heap_after_matching_bytes/op	 141591632 heap_initial_bytes/op	55630300 B/op	 1277698 allocs/op
-	//	BenchmarkDNSEngine_heapAlloc/100_matching-16       	       1	25081752219 ns/op	 173766144 heap_after_compilation_bytes/op	 283283240 heap_after_matching_bytes/op	 141553136 heap_initial_bytes/op	268869168 B/op	 8716858 allocs/op
-	//	BenchmarkDNSEngine_heapAlloc/1_non_matching-16     	     152	  79486993 ns/op	 173501243 heap_after_compilation_bytes/op	 173508723 heap_after_matching_bytes/op	 141566519 heap_initial_bytes/op	31942207 B/op	  450720 allocs/op
-	//	BenchmarkDNSEngine_heapAlloc/10_non_matching-16    	     156	  77002422 ns/op	 173520815 heap_after_compilation_bytes/op	 173528583 heap_after_matching_bytes/op	 141570125 heap_initial_bytes/op	31958469 B/op	  450730 allocs/op
-	//	BenchmarkDNSEngine_heapAlloc/100_non_matching-16   	     153	  81478424 ns/op	 173521682 heap_after_compilation_bytes/op	 173532330 heap_after_matching_bytes/op	 141573571 heap_initial_bytes/op	31958763 B/op	  450820 allocs/op
+	//	cpu: Apple M3
+	//	BenchmarkDNSEngine_heapAlloc/1_matching-8         	       8	 192417896 ns/op	 171684650 heap_after_compilation_bytes/op	 174154105 heap_after_matching_bytes/op	 140625226 heap_initial_bytes/op	33518451 B/op	  533789 allocs/op
+	//	BenchmarkDNSEngine_heapAlloc/10_matching-8        	       2	 1429245396 ns/op	 171551868 heap_after_compilation_bytes/op	 195331496 heap_after_matching_bytes/op	 140615404 heap_initial_bytes/op	54716140 B/op	  1277712 allocs/op
+	//	BenchmarkDNSEngine_heapAlloc/100_matching-8       	       1	 12506500041 ns/op	 171609656 heap_after_compilation_bytes/op	 281924200 heap_after_matching_bytes/op	 140574824 heap_initial_bytes/op	267684776 B/op	  8716885 allocs/op
+	//	BenchmarkDNSEngine_heapAlloc/1_non_matching-8     	      58	  31100568 ns/op	 171625776 heap_after_compilation_bytes/op	 171629768 heap_after_matching_bytes/op	 140584160 heap_initial_bytes/op	31045626 B/op	  450720 allocs/op
+	//	BenchmarkDNSEngine_heapAlloc/10_non_matching-8    	      58	  31121919 ns/op	 171625554 heap_after_compilation_bytes/op	 171629834 heap_after_matching_bytes/op	 140589035 heap_initial_bytes/op	31040805 B/op	  450729 allocs/op
+	//	BenchmarkDNSEngine_heapAlloc/100_non_matching-8   	      58	  30898313 ns/op	 171626982 heap_after_compilation_bytes/op	 171634142 heap_after_matching_bytes/op	 140585366 heap_initial_bytes/op	31048792 B/op	  450819 allocs/op
 }
 
 // DNS filter paths for tests.

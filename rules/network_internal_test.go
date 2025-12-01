@@ -3,6 +3,7 @@ package rules
 import (
 	"testing"
 
+	"github.com/AdguardTeam/golibs/container"
 	"github.com/AdguardTeam/golibs/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -249,18 +250,18 @@ func TestParseCTags(t *testing.T) {
 
 	perm, rest, err := parseCTags("phone|pc|~printer", "|")
 	require.NoError(t, err)
-	assert.Equal(t, []string{"pc", "phone"}, perm)
-	assert.Equal(t, []string{"printer"}, rest)
+	assert.Equal(t, []string{"pc", "phone"}, perm.Values())
+	assert.Equal(t, []string{"printer"}, rest.Values())
 
 	perm, rest, err = parseCTags("device_pc0123", "|")
 	require.NoError(t, err)
-	assert.Equal(t, []string{"device_pc0123"}, perm)
-	assert.Nil(t, rest)
+	assert.Equal(t, []string{"device_pc0123"}, perm.Values())
+	assert.Equal(t, 0, rest.Len())
 
 	perm, rest, err = parseCTags("pc|~phone|bad.", "|")
 	require.Error(t, err)
-	assert.Equal(t, []string{"pc"}, perm)
-	assert.Equal(t, []string{"phone"}, rest)
+	assert.Equal(t, []string{"pc"}, perm.Values())
+	assert.Equal(t, []string{"phone"}, rest.Values())
 }
 
 func TestNetworkRule_cTagRules(t *testing.T) {
@@ -270,13 +271,13 @@ func TestNetworkRule_cTagRules(t *testing.T) {
 		t.Parallel()
 
 		r := newNetworkRule(t, "||test.example^$ctag=pc")
-		assert.Equal(t, []string{"pc"}, r.permittedClientTags)
+		assert.Equal(t, []string{"pc"}, r.permittedClientTags.Values())
 
 		req := NewRequestForHostname("test.example")
-		req.SortedClientTags = []string{"pc"}
+		req.ClientTags = container.NewSortedSliceSet("pc")
 		assert.True(t, r.Match(req))
 
-		req.SortedClientTags = nil
+		req.ClientTags = nil
 		assert.False(t, r.Match(req))
 	})
 
@@ -284,13 +285,13 @@ func TestNetworkRule_cTagRules(t *testing.T) {
 		t.Parallel()
 
 		r := newNetworkRule(t, "||test.example^$ctag=phone|pc")
-		assert.Equal(t, []string{"pc", "phone"}, r.permittedClientTags)
+		assert.Equal(t, []string{"pc", "phone"}, r.permittedClientTags.Values())
 
 		req := NewRequestForHostname("test.example")
-		req.SortedClientTags = []string{"phone", "other"}
+		req.ClientTags = container.NewSortedSliceSet("phone", "other")
 		assert.True(t, r.Match(req))
 
-		req.SortedClientTags = nil
+		req.ClientTags = nil
 		assert.False(t, r.Match(req))
 	})
 
@@ -298,17 +299,17 @@ func TestNetworkRule_cTagRules(t *testing.T) {
 		t.Parallel()
 
 		r := newNetworkRule(t, "||test.example^$ctag=~phone|pc")
-		assert.Equal(t, []string{"pc"}, r.permittedClientTags)
-		assert.Equal(t, []string{"phone"}, r.restrictedClientTags)
+		assert.Equal(t, []string{"pc"}, r.permittedClientTags.Values())
+		assert.Equal(t, []string{"phone"}, r.restrictedClientTags.Values())
 
 		req := NewRequestForHostname("test.example")
-		req.SortedClientTags = []string{"phone", "pc"}
+		req.ClientTags = container.NewSortedSliceSet("phone", "pc")
 		assert.False(t, r.Match(req))
 
-		req.SortedClientTags = []string{"pc"}
+		req.ClientTags = container.NewSortedSliceSet("pc")
 		assert.True(t, r.Match(req))
 
-		req.SortedClientTags = []string{"phone"}
+		req.ClientTags = container.NewSortedSliceSet("phone")
 		assert.False(t, r.Match(req))
 	})
 }

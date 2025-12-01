@@ -35,19 +35,19 @@ type DNSEngine struct {
 
 // DNSRequest represents a DNS query with associated metadata.
 type DNSRequest struct {
+	// ClientTags is the list of tags to match against $ctag modifiers.
+	ClientTags *container.SortedSliceSet[string]
+
+	// ClientIdentifiers is the list of client IDs to match against $client
+	// modifiers.
+	ClientIdentifiers *container.SortedSliceSet[string]
+
 	// ClientIP is the IP address to match against $client modifiers.  The
 	// default zero value won't be considered.
 	ClientIP netip.Addr
 
-	// ClientName is the name to match against $client modifiers.  The default
-	// empty value won't be considered.
-	ClientName string
-
 	// Hostname is the hostname to filter.
 	Hostname string
-
-	// SortedClientTags is the list of tags to match against $ctag modifiers.
-	SortedClientTags []string
 
 	// DNSType is the type of the resource record (RR) of a DNS request, for
 	// example "A" or "AAAA".  See [rules.RRValue] for all acceptable constants
@@ -62,10 +62,10 @@ type DNSRequest struct {
 func (r *DNSRequest) Reset() {
 	r.ClientIP = netip.Addr{}
 
-	r.ClientName = ""
+	r.ClientIdentifiers.Clear()
 	r.Hostname = ""
 
-	r.SortedClientTags = r.SortedClientTags[:0]
+	r.ClientTags.Clear()
 
 	r.DNSType = 0
 
@@ -130,9 +130,9 @@ func (e *DNSEngine) getRequestFromPool(dReq *DNSRequest) (req *rules.Request) {
 	req.SourceHostname = ""
 	req.SourceURL = ""
 
-	req.SortedClientTags = dReq.SortedClientTags
+	req.ClientTags = dReq.ClientTags
 	req.ClientIP = dReq.ClientIP
-	req.ClientName = dReq.ClientName
+	req.ClientIdentifiers = dReq.ClientIdentifiers
 	req.DNSType = dReq.DNSType
 
 	rules.FillRequestForHostname(req, dReq.Hostname)

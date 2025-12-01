@@ -4,6 +4,7 @@ import (
 	"net/netip"
 	"slices"
 
+	"github.com/AdguardTeam/golibs/container"
 	"github.com/AdguardTeam/golibs/netutil"
 )
 
@@ -11,9 +12,7 @@ import (
 type clients struct {
 	// identifiers are the client string identifiers, that are neither IP
 	// addresses nor subnets.
-	//
-	// TODO(e.burkov):  Think of using [container.MapSet].
-	identifiers []string
+	identifiers *container.SortedSliceSet[string]
 
 	// nets are the clients defined by IP addresses or subnets.
 	nets netutil.SliceSubnetSet
@@ -25,7 +24,7 @@ func (c *clients) len() (l int) {
 		return 0
 	}
 
-	return len(c.identifiers) + len(c.nets)
+	return c.identifiers.Len() + len(c.nets)
 }
 
 // equal returns true if c and other contain the same identifiers in the same
@@ -36,7 +35,7 @@ func (c *clients) equal(other *clients) (ok bool) {
 		return other == nil
 	case
 		other == nil,
-		!slices.Equal(c.identifiers, other.identifiers),
+		!c.identifiers.Equal(other.identifiers),
 		!slices.Equal(c.nets, other.nets):
 		return false
 	default:
@@ -54,10 +53,7 @@ func (c *clients) add(client string) {
 	case netutil.IsValidIPPrefixString(client):
 		pref = netip.MustParsePrefix(client).Masked()
 	default:
-		idx, ok := slices.BinarySearch(c.identifiers, client)
-		if !ok {
-			c.identifiers = slices.Insert(c.identifiers, idx, client)
-		}
+		c.identifiers.Add(client)
 
 		return
 	}
@@ -70,28 +66,22 @@ func (c *clients) add(client string) {
 
 // newClients creates a new clients set from a slice of clients.
 func newClients(clientStrs ...string) (c *clients) {
-	c = &clients{}
-	for _, s := range clientStrs {
-		c.add(s)
+	c = &clients{identifiers: container.NewSortedSliceSet[string]()}
+	for _, client := range clientStrs {
+		c.add(client)
 	}
 
 	return c
 }
 
-// containsAny returns true if clients contain either host or the IP address
-// ipStr is within one of the clients' subnets.  If c is nil, ok is false.
-func (c *clients) containsAny(host string, ip netip.Addr) (ok bool) {
+// match returns true if clients contain either host or the IP address.  If c is
+// nil, ok is false.
+func (c *clients) match(ids *container.SortedSliceSet[string], ip netip.Addr) (ok bool) {
 	if c == nil {
 		return false
 	}
 
-	if host != "" {
-		if _, ok = slices.BinarySearch(c.identifiers, host); ok {
-			return true
-		}
-	}
-
-	return ip != (netip.Addr{}) && c.nets.Contains(ip)
+	return c.identifiers.Intersects(ids) || ip != (netip.Addr{}) && c.nets.Contains(ip)
 }
 
 // comparePrefix is a comparison function for sorting slices of [netip.Prefix].
