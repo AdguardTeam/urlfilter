@@ -206,10 +206,10 @@ const MaxURLLength = 4 * 1024
 func (r *Request) AppendURLData(orig []byte, lower bool) (data []byte) {
 	if len(r.urlData) == 0 {
 		r.urlData, _ = r.URL.AppendBinary(r.urlData)
-	}
 
-	if len(r.urlData) > MaxURLLength {
-		r.urlData = r.urlData[:MaxURLLength]
+		if len(r.urlData) > MaxURLLength {
+			r.urlData = r.urlData[:MaxURLLength]
+		}
 	}
 
 	if !lower {
