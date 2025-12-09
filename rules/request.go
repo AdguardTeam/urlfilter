@@ -7,6 +7,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/AdguardTeam/golibs/container"
 	"github.com/AdguardTeam/golibs/netutil"
 	"github.com/AdguardTeam/golibs/netutil/urlutil"
 	"golang.org/x/net/publicsuffix"
@@ -70,6 +71,13 @@ func (t RequestType) Count() (n int) {
 
 // Request is a web filtering request.
 type Request struct {
+	// ClientTags is the set of tags to match against $ctag modifiers.
+	ClientTags *container.SortedSliceSet[string]
+
+	// ClientIdentifiers is the list of client IDs to match against $client
+	// modifiers, if any.
+	ClientIdentifiers *container.SortedSliceSet[string]
+
 	// ClientIP is the IP address to match against $client modifiers, if any.
 	ClientIP netip.Addr
 
@@ -78,9 +86,6 @@ type Request struct {
 
 	// URL is the full request URL.  It must not be nil.
 	URL *url.URL
-
-	// ClientName is the name to match against $client modifiers, if any.
-	ClientName string
 
 	// Domain is the effective top-level domain of the request with an
 	// additional label.
@@ -92,9 +97,6 @@ type Request struct {
 	// SourceDomain is the effective top-level domain of the source with an
 	// additional label.
 	SourceDomain string
-
-	// SortedClientTags is the list of tags to match against $ctag modifiers.
-	SortedClientTags []string
 
 	// urlData is the bytes of this request URL.
 	urlData []byte

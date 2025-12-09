@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/AdguardTeam/golibs/container"
 	"github.com/AdguardTeam/golibs/netutil/urlutil"
 	"github.com/AdguardTeam/golibs/testutil"
 	"github.com/AdguardTeam/urlfilter/internal/uftest"
@@ -590,20 +591,20 @@ func TestNetworkRule_Match_client(t *testing.T) {
 
 	r = uftest.NewNetworkRule(t, uftest.RuleHost+`$client=~'Frank's laptop'`)
 
-	req.ClientName = "Frank's laptop"
+	req.ClientIdentifiers = container.NewSortedSliceSet("Frank's laptop")
 	assert.False(t, r.Match(req))
 
-	req.ClientName = "Frank's phone"
+	req.ClientIdentifiers = container.NewSortedSliceSet("Frank's phone")
 	assert.True(t, r.Match(req))
 
 	r = uftest.NewNetworkRule(t, uftest.RuleHost+"$client=name")
 
 	req.ClientIP = netip.MustParseAddr("127.0.0.1")
-	req.ClientName = "name"
+	req.ClientIdentifiers = container.NewSortedSliceSet("name")
 	assert.True(t, r.Match(req))
 
 	req.ClientIP = netip.MustParseAddr("127.0.0.1")
-	req.ClientName = "another-name"
+	req.ClientIdentifiers = container.NewSortedSliceSet("another-name")
 	assert.False(t, r.Match(req))
 }
 
@@ -904,11 +905,11 @@ func BenchmarkNetworkRule_Match(b *testing.B) {
 	require.True(b, ok)
 
 	// Most recent results:
-	//	goos: linux
-	//	goarch: amd64
+	//	goos: darwin
+	//	goarch: arm64
 	//	pkg: github.com/AdguardTeam/urlfilter/rules
-	//	cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
-	//	BenchmarkNetworkRule_Match-16    	 1793748	       670.3 ns/op	       0 B/op	       0 allocs/op
+	//	cpu: Apple M3
+	//	BenchmarkNetworkRule_Match-8   	 3261547	       359.4 ns/op	       0 B/op	       0 allocs/op
 }
 
 // TODO(d.kolyshev): Improve this benchmark.
@@ -930,6 +931,50 @@ func BenchmarkNetworkRule_IsHigherPriority(b *testing.B) {
 	//	pkg: github.com/AdguardTeam/urlfilter/rules
 	//	cpu: Apple M1 Pro
 	//	BenchmarkNetworkRule_IsHigherPriority-8   	134632681	         8.891 ns/op	       0 B/op	       0 allocs/op
+}
+
+func BenchmarkNetworkRule_Match_Tags(b *testing.B) {
+	r := uftest.NewNetworkRule(b, "||example.org^$ctag=device_pc|~device_phone")
+	req := rules.NewRequestForHostname("example.org")
+	req.ClientTags = container.NewSortedSliceSet("device_pc", "os_macos", "user_child")
+
+	var ok bool
+
+	b.ReportAllocs()
+	for b.Loop() {
+		ok = r.Match(req)
+	}
+
+	require.True(b, ok)
+
+	// Most recent results:
+	//	goos: darwin
+	//	goarch: arm64
+	//	pkg: github.com/AdguardTeam/urlfilter/rules
+	//	cpu: Apple M3
+	//	BenchmarkNetworkRule_Match_Tags-8   	 3062398	       378.5 ns/op	       0 B/op	       0 allocs/op
+}
+
+func BenchmarkNetworkRule_Match_ClientIdentifiers(b *testing.B) {
+	r := uftest.NewNetworkRule(b, "||example.org^$client=id_1|id_2|id_3|id_4|id_5|id_6")
+	req := rules.NewRequestForHostname("example.org")
+	req.ClientIdentifiers = container.NewSortedSliceSet("id_5")
+
+	var ok bool
+
+	b.ReportAllocs()
+	for b.Loop() {
+		ok = r.Match(req)
+	}
+
+	require.True(b, ok)
+
+	// Most recent results:
+	//	goos: darwin
+	//	goarch: arm64
+	//	pkg: github.com/AdguardTeam/urlfilter/rules
+	//	cpu: Apple M3
+	//	BenchmarkNetworkRule_Match_ClientIdentifiers-8   	 3014610	       390.0 ns/op	       0 B/op	       0 allocs/op
 }
 
 func FuzzNetworkRule_Match(f *testing.F) {

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/AdguardTeam/golibs/container"
 	"github.com/AdguardTeam/golibs/mathutil"
 	"github.com/AdguardTeam/golibs/netutil"
 	"github.com/AdguardTeam/golibs/syncutil"
@@ -157,6 +158,18 @@ type NetworkRule struct {
 	// regexp is the regular expression compiled from the pattern.
 	regexp *regexp.Regexp
 
+	// permittedClientTags is a sorted list of permitted client tags from the
+	// $ctag modifier.
+	//
+	// See https://github.com/AdguardTeam/AdGuardHome/issues/1081#issuecomment-575142737.
+	permittedClientTags *container.SortedSliceSet[string]
+
+	// restrictedClientTags is a sorted list of restricted client tags from the
+	// $ctag modifier.
+	//
+	// See https://github.com/AdguardTeam/AdGuardHome/issues/1081#issuecomment-575142737.
+	restrictedClientTags *container.SortedSliceSet[string]
+
 	// text is the original rule text.
 	text string
 
@@ -186,18 +199,6 @@ type NetworkRule struct {
 	// restrictedDNSTypes is the list of restricted DNS record type names from
 	// the $dnstype modifier.
 	restrictedDNSTypes []RRType
-
-	// permittedClientTags is a sorted list of permitted client tags from the
-	// $ctag modifier.
-	//
-	// See https://github.com/AdguardTeam/AdGuardHome/issues/1081#issuecomment-575142737.
-	permittedClientTags []string
-
-	// restrictedClientTags is a sorted list of restricted client tags from the
-	// $ctag modifier.
-	//
-	// See https://github.com/AdguardTeam/AdGuardHome/issues/1081#issuecomment-575142737.
-	restrictedClientTags []string
 
 	// id is a filter list identifier.
 	id ListID
@@ -269,8 +270,8 @@ func NewNetworkRule(ruleText string, id ListID) (r *NetworkRule, err error) {
 			len(r.restrictedDomains) == 0 &&
 			r.permittedClients.len() == 0 &&
 			r.restrictedClients.len() == 0 &&
-			len(r.permittedClientTags) == 0 &&
-			len(r.restrictedClientTags) == 0 &&
+			r.permittedClientTags.Len() == 0 &&
+			r.restrictedClientTags.Len() == 0 &&
 			len(r.permittedDNSTypes) == 0 &&
 			len(r.restrictedDNSTypes) == 0 &&
 			len(r.denyAllowDomains) == 0 {
@@ -318,8 +319,8 @@ func (r *NetworkRule) Match(req *Request) (ok bool) {
 		!r.matchRequestDomain(req.URL.Hostname(), req.IsHostnameRequest),
 		!r.matchSourceDomain(req.SourceHostname),
 		!r.matchDNSType(req.DNSType),
-		!r.matchClientTags(req.SortedClientTags),
-		!r.matchClient(req.ClientName, req.ClientIP),
+		!r.matchClientTags(req.ClientTags),
+		!r.matchClient(req.ClientIdentifiers, req.ClientIP),
 		!r.matchPattern(req):
 		return false
 	}
@@ -459,7 +460,7 @@ func (r *NetworkRule) calcRuleSpecs() (prio int) {
 			len(r.permittedDNSTypes) != 0 || len(r.restrictedDNSTypes) != 0,
 		) +
 		mathutil.BoolToNumber[int](
-			len(r.permittedClientTags) != 0 || len(r.restrictedClientTags) != 0,
+			r.permittedClientTags.Len() != 0 || r.restrictedClientTags.Len() != 0,
 		) +
 		mathutil.BoolToNumber[int](
 			r.permittedClients.len() != 0 || r.restrictedClients.len() != 0,
@@ -481,8 +482,8 @@ func (r *NetworkRule) negatesBadfilter(other *NetworkRule) (ok bool) {
 		r.disabledOptions != other.disabledOptions,
 		!slices.Equal(r.permittedDomains, other.permittedDomains),
 		!slices.Equal(r.restrictedDomains, other.restrictedDomains),
-		!slices.Equal(r.permittedClientTags, other.permittedClientTags),
-		!slices.Equal(r.restrictedClientTags, other.restrictedClientTags),
+		!r.permittedClientTags.Equal(other.permittedClientTags),
+		!r.restrictedClientTags.Equal(other.restrictedClientTags),
 		!r.permittedClients.equal(other.permittedClients),
 		!r.restrictedClients.equal(other.restrictedClients):
 		return false
@@ -668,52 +669,31 @@ func (r *NetworkRule) matchDNSType(rtype uint16) (allowed bool) {
 	return true
 }
 
-// matchClientTagsSpecific returns true if there is a common element in the two
-// slices.  The matching is case-sensitive.
-//
-// TODO(a.garipov):  Test and optimize.
-func matchClientTagsSpecific(sortedRuleTags, sortedClientTags []string) (ok bool) {
-	idxRule := 0
-	idxCli := 0
-	for idxRule != len(sortedRuleTags) && idxCli != len(sortedClientTags) {
-		res := strings.Compare(sortedRuleTags[idxRule], sortedClientTags[idxCli])
-		if res == 0 {
-			return true
-		} else if res < 0 {
-			idxRule++
-		} else {
-			idxCli++
-		}
-	}
-
-	return false
-}
-
-// matchClientTags returns true if r matches one of sortedTags.
-func (r *NetworkRule) matchClientTags(sortedTags []string) (ok bool) {
-	if len(r.restrictedClientTags) == 0 && len(r.permittedClientTags) == 0 {
+// matchClientTags returns true if r matches one of tags.
+func (r *NetworkRule) matchClientTags(tags *container.SortedSliceSet[string]) (ok bool) {
+	if r.restrictedClientTags.Len() == 0 && r.permittedClientTags.Len() == 0 {
 		// the rule doesn't contain $ctag extension
 		return true
 	}
 
-	if matchClientTagsSpecific(r.restrictedClientTags, sortedTags) {
+	if r.restrictedClientTags.Intersects(tags) {
 		// matched by restricted client tag
 		return false
 	}
 
-	if len(r.permittedClientTags) != 0 {
+	if r.permittedClientTags.Len() != 0 {
 		// If the rule is permitted for specific tags only,
 		// we should check whether our tag is among permitted or not
 		// and return the result the result immediately
-		return matchClientTagsSpecific(r.permittedClientTags, sortedTags)
+		return r.permittedClientTags.Intersects(tags)
 	}
 
 	return true
 }
 
 // matchClient returns true if the rule is specified for client defined by
-// host or ip.  Both host and ip can be empty.
-func (r *NetworkRule) matchClient(host string, ip netip.Addr) (ok bool) {
+// host or ip.
+func (r *NetworkRule) matchClient(ids *container.SortedSliceSet[string], ip netip.Addr) (ok bool) {
 	restLen := r.restrictedClients.len()
 	permLen := r.permittedClients.len()
 
@@ -722,7 +702,7 @@ func (r *NetworkRule) matchClient(host string, ip netip.Addr) (ok bool) {
 		return true
 	}
 
-	if r.restrictedClients.containsAny(host, ip) {
+	if r.restrictedClients.match(ids, ip) {
 		// The client is in the restricted set.
 		return false
 	}
@@ -730,7 +710,7 @@ func (r *NetworkRule) matchClient(host string, ip netip.Addr) (ok bool) {
 	if permLen != 0 {
 		// If the rule is permitted for specific client only, check whether the
 		// client is among permitted.
-		return r.permittedClients.containsAny(host, ip)
+		return r.permittedClients.match(ids, ip)
 	}
 
 	// If we got here, permitted list is empty and the client is not among
