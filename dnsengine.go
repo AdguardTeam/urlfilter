@@ -87,8 +87,12 @@ func NewDNSEngine(s *filterlist.RuleStorage) (e *DNSEngine) {
 		rulesStorage: s,
 		ruleIndex:    make(map[string][]filterlist.StorageID, numRulesEst),
 		rulesCount:   0,
-		reqPool:      syncutil.NewPool(func() (v *rules.Request) { return &rules.Request{} }),
-		rulesPool:    syncutil.NewSlicePool[*rules.HostRule](1),
+		reqPool: syncutil.NewPool(func() (v *rules.Request) {
+			return &rules.Request{
+				URL: &url.URL{Scheme: urlutil.SchemeHTTP},
+			}
+		}),
+		rulesPool: syncutil.NewSlicePool[*rules.HostRule](1),
 	}
 
 	netEng := NewNetworkEngineSkipStorageScan(s)
@@ -128,9 +132,6 @@ func (e *DNSEngine) Match(hostname string) (res *DNSResult, matched bool) {
 func (e *DNSEngine) getRequestFromPool(dReq *DNSRequest) (req *rules.Request) {
 	req = e.reqPool.Get()
 
-	req.URL = &url.URL{
-		Scheme: urlutil.SchemeHTTP,
-	}
 	req.SourceDomain = ""
 	req.SourceHostname = ""
 	req.SourceURL = nil
