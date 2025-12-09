@@ -182,5 +182,5 @@ func BenchmarkFillRequestForHostname(b *testing.B) {
 	//	goarch: arm64
 	//	pkg: github.com/AdguardTeam/urlfilter/rules
 	//	cpu: Apple M1 Pro
-	//	BenchmarkFillRequestForHostname-8   	18789363	        63.37 ns/op	       0 B/op	       0 allocs/op
+	//	BenchmarkFillRequestForHostname-8                       10620733               113.0 ns/op            48 B/op          1 allocs/op
 }

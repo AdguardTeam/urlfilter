@@ -646,13 +646,13 @@ func BenchmarkDNSEngine_heapAlloc(b *testing.B) {
 	//	goos: darwin
 	//	goarch: arm64
 	//	pkg: github.com/AdguardTeam/urlfilter
-	//	cpu: Apple M3
-	//	BenchmarkDNSEngine_heapAlloc/1_matching-8         	       8	 192417896 ns/op	 171684650 heap_after_compilation_bytes/op	 174154105 heap_after_matching_bytes/op	 140625226 heap_initial_bytes/op	33518451 B/op	  533789 allocs/op
-	//	BenchmarkDNSEngine_heapAlloc/10_matching-8        	       2	 1429245396 ns/op	 171551868 heap_after_compilation_bytes/op	 195331496 heap_after_matching_bytes/op	 140615404 heap_initial_bytes/op	54716140 B/op	  1277712 allocs/op
-	//	BenchmarkDNSEngine_heapAlloc/100_matching-8       	       1	 12506500041 ns/op	 171609656 heap_after_compilation_bytes/op	 281924200 heap_after_matching_bytes/op	 140574824 heap_initial_bytes/op	267684776 B/op	  8716885 allocs/op
-	//	BenchmarkDNSEngine_heapAlloc/1_non_matching-8     	      58	  31100568 ns/op	 171625776 heap_after_compilation_bytes/op	 171629768 heap_after_matching_bytes/op	 140584160 heap_initial_bytes/op	31045626 B/op	  450720 allocs/op
-	//	BenchmarkDNSEngine_heapAlloc/10_non_matching-8    	      58	  31121919 ns/op	 171625554 heap_after_compilation_bytes/op	 171629834 heap_after_matching_bytes/op	 140589035 heap_initial_bytes/op	31040805 B/op	  450729 allocs/op
-	//	BenchmarkDNSEngine_heapAlloc/100_non_matching-8   	      58	  30898313 ns/op	 171626982 heap_after_compilation_bytes/op	 171634142 heap_after_matching_bytes/op	 140585366 heap_initial_bytes/op	31048792 B/op	  450819 allocs/op
+	//	cpu: Apple M1 Pro
+	//	BenchmarkDNSEngine_heapAlloc/1_matching-8                      2         532197500 ns/op          95145544 heap_after_compilation_bytes/op       191511764 heap_after_matching_bytes/op   73393296 heap_initial_bytes/op      202865876 B/op   1893784 allocs/op
+	//	BenchmarkDNSEngine_heapAlloc/10_matching-8                     1        3416360041 ns/op         171337192 heap_after_compilation_bytes/op       153748424 heap_after_matching_bytes/op  140302248 heap_initial_bytes/op      103966624 B/op   2101815 allocs/op
+	//	BenchmarkDNSEngine_heapAlloc/100_matching-8                    1        30097983917 ns/op        171632392 heap_after_compilation_bytes/op       253247264 heap_after_matching_bytes/op  140302312 heap_initial_bytes/op      757816256 B/op  16957139 allocs/op
+	//	BenchmarkDNSEngine_heapAlloc/1_non_matching-8                 20          57880275 ns/op         171368775 heap_after_compilation_bytes/op       171383031 heap_after_matching_bytes/op  140323993 heap_initial_bytes/op      31059049 B/op     450739 allocs/op
+	//	BenchmarkDNSEngine_heapAlloc/10_non_matching-8                21          53417010 ns/op         171312267 heap_after_compilation_bytes/op       171327622 heap_after_matching_bytes/op  140324164 heap_initial_bytes/op      31003462 B/op     450754 allocs/op
+	//	BenchmarkDNSEngine_heapAlloc/100_non_matching-8               22          55191788 ns/op         171408578 heap_after_compilation_bytes/op       171432413 heap_after_matching_bytes/op  140324385 heap_initial_bytes/op      31108028 B/op     450938 allocs/op
 }
 
 // DNS filter paths for tests.
@@ -806,7 +806,7 @@ func BenchmarkDNSEngine_Match(b *testing.B) {
 	//	goarch: arm64
 	//	pkg: github.com/AdguardTeam/urlfilter
 	//	cpu: Apple M1 Pro
-	//	BenchmarkDNSEngine_Match-8   	      19	  58246607 ns/op	 7566559 B/op	   96903 allocs/op
+	//	BenchmarkDNSEngine_Match-8                                    14          79705015 ns/op         5075396 B/op     101556 allocs/op
 }
 
 func BenchmarkDNSEngine_MatchRequestInto(b *testing.B) {
@@ -844,7 +844,7 @@ func BenchmarkDNSEngine_MatchRequestInto(b *testing.B) {
 	//	goarch: arm64
 	//	pkg: github.com/AdguardTeam/urlfilter
 	//	cpu: Apple M1 Pro
-	//	BenchmarkDNSEngine_MatchRequestInto-8   	      20	  57013300 ns/op	 5191933 B/op	   55950 allocs/op
+	//	BenchmarkDNSEngine_MatchRequestInto-8                         14          90682113 ns/op         2605386 B/op      58278 allocs/op
 }
 
 func FuzzDNSEngine_Match(f *testing.F) {

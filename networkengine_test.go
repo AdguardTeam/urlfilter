@@ -214,12 +214,12 @@ func BenchmarkNetworkEngine_heapAlloc(b *testing.B) {
 	//	goarch: arm64
 	//	pkg: github.com/AdguardTeam/urlfilter
 	//	cpu: Apple M1 Pro
-	//	BenchmarkNetworkEngine_heapAlloc/1_matching-8         	      21	  51336286 ns/op	  12020605 heap_after_compilation_bytes/op	  12455160 heap_after_matching_bytes/op	   1159396 heap_initial_bytes/op	39397702 B/op	  361864 allocs/op
-	//	BenchmarkNetworkEngine_heapAlloc/10_matching-8        	       7	 166036208 ns/op	  11613346 heap_after_compilation_bytes/op	  12189706 heap_after_matching_bytes/op	   1207706 heap_initial_bytes/op	39583158 B/op	  362703 allocs/op
-	//	BenchmarkNetworkEngine_heapAlloc/100_matching-8       	       1	1304518750 ns/op	  13763472 heap_after_compilation_bytes/op	  13469504 heap_after_matching_bytes/op	   1015992 heap_initial_bytes/op	40647016 B/op	  373282 allocs/op
-	//	BenchmarkNetworkEngine_heapAlloc/1_non_matching-8     	      34	  33701776 ns/op	  12223364 heap_after_compilation_bytes/op	  12246164 heap_after_matching_bytes/op	   1043357 heap_initial_bytes/op	35642842 B/op	  335216 allocs/op
-	//	BenchmarkNetworkEngine_heapAlloc/10_non_matching-8    	      33	  34367210 ns/op	  12046043 heap_after_compilation_bytes/op	  12068838 heap_after_matching_bytes/op	   1047029 heap_initial_bytes/op	35646567 B/op	  335218 allocs/op
-	//	BenchmarkNetworkEngine_heapAlloc/100_non_matching-8   	      34	  35464178 ns/op	  11761235 heap_after_compilation_bytes/op	  11551277 heap_after_matching_bytes/op	   1052049 heap_initial_bytes/op	35652948 B/op	  335217 allocs/op
+	//	BenchmarkNetworkEngine_heapAlloc/1_matching-8                  2         955011020 ns/op          44020008 heap_after_compilation_bytes/op        59332428 heap_after_matching_bytes/op   27136216 heap_initial_bytes/op      63935084 B/op     584529 allocs/op
+	//	BenchmarkNetworkEngine_heapAlloc/10_matching-8                 1        8425051542 ns/op          45276760 heap_after_compilation_bytes/op        68122968 heap_after_matching_bytes/op   32450552 heap_initial_bytes/op      57098280 B/op     532410 allocs/op
+	//	BenchmarkNetworkEngine_heapAlloc/100_matching-8                1        82011139084 ns/op         49019400 heap_after_compilation_bytes/op        71002248 heap_after_matching_bytes/op   32450848 heap_initial_bytes/op      108113448 B/op   1047191 allocs/op
+	//	BenchmarkNetworkEngine_heapAlloc/1_non_matching-8             25          44611052 ns/op          46521772 heap_after_compilation_bytes/op        46544286 heap_after_matching_bytes/op   32477133 heap_initial_bytes/op      34340867 B/op     335115 allocs/op
+	//	BenchmarkNetworkEngine_heapAlloc/10_non_matching-8                    26          43685163 ns/op          46404201 heap_after_compilation_bytes/op        46426713 heap_after_matching_bytes/op   32477623 heap_initial_bytes/op      34356335 B/op     335114 allocs/op
+	//	BenchmarkNetworkEngine_heapAlloc/100_non_matching-8                   26          44092356 ns/op          46623682 heap_after_compilation_bytes/op        46646206 heap_after_matching_bytes/op   32478342 heap_initial_bytes/op      34349195 B/op     335115 allocs/op
 }
 
 // networkEngineMeasurement emulates a life cycle of a network filtering engine.
