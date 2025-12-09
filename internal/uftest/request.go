@@ -16,9 +16,16 @@ import (
 
 // Request contains data for a filtering request for tests.
 type Request struct {
-	URL         *urlutil.URL `json:"url"`
-	FrameURL    *url.URL
+	// FrameURL is the URL of the frame.
+	FrameURL *url.URL
+
+	// URL is the URL of the request.  It must not be nil.
+	URL *urlutil.URL `json:"url"`
+
+	// FrameURLStr is the URL string of the frame.
 	FrameURLStr string `json:"frameUrl"`
+
+	// RequestType is the request type.
 	RequestType string `json:"cpt"`
 }
 
@@ -67,6 +74,7 @@ func ParseRequests(tb testing.TB) (requests []*Request) {
 		req := &Request{}
 		err = json.Unmarshal(line, req)
 		if err != nil {
+			// Skip requests with invalid data.
 			continue
 		}
 
