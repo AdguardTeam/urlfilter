@@ -17,7 +17,7 @@ import (
 // Request contains data for a filtering request for tests.
 type Request struct {
 	// FrameURL is the URL of the frame.
-	FrameURL *url.URL
+	FrameURL *url.URL `json:"-"`
 
 	// URL is the URL of the request.  It must not be nil.
 	URL *urlutil.URL `json:"url"`
