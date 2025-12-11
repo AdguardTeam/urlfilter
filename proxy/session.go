@@ -7,7 +7,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/AdguardTeam/golibs/netutil/urlutil"
+	"github.com/AdguardTeam/golibs/log"
 	"github.com/AdguardTeam/urlfilter/rules"
 )
 
@@ -56,26 +56,32 @@ type Session struct {
 }
 
 // NewSession creates a new instance of the Session struct and initializes it.
-// id -- unique session identifier
-// req -- HTTP request data
-func NewSession(id string, req *http.Request) *Session {
+// id is the unique session identifier.  req must not be nil.
+func NewSession(id string, req *http.Request) (s *Session) {
 	requestType := assumeRequestType(req, nil)
+	sourceURL := parseSourceURL(req.Referer())
 
-	var sourceURL *url.URL
-	if req.Referer() != "" {
-		sourceURL = &url.URL{
-			Scheme: urlutil.SchemeHTTP,
-			Host:   req.Referer(),
-		}
-	}
-
-	s := Session{
+	return &Session{
 		ID:          id,
 		Request:     rules.NewRequest(req.URL, sourceURL, requestType),
 		HTTPRequest: req,
 	}
+}
 
-	return &s
+// parseSourceURL parses the source URL from the referer string.  It returns nil
+// if the referer string is empty or if parsing fails.  It logs an error if
+// parsing fails.
+func parseSourceURL(refStr string) (sourceURL *url.URL) {
+	if refStr == "" {
+		return nil
+	}
+
+	sourceURL, err := url.Parse(refStr)
+	if err != nil {
+		log.Error("urlfilter: failed to parse referer %q: %v", refStr, err)
+	}
+
+	return sourceURL
 }
 
 // SetResponse sets the response of this session

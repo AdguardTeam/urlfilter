@@ -100,11 +100,15 @@ func isSupportedURL(u *url.URL) (ok bool) {
 		return true
 	}
 
-	scheme := u.Scheme
-
-	// TODO(a.garipov):  Add websocket schemes to golibs.
-	return scheme == urlutil.SchemeHTTP ||
-		scheme == urlutil.SchemeHTTPS ||
-		scheme == "ws" ||
-		scheme == "wss"
+	switch u.Scheme {
+	case
+		urlutil.SchemeHTTP,
+		urlutil.SchemeHTTPS,
+		// TODO(a.garipov):  Add websocket schemes to golibs.
+		"ws",
+		"wss":
+		return true
+	default:
+		return false
+	}
 }

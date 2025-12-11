@@ -240,6 +240,8 @@ func effectiveTLDPlusOne(hostname string) (domain string) {
 		return ""
 	}
 
+	// TODO(a.garipov):  x/net/publicsuffix has unnecessary allocation since
+	// v0.47.0.  See https://github.com/golang/go/issues/76766.
 	suffix, _ := publicsuffix.PublicSuffix(hostname)
 
 	i := hostnameLen - len(suffix) - 1
