@@ -500,6 +500,10 @@ func (r *NetworkRule) isDocumentWhitelistRule() (ok bool) {
 // called before matching the rule by pattern.  It sets either isInvalid,
 // matchesAll, or regex.
 func (r *NetworkRule) preparePattern() {
+	// It is important to set r.isInvalid to true until proven otherwise to
+	// prevent panics in r.matchPattern in case of panics anywere below.
+	r.isInvalid = true
+
 	pattern := patternToRegexp(r.pattern)
 	if pattern == RegexAnyCharacter {
 		r.matchesAll = true
@@ -1056,7 +1060,7 @@ func findRegexpShortcut(pattern string) (shortcut string) {
 // TODO(a.garipov):  Refactor.
 func parseRuleText(ruleText string) (pattern, options string, isWhitelist bool, err error) {
 	if ruleText == "" || ruleText == maskWhiteList {
-		return "", "", isWhitelist, fmt.Errorf("the rule %s is too short", ruleText)
+		return "", "", isWhitelist, fmt.Errorf("rule %q is too short", ruleText)
 	}
 
 	if strings.HasPrefix(ruleText, maskWhiteList) {
@@ -1093,6 +1097,10 @@ func parseRuleText(ruleText string) (pattern, options string, isWhitelist bool, 
 		// Exit the loop since the options delimiter has been found.
 		break
 
+	}
+
+	if ruleText == "^" {
+		return "", "", isWhitelist, fmt.Errorf("rule %q is not supported", ruleText)
 	}
 
 	return ruleText, options, isWhitelist, nil

@@ -107,7 +107,12 @@ func TestParseRuleText(t *testing.T) {
 
 	t.Run("bad_rule", func(t *testing.T) {
 		_, _, _, err := parseRuleText("@@")
-		testutil.AssertErrorMsg(t, "the rule @@ is too short", err)
+		testutil.AssertErrorMsg(t, `rule "@@" is too short`, err)
+	})
+
+	t.Run("single_circumflex_with_modifier", func(t *testing.T) {
+		_, _, _, err := parseRuleText("^$client=1")
+		testutil.AssertErrorMsg(t, `rule "^" is not supported`, err)
 	})
 }
 
