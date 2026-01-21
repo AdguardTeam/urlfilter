@@ -9,6 +9,9 @@
     'key': 'URLFILTER'
     'name': 'urlfilter - Lint and Run tests'
 'variables':
+    # This variable is used to override Docker caching, for example to rerun a
+    # flaky test suite.
+    'cacheBuster': '0'
     # When there is a patch release of Go available, set this property to an
     # exact patch version as opposed to a minor one to make sure that this exact
     # version is actually used and not whatever the docker daemon on the CI has
@@ -19,83 +22,13 @@
     'packageName': 'urlfilter'
 
 'stages':
-  - 'Go Lint':
-        'manual': false
-        'final': false
-        'jobs':
-          - 'Go Lint'
-  - 'Misc Lint':
-        'manual': false
-        'final': false
-        'jobs':
-          - 'Misc Lint'
   - 'Test':
         'manual': false
         'final': false
         'jobs':
           - 'Test'
 
-'Go Lint':
-    'docker':
-        'image': '${bamboo.dockerGo}'
-        'volumes':
-            '${system.GO_CACHE_DIR}': '${bamboo.cacheGo}'
-            '${system.GO_PKG_CACHE_DIR}': '${bamboo.cacheGoPkg}'
-    'key': 'GOLINT'
-    'other':
-        'clean-working-dir': true
-    'requirements':
-      - 'adg-docker': true
-    'tasks':
-      - 'checkout':
-            'force-clean-build': true
-      - 'script':
-            'interpreter': 'SHELL'
-            'scripts':
-              - |
-                #!/bin/sh
-
-                set -e -f -u -x
-
-                make \
-                    VERBOSE=1 \
-                    go-tools \
-                    go-lint \
-                    ;
-
-'Misc Lint':
-    'docker':
-        'image': '${bamboo.dockerGo}'
-    'key': 'MISCLINT'
-    'other':
-        'clean-working-dir': true
-    'requirements':
-      - 'adg-docker': true
-    'tasks':
-      - 'checkout':
-            'force-clean-build': true
-      - 'script':
-            'interpreter': 'SHELL'
-            'scripts':
-              - |
-                #!/bin/sh
-
-                set -e -f -u -x
-
-                make \
-                    VERBOSE=1 \
-                    go-tools \
-                    md-lint \
-                    sh-lint \
-                    txt-lint \
-                    ;
-
 'Test':
-    'docker':
-        'image': '${bamboo.dockerGo}'
-        'volumes':
-            '${system.GO_CACHE_DIR}': '${bamboo.cacheGo}'
-            '${system.GO_PKG_CACHE_DIR}': '${bamboo.cacheGoPkg}'
     'final-tasks':
       - 'test-parser':
           # The default pattern, '**/test-reports/*.xml', works, so don't set
@@ -115,25 +48,21 @@
 
                 set -e -f -u -x
 
-                make \
-                    TEST_REPORTS_DIR="./test-reports/" \
-                    VERBOSE=1 \
-                    go-tools \
-                    go-test \
-                    ;
+                docker info
+
+                docker build \
+                    --build-arg "BASE_IMAGE=${bamboo_dockerGo}" \
+                    --build-arg "CACHE_BUSTER=${bamboo_cacheBuster}" \
+                    --output '.' \
+                    --progress 'plain' \
+                    --target 'tester-exporter' \
+                    -f ./docker/ci.docker \
+                    .
 
                 exit_code="$(cat ./test-reports/test-exit-code.txt)"
                 readonly exit_code
 
-                make \
-                    VERBOSE=1 \
-                    go-fuzz \
-                    go-bench \
-                    ;
-
                 exit "$exit_code"
-    'requirements':
-      - 'adg-docker': true
 
 'branches':
     'create': 'for-pull-request'
@@ -141,26 +70,6 @@
         'after-deleted-days': 1
         'after-inactive-days': 5
     'link-to-jira': true
-
-# Run only the linting and testing stages in any branch save for "master".
-'branch-overrides':
-  - '^((?!master).)*$':
-        'stages':
-          - 'Go Lint':
-                'manual': false
-                'final': false
-                'jobs':
-                  - 'Go Lint'
-          - 'Misc Lint':
-                'manual': false
-                'final': false
-                'jobs':
-                  - 'Misc Lint'
-          - 'Test':
-                'manual': false
-                'final': false
-                'jobs':
-                  - 'Test'
 
 'notifications':
   - 'events':
