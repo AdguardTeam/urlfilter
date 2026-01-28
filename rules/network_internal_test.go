@@ -112,7 +112,7 @@ func TestParseRuleText(t *testing.T) {
 
 	t.Run("single_circumflex_with_modifier", func(t *testing.T) {
 		_, _, _, err := parseRuleText("^$client=1")
-		testutil.AssertErrorMsg(t, `rule "^" is not supported`, err)
+		require.NoError(t, err)
 	})
 }
 

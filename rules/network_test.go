@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/AdguardTeam/golibs/container"
+	"github.com/AdguardTeam/golibs/netutil"
 	"github.com/AdguardTeam/golibs/netutil/urlutil"
 	"github.com/AdguardTeam/golibs/testutil"
 	"github.com/AdguardTeam/urlfilter/internal/uftest"
@@ -615,6 +616,12 @@ func TestNetworkRule_Match_client(t *testing.T) {
 	req.ClientIP = netip.MustParseAddr("127.0.0.1")
 	req.ClientIdentifiers = container.NewSortedSliceSet("another-name")
 	assert.False(t, r.Match(req))
+
+	r = uftest.NewNetworkRule(t, `0$client=127.0.0.1`)
+	assert.False(t, r.Match(req))
+
+	r = uftest.NewNetworkRule(t, "^$client=127.0.0.1")
+	assert.False(t, r.Match(req))
 }
 
 func TestNetworkRule_IsHigherPriority(t *testing.T) {
@@ -1003,6 +1010,40 @@ func FuzzNetworkRule_Match(f *testing.F) {
 
 		assert.NotPanics(t, func() {
 			_ = r.Match(req)
+		})
+	})
+}
+
+func FuzzNewNetworkRule(f *testing.F) {
+	for _, seed := range []string{
+		"",
+		" ",
+		"1",
+		"^",
+		"$client=127.0.0.1",
+		"^$client=1",
+		"@@||example.org$document,~extension",
+		"||github.com^",
+		"*$third-party",
+		"$dnstype=",
+		"/regex/",
+		"$unknown=value",
+		"||example.org$domain=|",
+	} {
+		f.Add(seed)
+	}
+
+	req := rules.NewRequestForHostname(uftest.Host)
+	req.ClientIP = netutil.IPv4Localhost()
+
+	f.Fuzz(func(t *testing.T, rule string) {
+		assert.NotPanics(t, func() {
+			r, err := rules.NewNetworkRule(rule, uftest.ListID1)
+			if err != nil {
+				return
+			}
+
+			r.Match(req)
 		})
 	})
 }

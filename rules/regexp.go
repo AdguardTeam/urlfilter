@@ -98,7 +98,7 @@ func patternToRegexp(pattern string) (reStr string) {
 		reStr = reStr[:len(MaskStartURL)] +
 			strings.ReplaceAll(reStr[len(MaskStartURL):len(reStr)-1], MaskPipe, "\\"+MaskPipe) +
 			reStr[len(reStr)-1:]
-	} else {
+	} else if len(reStr) > len(MaskPipe) {
 		reStr = reStr[:len(MaskPipe)] +
 			strings.ReplaceAll(reStr[len(MaskPipe):len(reStr)-1], MaskPipe, "\\"+MaskPipe) +
 			reStr[len(reStr)-1:]

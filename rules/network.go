@@ -227,12 +227,11 @@ type NetworkRule struct {
 	// TODO(a.garipov):  Consider unexporting.
 	Whitelist bool
 
-	// isInvalid marks the rule as invalid.  Pattern matching always returns
-	// false in this case.
-	isInvalid bool
-
 	// matchesAll shows if the rule matches everything.
 	matchesAll bool
+
+	// matchesNothing shows if the rule matches nothing.
+	matchesNothing bool
 }
 
 // NewNetworkRule parses the rule text and returns a filter rule.
@@ -243,10 +242,11 @@ func NewNetworkRule(ruleText string, id ListID) (r *NetworkRule, err error) {
 	}
 
 	r = &NetworkRule{
-		text:      ruleText,
-		Whitelist: whitelist,
-		id:        id,
-		pattern:   pattern,
+		text:           ruleText,
+		Whitelist:      whitelist,
+		id:             id,
+		pattern:        pattern,
+		matchesNothing: pattern == MaskSeparator,
 	}
 
 	if err = r.loadOptions(options); err != nil {
@@ -255,33 +255,36 @@ func NewNetworkRule(ruleText string, id ListID) (r *NetworkRule, err error) {
 
 	// Normalize rules like "example.org/*" into "example.org^".
 	if strings.HasSuffix(r.pattern, "/*") {
-		r.pattern = r.pattern[:len(r.pattern)-len("/*")] + "^"
+		r.pattern = r.pattern[:len(r.pattern)-len("/*")] + MaskSeparator
 	}
 
-	// Validate rule for wideness.
-	if pattern == MaskStartURL ||
-		pattern == MaskPipe ||
-		pattern == MaskAnyCharacter ||
-		pattern == "" ||
-		len(pattern) < 3 {
-		if len(r.permittedDomains) == 0 &&
-			len(r.restrictedDomains) == 0 &&
-			r.permittedClients.len() == 0 &&
-			r.restrictedClients.len() == 0 &&
-			r.permittedClientTags.Len() == 0 &&
-			r.restrictedClientTags.Len() == 0 &&
-			len(r.permittedDNSTypes) == 0 &&
-			len(r.restrictedDNSTypes) == 0 &&
-			len(r.denyAllowDomains) == 0 {
-			// Rule matches too much and does not have any domain, client or ctag restrictions
-			// We should not allow this kind of rules
-			return nil, ErrTooWideRule
-		}
+	if r.isTooWide(pattern) {
+		return nil, ErrTooWideRule
 	}
 
 	r.setShortcut()
 
 	return r, nil
+}
+
+// isTooWide returns true if r is too wide.  r must not be nil
+func (r *NetworkRule) isTooWide(pattern string) (ok bool) {
+	// Rule matches too much and does not have any domain, client or ctag
+	// restrictions.  We should not allow this kind of rules.
+	return (pattern == MaskStartURL ||
+		pattern == MaskPipe ||
+		pattern == MaskAnyCharacter ||
+		pattern == "" ||
+		len(pattern) < 3) &&
+		len(r.permittedDomains) == 0 &&
+		len(r.restrictedDomains) == 0 &&
+		r.permittedClients.len() == 0 &&
+		r.restrictedClients.len() == 0 &&
+		r.permittedClientTags.Len() == 0 &&
+		r.restrictedClientTags.Len() == 0 &&
+		len(r.permittedDNSTypes) == 0 &&
+		len(r.restrictedDNSTypes) == 0 &&
+		len(r.denyAllowDomains) == 0
 }
 
 // type check
@@ -487,7 +490,7 @@ func (r *NetworkRule) negatesBadfilter(other *NetworkRule) (ok bool) {
 	return true
 }
 
-// isDocumentRule checks if the rule is a document-level whitelist rule.  This
+// isDocumentWhitelistRule checks if the rule is a document-level whitelist rule.  This
 // means that the rule is supposed to disable or modify blocking of the page
 // subrequests.  For example, "@@||example.org^$urlblock" unblocks all
 // sub-requests.
@@ -497,12 +500,16 @@ func (r *NetworkRule) isDocumentWhitelistRule() (ok bool) {
 }
 
 // preparePattern converts the pattern to a regexp and parses it.  It should be
-// called before matching the rule by pattern.  It sets either isInvalid,
+// called before matching the rule by pattern.  It sets either matchesNothing,
 // matchesAll, or regex.
 func (r *NetworkRule) preparePattern() {
-	// It is important to set r.isInvalid to true until proven otherwise to
+	if r.matchesNothing {
+		return
+	}
+
+	// It is important to set r.matchesNothing to true until proven otherwise to
 	// prevent panics in r.matchPattern in case of panics anywere below.
-	r.isInvalid = true
+	r.matchesNothing = true
 
 	pattern := patternToRegexp(r.pattern)
 	if pattern == RegexAnyCharacter {
@@ -517,15 +524,14 @@ func (r *NetworkRule) preparePattern() {
 	// a context?
 	var err error
 	r.regexp, err = regexp.Compile(pattern)
-	r.isInvalid = err != nil
+	r.matchesNothing = err != nil
 }
 
 // matchPattern uses the regex pattern to match the request URL.  req must not
 // be nil.
 func (r *NetworkRule) matchPattern(req *Request) (matched bool) {
 	r.initOnce.Do(r.preparePattern)
-
-	if r.isInvalid {
+	if r.matchesNothing {
 		return false
 	} else if r.matchesAll {
 		return true
@@ -1097,10 +1103,6 @@ func parseRuleText(ruleText string) (pattern, options string, isWhitelist bool, 
 		// Exit the loop since the options delimiter has been found.
 		break
 
-	}
-
-	if ruleText == "^" {
-		return "", "", isWhitelist, fmt.Errorf("rule %q is not supported", ruleText)
 	}
 
 	return ruleText, options, isWhitelist, nil
