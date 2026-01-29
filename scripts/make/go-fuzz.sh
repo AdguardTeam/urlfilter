@@ -68,5 +68,6 @@ done <<-'EOF'
 	./rules           FuzzHostRule_Match
 	./rules           FuzzNetworkEngine_Match
 	./rules           FuzzNetworkRule_Match
+	./rules           FuzzNewNetworkRule
 	./rules           FuzzNewRule
 EOF
