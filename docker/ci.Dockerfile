@@ -61,7 +61,8 @@ EOF
 # failures easier.
 #
 # Use fake BRANCH and REVISION values to both prevent git calls and also not
-# ruin the caching with ARGs.
+# ruin the caching with ARGs.  IGNORE_NON_REPRODUCIBLE is set to 1 to make this
+# stage reproducible even when linters that query external sources fail.
 FROM dependencies AS linter
 ADD . /app
 WORKDIR /app
@@ -73,6 +74,7 @@ set -e -f -u -x
 export GOMAXPROCS=2
 make \
 	BRANCH='master' \
+	IGNORE_NON_REPRODUCIBLE='1' \
 	REVISION='0000000000000000000000000000000000000000' \
 	VERBOSE=1 \
 	go-lint \
