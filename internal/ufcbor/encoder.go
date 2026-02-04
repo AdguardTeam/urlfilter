@@ -29,6 +29,7 @@ func (e Encoder) EncodeArrayStart(orig []byte, l uint64) (res []byte) {
 	var bufLen int
 	switch {
 	case l <= ValueUintTinyMax:
+		// #nosec G115 -- l has been validated in the case condition.
 		hdr = byte(HeaderArrayTinyMin | l)
 	case l <= math.MaxUint8:
 		hdr = HeaderArray8
@@ -58,13 +59,14 @@ func (e Encoder) EncodeArrayStart(orig []byte, l uint64) (res []byte) {
 func (e Encoder) EncodeBytes(orig, b []byte) (res []byte) {
 	res = orig
 
-	l := len(b)
+	l := uint64(len(b))
 
 	var hdr byte
 	var buf [8]byte
 	var bufLen int
 	switch {
 	case l <= ValueUintTinyMax:
+		// #nosec G115 -- l has been validated in the case condition.
 		hdr = byte(HeaderBytesTinyMin | l)
 	case l <= math.MaxUint8:
 		hdr = HeaderBytes8
@@ -104,6 +106,7 @@ func (e Encoder) EncodeInt64(orig []byte, n int64) (res []byte) {
 	var bufLen int
 	switch {
 	case n >= ValueIntTinyMin:
+		// #nosec G115 -- n has been validated in the case condition.
 		hdr = byte(HeaderIntTinyMin | -n - 1)
 	case n >= -math.MaxUint8:
 		hdr = HeaderInt8
@@ -142,6 +145,7 @@ func (e Encoder) EncodeMapStart(orig []byte, l uint64) (res []byte) {
 	var bufLen int
 	switch {
 	case l <= ValueUintTinyMax:
+		// #nosec G115 -- l has been validated in the case condition.
 		hdr = byte(HeaderMapTinyMin | l)
 	case l <= math.MaxUint8:
 		hdr = HeaderMap8
