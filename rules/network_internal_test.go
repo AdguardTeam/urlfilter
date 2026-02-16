@@ -90,6 +90,12 @@ func TestParseRuleText(t *testing.T) {
 		in:            "||example.org^$client='\\$-client'",
 		wantPattern:   "||example.org^",
 		wantOptions:   "client='$-client'",
+	}, {
+		wantWhitelist: assert.False,
+		name:          "dollar_at_end",
+		in:            "example.org$",
+		wantPattern:   "example.org",
+		wantOptions:   "",
 	}}
 
 	for _, tc := range testCases {

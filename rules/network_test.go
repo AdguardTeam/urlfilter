@@ -1029,6 +1029,7 @@ func FuzzNewNetworkRule(f *testing.F) {
 		"/regex/",
 		"$unknown=value",
 		"||example.org$domain=|",
+		"example.org$",
 	} {
 		f.Add(seed)
 	}

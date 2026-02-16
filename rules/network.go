@@ -1082,7 +1082,7 @@ func parseRuleText(ruleText string) (pattern, options string, isWhitelist bool, 
 	}
 
 	hasEscaped := false
-	for idx := len(ruleText) - 2; idx >= 0; idx-- {
+	for idx := len(ruleText) - 1; idx >= 0; idx-- {
 		c := ruleText[idx]
 		if c != optionsDelimiter {
 			continue
