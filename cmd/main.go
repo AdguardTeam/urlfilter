@@ -167,6 +167,8 @@ func createMITMConfig(options Options) *mitm.Config {
 	if err != nil {
 		log.Fatalf("failed to load root CA: %v", err)
 	}
+
+	// TODO(a.garipov):  Return an error of the certificate isn't RSA.
 	privateKey := tlsCert.PrivateKey.(*rsa.PrivateKey)
 
 	x509c, err := x509.ParseCertificate(tlsCert.Certificate[0])

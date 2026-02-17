@@ -12,9 +12,9 @@ type CosmeticEngine struct {
 	lookupTables map[rules.CosmeticRuleType]*cosmeticLookupTable
 }
 
-// NewCosmeticEngine builds a new cosmetic engine from the specified rule storage
-func NewCosmeticEngine(s *filterlist.RuleStorage) *CosmeticEngine {
-	engine := CosmeticEngine{
+// NewCosmeticEngine builds a new cosmetic engine.  s must not be nil.
+func NewCosmeticEngine(s *filterlist.RuleStorage) (e *CosmeticEngine) {
+	e = &CosmeticEngine{
 		lookupTables: map[rules.CosmeticRuleType]*cosmeticLookupTable{
 			rules.CosmeticElementHiding: newCosmeticLookupTable(),
 			rules.CosmeticCSS:           newCosmeticLookupTable(),
@@ -27,21 +27,23 @@ func NewCosmeticEngine(s *filterlist.RuleStorage) *CosmeticEngine {
 		f, _ := scanner.Rule()
 		rule, ok := f.(*rules.CosmeticRule)
 		if ok {
-			engine.addRule(rule)
+			e.addRule(rule)
 		}
 	}
 
-	return &engine
+	return e
 }
 
-// addRule adds a new cosmetic rule to one of the lookup tables
-func (e *CosmeticEngine) addRule(rule *rules.CosmeticRule) {
-	switch rule.Type {
+// addRule adds a new cosmetic rule to one of the lookup tables.  r must not be
+// nil.
+func (e *CosmeticEngine) addRule(r *rules.CosmeticRule) {
+	switch r.Type {
 	case rules.CosmeticElementHiding:
-		e.lookupTables[rules.CosmeticElementHiding].addRule(rule)
+		e.lookupTables[rules.CosmeticElementHiding].addRule(r)
 	default:
-		// TODO: Implement
-		// ignore
+		// Ignore.
+		//
+		// TODO(a.garipov):  Implement.
 	}
 }
 
@@ -134,23 +136,25 @@ func newCosmeticLookupTable() *cosmeticLookupTable {
 	}
 }
 
-// addRule adds the specified rule to the lookup table
-func (c *cosmeticLookupTable) addRule(f *rules.CosmeticRule) {
-	if f.Whitelist {
-		rules := c.whitelist[f.Content]
-		rules = append(rules, f)
-		c.whitelist[f.Content] = rules
+// addRule adds the specified rule to the lookup table.  r must not be nil.
+func (c *cosmeticLookupTable) addRule(r *rules.CosmeticRule) {
+	if r.Whitelist {
+		rules := c.whitelist[r.Content]
+		rules = append(rules, r)
+		c.whitelist[r.Content] = rules
+
 		return
 	}
 
-	if f.IsGeneric() {
-		c.genericRules = append(c.genericRules, f)
+	if r.IsGeneric() {
+		c.genericRules = append(c.genericRules, r)
+
 		return
 	}
 
-	for _, hostname := range f.GetPermittedDomains() {
+	for _, hostname := range r.GetPermittedDomains() {
 		rules := c.byHostname[hostname]
-		rules = append(rules, f)
+		rules = append(rules, r)
 		c.byHostname[hostname] = rules
 	}
 }

@@ -719,3 +719,22 @@ func TestDNSEngine_MatchRequest_dnsRewrite(t *testing.T) {
 		assert.Equal(t, srv, nr.DNSRewrite.Value)
 	})
 }
+
+func TestDNSResult_DNSRewrites_exceptionShift(t *testing.T) {
+	const rulesText = `
+	@@||excluded.example^$dnsrewrite=127.0.0.1
+	@@||excluded.example^$dnsrewrite=127.0.0.2
+	excluded.example^$dnsrewrite=127.0.0.2
+	excluded.example^$dnsrewrite=127.0.0.1
+`
+
+	ruleStorage := newTestRuleStorage(t, uftest.ListID1, rulesText)
+	dnsEngine := urlfilter.NewDNSEngine(ruleStorage)
+	require.NotNil(t, dnsEngine)
+
+	res, ok := dnsEngine.Match("excluded.example")
+	assert.False(t, ok)
+
+	dnsr := res.DNSRewrites()
+	assert.Empty(t, dnsr)
+}

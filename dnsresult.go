@@ -79,6 +79,7 @@ func (res *DNSResult) DNSRewrites() (nrules []*rules.NetworkRule) {
 		if nr.Whitelist {
 			nrules = slices.Delete(nrules, i, i+1)
 			nrules = removeMatchingException(nrules, nr)
+			i--
 		}
 	}
 
