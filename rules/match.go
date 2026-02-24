@@ -255,35 +255,34 @@ func (m *MatchingResult) GetCosmeticOption() (o CosmeticOption) {
 // removes matching bad filters from rules (see the $badfilter description
 // for more info).
 //
-// TODO(a.garipov):  Refactor.
+// TODO(f.setrakov): Improve the tests and refactor further.
 func removeBadfilterRules(rules []*NetworkRule) (res []*NetworkRule) {
 	var badfilterRules []*NetworkRule
 
 	for _, badfilter := range rules {
 		if badfilter.IsOptionEnabled(OptionBadfilter) {
-			// lazily create the badfilterRules array
-			if badfilterRules == nil {
-				badfilterRules = []*NetworkRule{}
-			}
-
 			badfilterRules = append(badfilterRules, badfilter)
 		}
 	}
 
 	if len(badfilterRules) > 0 {
-		filteredRules := []*NetworkRule{}
-		for _, badfilter := range badfilterRules {
-			for _, rule := range rules {
-				if !badfilter.negatesBadfilter(rule) && !rule.IsOptionEnabled(OptionBadfilter) {
-					filteredRules = append(filteredRules, rule)
-				}
-			}
-		}
-
-		return filteredRules
+		return filterNegatedRules(badfilterRules, rules)
 	}
 
 	return rules
+}
+
+// filterNegatedRules filters out rules that are negated by badfilter rules.
+func filterNegatedRules(badfilterRules, rules []*NetworkRule) (res []*NetworkRule) {
+	for _, badfilter := range badfilterRules {
+		for _, rule := range rules {
+			if !badfilter.negatesBadfilter(rule) && !rule.IsOptionEnabled(OptionBadfilter) {
+				res = append(res, rule)
+			}
+		}
+	}
+
+	return res
 }
 
 // removeDNSRewriteRules removes DNS rewrite rules from rules and returns the

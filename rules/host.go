@@ -8,6 +8,9 @@ import (
 	"github.com/AdguardTeam/urlfilter/internal/ufnet"
 )
 
+// hostRuleDelimiter is the default delimiter for [HostRule] parsing.
+const hostRuleDelimiter = " \t"
+
 // HostRule is a structure for simple host-level rules, i.e. /etc/hosts syntax.
 //
 // See http://man7.org/linux/man-pages/man5/hosts.5.html.
@@ -29,39 +32,22 @@ type HostRule struct {
 	id ListID
 }
 
-// splitNextByWhitespace splits string by whitespace (' ' or '\t') and returns
-// the first element.
-func splitNextByWhitespace(sPtr *string) (r string) {
-	s := *sPtr
+// splitNextByWhitespace splits the given string at the first entry of a space
+// or tab character, returning both parts of the result.  Unlike the
+// [strings.Cut], this function also trims repeated delimiter characters from
+// both result strings.
+func splitNextByWhitespace(s string) (before, after string) {
+	s = strings.TrimLeft(s, hostRuleDelimiter)
 
-	i := 0
-	// Trim space.
-	for ; i < len(s); i++ {
-		if s[i] != ' ' && s[i] != '\t' {
-			break
-		}
+	idx := strings.IndexAny(s, hostRuleDelimiter)
+	if idx == -1 {
+		return s, ""
 	}
 
-	begin := i
-	// Find space or tab.
-	for ; i < len(s); i++ {
-		if s[i] == ' ' || s[i] == '\t' {
-			break
-		}
-	}
+	before = s[:idx]
+	after = strings.TrimLeft(s[idx:], hostRuleDelimiter)
 
-	r = s[begin:i]
-
-	// Trim space.
-	for ; i < len(s); i++ {
-		if s[i] != ' ' && s[i] != '\t' {
-			break
-		}
-	}
-
-	*sPtr = s[i:]
-
-	return r
+	return before, after
 }
 
 // NewHostRule parses the rule and creates a new *HostRule.
@@ -77,7 +63,7 @@ func NewHostRule(ruleText string, id ListID) (h *HostRule, err error) {
 		ruleText = ruleText[0 : commentIndex-1]
 	}
 
-	first := splitNextByWhitespace(&ruleText)
+	first, ruleText := splitNextByWhitespace(ruleText)
 	if len(ruleText) == 0 {
 		if !ufnet.IsDomainName(first) {
 			return nil, &RuleSyntaxError{
@@ -97,8 +83,9 @@ func NewHostRule(ruleText string, id ListID) (h *HostRule, err error) {
 			}
 		}
 
+		var host string
 		for len(ruleText) != 0 {
-			host := splitNextByWhitespace(&ruleText)
+			host, ruleText = splitNextByWhitespace(ruleText)
 			h.Hostnames = append(h.Hostnames, host)
 		}
 	}

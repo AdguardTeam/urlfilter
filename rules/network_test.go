@@ -858,9 +858,13 @@ func TestNetworkRule_Match_ip(t *testing.T) {
 
 	req = rules.NewRequestForHostname("1.104.154.1")
 	assert.False(t, r.Match(req))
+}
 
-	r = uftest.NewNetworkRule(t, "/sub.")
-	req = rules.NewRequestForHostname("sub.example.org")
+func TestNetworkRule_agh1950(t *testing.T) {
+	t.Parallel()
+
+	r := uftest.NewNetworkRule(t, "/sub.")
+	req := rules.NewRequestForHostname("sub.example.org")
 	assert.True(t, r.Match(req))
 
 	req = rules.NewRequestForHostname("sub.host.org")

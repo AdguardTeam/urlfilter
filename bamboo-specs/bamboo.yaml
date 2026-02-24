@@ -16,7 +16,7 @@
     # exact patch version as opposed to a minor one to make sure that this exact
     # version is actually used and not whatever the docker daemon on the CI has
     # cached a few months ago.
-    'dockerGo': 'adguard/go-builder:1.25.5--1'
+    'dockerGo': 'adguard/go-builder:1.25.7--2'
     'maintainer': 'Adguard Go Team'
     'name': 'urlfilter'
     'packageName': 'urlfilter'
@@ -56,7 +56,7 @@
                     --output '.' \
                     --progress 'plain' \
                     --target 'tester-exporter' \
-                    -f ./docker/ci.docker \
+                    -f ./docker/ci.Dockerfile \
                     .
 
                 exit_code="$(cat ./test-reports/test-exit-code.txt)"

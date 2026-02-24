@@ -33,6 +33,9 @@ var (
 	regexpSpecialCharacters       = regexp.MustCompile(`[\\^$*+?.()|[\]{}]`)
 )
 
+// minPatternLen is the minimum valid pattern length for network rule.
+const minPatternLen = 4
+
 // NetworkRuleOption is the bitset of various rule options.
 type NetworkRuleOption uint64
 
@@ -549,36 +552,29 @@ func (r *NetworkRule) matchPattern(req *Request) (matched bool) {
 //
 // NOTE:  Full URL matching should be performed in some cases, see
 // https://github.com/AdguardTeam/AdGuardHome/issues/1249.
-//
-// TODO(a.garipov):  Refactor.
 func (r *NetworkRule) shouldMatchHostname(req *Request) (ok bool) {
 	if !req.IsHostnameRequest {
 		return false
 	}
 
-	if strings.HasPrefix(r.pattern, MaskStartURL) ||
+	if r.hasURLPrefix() {
+		return false
+	}
+
+	// Patterns that start with '/' and end with '.' are treated as
+	// URL-specific ones.
+	return len(r.pattern) < minPatternLen ||
+		r.pattern[0] != '/' ||
+		r.pattern[len(r.pattern)-1] != '.'
+}
+
+// hasURLPrefix reports whether the rule pattern starts with a URL-specific
+// prefix.
+func (r *NetworkRule) hasURLPrefix() (ok bool) {
+	return strings.HasPrefix(r.pattern, MaskStartURL) ||
 		strings.HasPrefix(r.pattern, "http://") ||
 		strings.HasPrefix(r.pattern, "https://") ||
-		strings.HasPrefix(r.pattern, "://") {
-		return false
-	}
-
-	// Check if the pattern "/hostname." contains only allowed characters.
-	if len(r.pattern) > 3 && r.pattern[0] == '/' && r.pattern[len(r.pattern)-1] == '.' {
-		for i := 1; i < len(r.pattern)-1; i++ {
-			ch := r.pattern[i]
-			if (ch < 'a' || ch > 'z') &&
-				(ch < 'A' || ch > 'Z') &&
-				(ch < '0' || ch > '9') &&
-				ch != '.' && ch != '-' {
-				return true
-			}
-		}
-
-		return false
-	}
-
-	return true
+		strings.HasPrefix(r.pattern, "://")
 }
 
 // matchShortcut simply checks if shortcut is a substring of the URL.
@@ -752,7 +748,7 @@ func (r *NetworkRule) loadOptions(optStr string) (err error) {
 		return nil
 	}
 
-	for _, o := range splitWithEscapeCharacter(optStr, ',', '\\', false) {
+	for _, o := range splitWithEscapeCharacter(optStr, ',', '\\') {
 		if eqIdx := strings.IndexByte(o, '='); eqIdx > 0 {
 			err = r.setOption(o[:eqIdx], o[eqIdx+1:])
 		} else {
@@ -1062,48 +1058,75 @@ func findRegexpShortcut(pattern string) (shortcut string) {
 // pattern that can be easily converted into a regular expression, and options,
 // a string containing the rule's options.  isWhitelist is true if the rule
 // should unblock requests instead of blocking them.
-//
-// TODO(a.garipov):  Refactor.
 func parseRuleText(ruleText string) (pattern, options string, isWhitelist bool, err error) {
 	if ruleText == "" || ruleText == maskWhiteList {
 		return "", "", isWhitelist, fmt.Errorf("rule %q is too short", ruleText)
 	}
 
-	if strings.HasPrefix(ruleText, maskWhiteList) {
-		isWhitelist = true
-		ruleText = ruleText[len(maskWhiteList):]
-	}
+	ruleText, isWhitelist = stripWhitelistPrefix(ruleText)
 
-	// Avoid parsing options inside of a regex rule.
-	if strings.HasPrefix(ruleText, maskRegexRule) &&
-		strings.HasSuffix(ruleText, maskRegexRule) &&
-		!strings.Contains(ruleText, replaceOption+"=") {
+	if isRegexRuleWithoutOptions(ruleText) {
 		return ruleText, "", isWhitelist, nil
 	}
 
-	hasEscaped := false
-	for idx := len(ruleText) - 1; idx >= 0; idx-- {
-		c := ruleText[idx]
-		if c != optionsDelimiter {
+	pattern, options = splitPatternAndOptions(ruleText)
+
+	return pattern, options, isWhitelist, nil
+}
+
+// stripWhitelistPrefix removes whitelist prefix and returns whether rule is
+// whitelist.
+func stripWhitelistPrefix(ruleText string) (stripped string, isWhitelist bool) {
+	if strings.HasPrefix(ruleText, maskWhiteList) {
+		return ruleText[len(maskWhiteList):], true
+	}
+
+	return ruleText, false
+}
+
+// isRegexRuleWithoutOptions checks if rule is a regex rule without options.
+//
+// TODO(f.setrakov): Remove allocation.
+func isRegexRuleWithoutOptions(ruleText string) (ok bool) {
+	return strings.HasPrefix(ruleText, maskRegexRule) &&
+		strings.HasSuffix(ruleText, maskRegexRule) &&
+		!strings.Contains(ruleText, replaceOption+"=")
+}
+
+// splitPatternAndOptions splits rule text into pattern and options parts.
+func splitPatternAndOptions(ruleText string) (pattern, options string) {
+	idx, hasEscaped := findOptionsDelimiter(ruleText)
+	if idx == -1 {
+		return ruleText, ""
+	}
+
+	pattern, options = ruleText[:idx], ruleText[idx+1:]
+	if hasEscaped {
+		options = regexpEscapedOptionsDelimiter.ReplaceAllString(
+			options,
+			string(optionsDelimiter),
+		)
+	}
+
+	return pattern, options
+}
+
+// findOptionsDelimiter finds the position of options delimiter and whether it
+// has escaped delimiters.
+func findOptionsDelimiter(ruleText string) (idx int, hasEscaped bool) {
+	for idx = len(ruleText) - 1; idx >= 0; idx-- {
+		if ruleText[idx] != optionsDelimiter {
 			continue
-		} else if !hasEscaped && idx > 0 && ruleText[idx-1] == escapeCharacter {
+		}
+
+		if idx > 0 && ruleText[idx-1] == escapeCharacter {
 			hasEscaped = true
 
 			continue
 		}
 
-		ruleText, options = ruleText[:idx], ruleText[idx+1:]
-		if hasEscaped {
-			options = regexpEscapedOptionsDelimiter.ReplaceAllString(
-				options,
-				string(optionsDelimiter),
-			)
-		}
-
-		// Exit the loop since the options delimiter has been found.
-		break
-
+		return idx, hasEscaped
 	}
 
-	return ruleText, options, isWhitelist, nil
+	return -1, hasEscaped
 }

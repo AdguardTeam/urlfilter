@@ -251,40 +251,37 @@ func (r *CosmeticRule) Match(hostname string) (ok bool) {
 // returns the start index and the marker found.  If nothing found, idx is -1.
 func findCosmeticRuleMarker(ruleText string) (idx int, marker string) {
 	for _, firstMarkerChar := range cosmeticRuleMarkersFirstChars {
-		startIndex := strings.IndexByte(ruleText, firstMarkerChar)
-		if startIndex == -1 {
-			continue
-		}
-
-		// Handling false positives while looking for cosmetic rules in host
-		// files.  For instance, it could look like this:
-		//
-		//	0.0.0.0 jackbootedroom.com  ## phishing
-		if startIndex > 0 && ruleText[startIndex-1] == ' ' {
-			continue
-		}
-
-		for _, marker = range cosmeticRulesMarkers {
-			if startsAtIndexWith(ruleText, startIndex, marker) {
-				return startIndex, marker
-			}
+		idx, marker = findMarkerByFirstChar(ruleText, firstMarkerChar)
+		if idx != -1 {
+			return idx, marker
 		}
 	}
 
 	return -1, ""
 }
 
-// startsAtIndexWith checks if s starts with substr at startIdx.
-func startsAtIndexWith(s string, startIdx int, substr string) (ok bool) {
-	if len(s)-startIdx < len(substr) {
-		return false
+// findMarkerByFirstChar looks for the first character of a cosmetic rule marker
+// within the rule text, returning the start index and the marker found.  If
+// nothing is found, the idx is -1.
+func findMarkerByFirstChar(ruleText string, firstMarkerChar byte) (idx int, marker string) {
+	startIndex := strings.IndexByte(ruleText, firstMarkerChar)
+	if startIndex == -1 {
+		return -1, ""
 	}
 
-	for i := 0; i < len(substr); i++ {
-		if s[startIdx+i] != substr[i] {
-			return false
+	// Handling false positives while looking for cosmetic rules in host files.
+	// For instance, it could look like this:
+	//
+	//  0.0.0.0 jackbootedroom.com  ## phishing
+	if startIndex > 0 && ruleText[startIndex-1] == ' ' {
+		return -1, ""
+	}
+
+	for _, marker = range cosmeticRulesMarkers {
+		if strings.HasPrefix(ruleText[startIndex:], marker) {
+			return startIndex, marker
 		}
 	}
 
-	return true
+	return -1, ""
 }

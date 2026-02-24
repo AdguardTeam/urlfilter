@@ -4,6 +4,7 @@ package rules
 import (
 	"strings"
 
+	"github.com/AdguardTeam/golibs/netutil"
 	"golang.org/x/net/publicsuffix"
 )
 
@@ -23,29 +24,43 @@ func isCosmetic(line string) (ok bool) {
 
 // isDomainOrSubdomainOfAny returns true if domains contain domain itself or its
 // superdomain.  It supports wildcards.
-//
-// TODO(a.garipov):  Test and refactor.
 func isDomainOrSubdomainOfAny(domain string, domains []string) (ok bool) {
 	for _, d := range domains {
-		if strings.HasSuffix(d, ".*") {
-			// A pattern like "google.*" will match any "google.TLD" domain or
-			// subdomain.
-			withoutWildcard := d[0 : len(d)-1]
+		if matchWildcard(domain, d) {
+			return true
+		}
 
-			if strings.HasPrefix(domain, withoutWildcard) ||
-				(strings.Index(domain, withoutWildcard) > 0 && strings.Index(domain, "."+withoutWildcard) > 0) {
-				tld, icann := publicsuffix.PublicSuffix(domain)
+		if domain == d || netutil.IsSubdomain(domain, d) {
+			return true
+		}
+	}
 
-				// Check that the domain's TLD is one of the public suffixes.
-				if tld != "" && icann && strings.HasSuffix(domain, withoutWildcard+tld) {
-					return true
-				}
-			}
-		} else {
-			if domain == d ||
-				(strings.HasSuffix(domain, d) && strings.HasSuffix(domain, "."+d)) {
-				return true
-			}
+	return false
+}
+
+// matchWildcard matches the domain against a wildcard pattern with TLD
+// placeholder.  The wildcard must appear as a complete domain label before a
+// valid top-level domain.  For example, "example.*" matches "example.com" and
+// "sub.example.org", but not "not-example.com" (not a separate label) or
+// "example.sub.com" ("sub.com" is not a valid public suffix).
+func matchWildcard(domain, wildcard string) (ok bool) {
+	if !strings.HasSuffix(wildcard, ".*") {
+		return false
+	}
+	// A pattern like "google.*" will match any "google.TLD" domain or
+	// subdomain.
+	withoutWildcard := wildcard[0 : len(wildcard)-1]
+
+	// Unlike [netutil.IsSubdomain], which requires the pattern to be a suffix
+	// of the domain, this check matches the wildcard pattern at any position
+	// within the domain hierarchy.
+	if strings.HasPrefix(domain, withoutWildcard) ||
+		(strings.Index(domain, withoutWildcard) > 0 && strings.Index(domain, "."+withoutWildcard) > 0) {
+		tld, icann := publicsuffix.PublicSuffix(domain)
+
+		// Check that the domain's TLD is one of the public suffixes.
+		if tld != "" && icann && strings.HasSuffix(domain, withoutWildcard+tld) {
+			return true
 		}
 	}
 
@@ -53,42 +68,27 @@ func isDomainOrSubdomainOfAny(domain string, domains []string) (ok bool) {
 }
 
 // splitWithEscapeCharacter splits s by sep if it is not escaped.
-//
-// TODO(a.garipov):  Refactor.
-func splitWithEscapeCharacter(s string, sep, esc byte, preserveAllTokens bool) (parts []string) {
-	if s == "" {
-		return parts
-	}
+func splitWithEscapeCharacter(s string, sep, esc byte) (parts []string) {
+	sb := strings.Builder{}
+	l := len(s)
 
-	var sb strings.Builder
-	escaped := false
-	for i := range s {
-		c := s[i]
+	for i := 0; i < l; i++ {
+		ch := s[i]
 
-		switch c {
-		case esc:
-			escaped = true
-		case sep:
-			if escaped {
-				_ = sb.WriteByte(c)
-				escaped = false
-			} else {
-				if preserveAllTokens || sb.Len() > 0 {
-					parts = append(parts, sb.String())
-					sb.Reset()
-				}
+		if ch == esc && i+1 < l && s[i+1] == sep {
+			sb.WriteByte(sep)
+			i++
+		} else if ch == sep {
+			if sb.Len() > 0 {
+				parts = append(parts, sb.String())
+				sb.Reset()
 			}
-		default:
-			if escaped {
-				escaped = false
-				_ = sb.WriteByte(esc)
-			}
-
-			_ = sb.WriteByte(c)
+		} else {
+			sb.WriteByte(ch)
 		}
 	}
 
-	if preserveAllTokens || sb.Len() > 0 {
+	if sb.Len() > 0 {
 		parts = append(parts, sb.String())
 	}
 

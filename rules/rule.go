@@ -62,7 +62,7 @@ func isComment(line string) (ok bool) {
 
 		// Now we should check that this is not a cosmetic rule.
 		for _, marker := range cosmeticRulesMarkers {
-			if startsAtIndexWith(line, 0, marker) {
+			if strings.HasPrefix(line, marker) {
 				return false
 			}
 		}
@@ -126,34 +126,49 @@ func strToRRType(s string) (rr RRType, err error) {
 // parseDNSTypes parses the $dnstype modifier.  types is the list of types.
 func parseDNSTypes(types string) (permittedTypes, restrictedTypes []RRType, err error) {
 	if types == "" {
-		return nil, nil, errors.Error("no dns record types specified")
+		return nil, nil, fmt.Errorf("parsing dns types: %w", errors.ErrEmptyValue)
 	}
 
 	list := strings.Split(types, "|")
 	for i, rrStr := range list {
-		if len(rrStr) == 0 {
-			return nil, nil, fmt.Errorf("dns record type %d is empty", i)
-		}
-
-		restricted := rrStr[0] == '~'
-		if restricted {
-			rrStr = rrStr[1:]
-		}
-
 		var rr RRType
-		rr, err = strToRRType(rrStr)
+		var isRestricted bool
+		rr, isRestricted, err = parseDNSType(rrStr)
 		if err != nil {
-			return nil, nil, fmt.Errorf("type %d (%q): %w", i, rrStr, err)
+			return nil, nil, fmt.Errorf("parsing dns type: at index %d: %w", i, err)
 		}
 
-		if restricted {
+		if isRestricted {
 			restrictedTypes = append(restrictedTypes, rr)
-		} else {
-			permittedTypes = append(permittedTypes, rr)
+
+			continue
 		}
+
+		permittedTypes = append(permittedTypes, rr)
 	}
 
 	return permittedTypes, restrictedTypes, nil
+}
+
+// parseDNSType parses DNS resource record type.  If rrStr has a restricted rule
+// prefix, isRestricted will be true.
+func parseDNSType(rrStr string) (rrType RRType, isRestricted bool, err error) {
+	if len(rrStr) == 0 {
+		return 0, false, errors.ErrEmptyValue
+	}
+
+	isRestricted = rrStr[0] == '~'
+	if isRestricted {
+		rrStr = rrStr[1:]
+	}
+
+	var rr RRType
+	rr, err = strToRRType(rrStr)
+	if err != nil {
+		return 0, false, fmt.Errorf("converting string to RRType: %w", err)
+	}
+
+	return rr, isRestricted, nil
 }
 
 // isValidCTag returns true if ctag value format is correct.
@@ -246,7 +261,7 @@ func parseClients(value string, sep byte) (permitted, restricted *clients, err e
 		return nil, nil, errors.ErrEmptyValue
 	}
 
-	for _, client := range splitWithEscapeCharacter(value, sep, '\\', false) {
+	for _, client := range splitWithEscapeCharacter(value, sep, '\\') {
 		permitted, restricted, err = appendClient(client, permitted, restricted)
 		if err != nil {
 			return nil, nil, fmt.Errorf("invalid $client value: %w", err)
