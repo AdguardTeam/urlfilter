@@ -71,6 +71,12 @@ var specialCharReplacer = strings.NewReplacer(
 	`\`, `\\`,
 )
 
+// maskReplacer replaces mask special characters with their regexp equivalents.
+var maskReplacer = strings.NewReplacer(
+	MaskAnyCharacter, RegexAnyCharacter,
+	MaskSeparator, RegexSeparator,
+)
+
 // patternToRegexp is a helper method for creating regular expressions from
 // simple wildcard-based syntax which is used in basic filters.
 //
@@ -82,7 +88,6 @@ func patternToRegexp(pattern string) (reStr string) {
 		pattern == MaskPipe ||
 		pattern == MaskAnyCharacter ||
 		pattern == "" {
-
 		return RegexAnyCharacter
 	}
 
@@ -90,33 +95,50 @@ func patternToRegexp(pattern string) (reStr string) {
 		return pattern[1 : len(pattern)-1]
 	}
 
-	// Escape special characters.
 	reStr = specialCharReplacer.Replace(pattern)
+	reStr = escapePipes(reStr)
+	reStr = maskReplacer.Replace(reStr)
+	reStr = replacePrefix(reStr)
+	reStr = replaceSuffix(reStr)
 
-	// Escape "|" characters, but avoid escaping them in the special places.
-	if strings.HasPrefix(reStr, MaskStartURL) {
-		reStr = reStr[:len(MaskStartURL)] +
-			strings.ReplaceAll(reStr[len(MaskStartURL):len(reStr)-1], MaskPipe, "\\"+MaskPipe) +
-			reStr[len(reStr)-1:]
-	} else if len(reStr) > len(MaskPipe) {
-		reStr = reStr[:len(MaskPipe)] +
-			strings.ReplaceAll(reStr[len(MaskPipe):len(reStr)-1], MaskPipe, "\\"+MaskPipe) +
-			reStr[len(reStr)-1:]
+	return reStr
+}
+
+// escapePipes escapes pipe characters in the middle of the string.
+func escapePipes(reStr string) (res string) {
+	if len(reStr) <= len(MaskPipe) {
+		return reStr
 	}
 
-	// Replace special URL masks.
-	reStr = strings.ReplaceAll(reStr, MaskAnyCharacter, RegexAnyCharacter)
-	reStr = strings.ReplaceAll(reStr, MaskSeparator, RegexSeparator)
-
-	// Replace start URL and pipes.
+	prefixLen := len(MaskPipe)
 	if strings.HasPrefix(reStr, MaskStartURL) {
-		reStr = RegexStartURL + reStr[len(MaskStartURL):]
-	} else if strings.HasPrefix(reStr, MaskPipe) {
-		reStr = RegexStartString + reStr[len(MaskPipe):]
+		prefixLen = len(MaskStartURL)
 	}
 
+	return reStr[:prefixLen] +
+		strings.ReplaceAll(reStr[prefixLen:len(reStr)-1], MaskPipe, `\`+MaskPipe) +
+		reStr[len(reStr)-1:]
+}
+
+// replacePrefix replaces the wildcard-syntax prefix with the corresponding
+// regexp.
+func replacePrefix(reStr string) (res string) {
+	if strings.HasPrefix(reStr, MaskStartURL) {
+		return RegexStartURL + reStr[len(MaskStartURL):]
+	}
+
+	if strings.HasPrefix(reStr, MaskPipe) {
+		return RegexStartString + reStr[len(MaskPipe):]
+	}
+
+	return reStr
+}
+
+// replaceSuffix replaces the wildcard-syntax suffix with the corresponding
+// regexp.
+func replaceSuffix(reStr string) (res string) {
 	if strings.HasSuffix(reStr, MaskPipe) {
-		reStr = reStr[:len(reStr)-1] + RegexEndString
+		return reStr[:len(reStr)-1] + RegexEndString
 	}
 
 	return reStr

@@ -57,5 +57,5 @@ func TestContentScriptTmpl(t *testing.T) {
 
 	t.Log(data)
 
-	// TODO: Run a nodejs script that will validate the data
+	// TODO(ameshkov): Run a nodejs script that will validate the data.
 }

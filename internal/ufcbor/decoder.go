@@ -179,7 +179,29 @@ func (d *Decoder) DecodeInt64(b []byte) (n int64, rest []byte) {
 		return d.decodeNonNegativeInt(rest, b)
 	}
 
-	rest = rest[1:]
+	return d.decodeNegativeInt(rest, b)
+}
+
+// decodeNonNegativeInt decodes a non-negative signed integer.  If there are
+// errors, n is 0 and rest is origB.
+func (d *Decoder) decodeNonNegativeInt(b, origB []byte) (n int64, rest []byte) {
+	rest = b
+
+	u, rest := d.DecodeUint64(rest)
+	if u > math.MaxInt64 {
+		d.err = fmt.Errorf("expected int; got overflow: %d", u)
+
+		return 0, origB
+	}
+
+	return int64(u), rest
+}
+
+// decodeNegativeInt decodes a negative signed integer.  If there are errors,
+// n is 0 and rest is origB.
+func (d *Decoder) decodeNegativeInt(b, origB []byte) (n int64, rest []byte) {
+	hdr := b[0]
+	rest = b[1:]
 
 	var u uint64
 	switch {
@@ -198,33 +220,18 @@ func (d *Decoder) DecodeInt64(b []byte) (n int64, rest []byte) {
 	}
 
 	if d.err != nil {
-		return 0, b
+		return 0, origB
 	}
 
-	if u > math.MaxInt64 {
-		d.err = fmt.Errorf("expected int; got overflow: %d", u)
-
-		return 0, b
-	}
-
-	n = -int64(u) - 1
-
-	return n, rest
-}
-
-// decodeNonNegativeInt decodes a non-negative signed integer.  If there are
-// errors, n is 0 and rest is origB.
-func (d *Decoder) decodeNonNegativeInt(b, origB []byte) (n int64, rest []byte) {
-	rest = b
-
-	u, rest := d.DecodeUint64(rest)
 	if u > math.MaxInt64 {
 		d.err = fmt.Errorf("expected int; got overflow: %d", u)
 
 		return 0, origB
 	}
 
-	return int64(u), rest
+	n = -int64(u) - 1
+
+	return n, rest
 }
 
 // DecodeMapStart decodes a start of a CBOR map with the length l, if b contains

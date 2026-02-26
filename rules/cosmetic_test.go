@@ -10,6 +10,8 @@ import (
 )
 
 func TestCosmeticRule_Match(t *testing.T) {
+	t.Parallel()
+
 	r, err := rules.NewCosmeticRule("##banner", uftest.ListID1)
 	require.NotNil(t, r)
 	require.NoError(t, err)
@@ -28,6 +30,8 @@ func TestCosmeticRule_Match(t *testing.T) {
 }
 
 func TestCosmeticRule_Match_wildcardTLD(t *testing.T) {
+	t.Parallel()
+
 	r, err := rules.NewCosmeticRule("example.*##banner", uftest.ListID1)
 	require.NotNil(t, r)
 	require.NoError(t, err)

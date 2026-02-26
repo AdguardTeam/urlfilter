@@ -21,6 +21,8 @@ const (
 )
 
 func TestEmptyNetworkEngine(t *testing.T) {
+	t.Parallel()
+
 	ruleStorage := newTestRuleStorage(t, uftest.ListID1, "")
 	engine := urlfilter.NewNetworkEngine(ruleStorage)
 	r := rules.NewRequest("http://example.org/", "", rules.TypeOther)
@@ -30,6 +32,8 @@ func TestEmptyNetworkEngine(t *testing.T) {
 }
 
 func TestMatchWhitelistRule(t *testing.T) {
+	t.Parallel()
+
 	r1 := "||example.org^$script"
 	r2 := "@@http://example.org^"
 	rulesText := strings.Join([]string{r1, r2}, "\n")
@@ -44,6 +48,8 @@ func TestMatchWhitelistRule(t *testing.T) {
 }
 
 func TestMatchImportantRule(t *testing.T) {
+	t.Parallel()
+
 	r1 := "||test2.example.org^$important"
 	r2 := "@@||example.org^"
 	r3 := "||test1.example.org^"
@@ -71,6 +77,8 @@ func TestMatchImportantRule(t *testing.T) {
 }
 
 func TestMatchSourceRule(t *testing.T) {
+	t.Parallel()
+
 	ruleText := "|https://$image,media,script,third-party,domain=~feedback.pornhub.com|pornhub.com|redtube.com|redtube.com.br|tube8.com|tube8.es|tube8.fr|youporn.com|youporngay.com"
 	ruleStorage := newTestRuleStorage(t, uftest.ListID1, ruleText)
 	engine := urlfilter.NewNetworkEngine(ruleStorage)
@@ -85,6 +93,8 @@ func TestMatchSourceRule(t *testing.T) {
 }
 
 func TestMatchSimplePattern(t *testing.T) {
+	t.Parallel()
+
 	// Simple pattern rule
 	ruleText := "_prebid_"
 	ruleStorage := newTestRuleStorage(t, uftest.ListID1, ruleText)

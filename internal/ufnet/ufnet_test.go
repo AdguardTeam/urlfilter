@@ -12,6 +12,8 @@ import (
 )
 
 func TestExtractHostname(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		name string
 		in   string
@@ -56,6 +58,8 @@ func TestExtractHostname(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
 			got := ufnet.ExtractHostname(tc.in)
 			require.Equal(t, tc.want, got)
 

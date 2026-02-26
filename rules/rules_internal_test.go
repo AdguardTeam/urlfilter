@@ -28,6 +28,8 @@ func newNetworkRule(tb testing.TB, text string) (r *NetworkRule) {
 }
 
 func TestSplitWithEscapeCharacter(t *testing.T) {
+	t.Parallel()
+
 	str := "opt1,opt2"
 	parts := splitWithEscapeCharacter(str, ',', '\\')
 	require.Len(t, parts, 2)

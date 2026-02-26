@@ -1,86 +1,74 @@
 package proxy
 
 import (
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"testing"
 
+	"github.com/AdguardTeam/golibs/netutil/urlutil"
 	"github.com/AdguardTeam/urlfilter/rules"
 	"github.com/stretchr/testify/require"
 )
 
+// testURL is the common URL value for tests.
+var testURL = &url.URL{
+	Scheme: urlutil.SchemeHTTPS,
+	Host:   "example.org",
+}
+
 func TestAssumeRequestType(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
-		headers         map[string]string
-		responseHeaders map[string]string
-		method          string
-		name            string
-		url             string
-		expectedType    rules.RequestType
-		response        bool
+		headers      http.Header
+		response     *http.Response
+		name         string
+		expectedType rules.RequestType
 	}{{
 		name: "sec-fetch-dest-video",
-		headers: map[string]string{
-			"Sec-Fetch-Dest": "video",
+		headers: http.Header{
+			"Sec-Fetch-Dest": {"video"},
 		},
 		expectedType: rules.TypeMedia,
 	}, {
 		name: "upgrade-websocket",
-		headers: map[string]string{
-			"Upgrade": "websocket",
+		headers: http.Header{
+			"Upgrade": {"websocket"},
 		},
 		expectedType: rules.TypeWebsocket,
 	}, {
 		name: "ping-header",
-		headers: map[string]string{
-			"Ping-To": "https://example.org",
+		headers: http.Header{
+			"Ping-To": {"https://example.org"},
 		},
 		expectedType: rules.TypePing,
 	}, {
-		name:     "html-content-type",
-		response: true,
-		responseHeaders: map[string]string{
-			"Content-Type": "text/html",
+		name: "html-content-type",
+		response: &http.Response{
+			Header: http.Header{"Content-Type": {"text/html"}},
 		},
 		expectedType: rules.TypeDocument,
 	}}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Prepare the test HTTP request first.
-			method := tc.method
-			if method == "" {
-				method = http.MethodGet
-			}
-			u := tc.url
-			if u == "" {
-				u = "https://example.org/"
-			}
-			req := httptest.NewRequest(method, u, nil)
-			for k, v := range tc.headers {
-				req.Header.Set(k, v)
-			}
+			t.Parallel()
 
-			// If needed, prepare the test HTTP response.
-			var res *http.Response
-			if tc.response {
-				res = &http.Response{
-					Header: map[string][]string{},
-				}
-				for k, v := range tc.responseHeaders {
-					res.Header.Set(k, v)
-				}
-			}
+			req := httptest.NewRequest(http.MethodGet, testURL.String(), nil)
+			maps.Copy(req.Header, tc.headers)
 
 			// Now check that
-			resourceType := assumeRequestType(req, res)
+			resourceType := assumeRequestType(req, tc.response)
 			require.Equal(t, tc.expectedType, resourceType)
 		})
 	}
 }
 
 func TestAssumeRequestTypeFromFetchDest(t *testing.T) {
+	t.Parallel()
+
 	require.Equal(t, rules.TypeDocument, assumeRequestTypeFromFetchDest("document"))
 	require.Equal(t, rules.TypeSubdocument, assumeRequestTypeFromFetchDest("iframe"))
 	require.Equal(t, rules.TypeStylesheet, assumeRequestTypeFromFetchDest("style"))
@@ -90,6 +78,8 @@ func TestAssumeRequestTypeFromFetchDest(t *testing.T) {
 }
 
 func TestAssumeRequestTypeFromMediaType(t *testing.T) {
+	t.Parallel()
+
 	require.Equal(t, rules.TypeDocument, assumeRequestTypeFromMediaType("text/html"))
 	require.Equal(t, rules.TypeDocument, assumeRequestTypeFromMediaType("text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3"))
 	require.Equal(t, rules.TypeStylesheet, assumeRequestTypeFromMediaType("text/css"))
@@ -97,6 +87,8 @@ func TestAssumeRequestTypeFromMediaType(t *testing.T) {
 }
 
 func TestAssumeRequestTypeFromURL(t *testing.T) {
+	t.Parallel()
+
 	u, _ := url.Parse("http://example.org/script.js")
 	require.Equal(t, rules.TypeScript, assumeRequestTypeFromURL(u))
 

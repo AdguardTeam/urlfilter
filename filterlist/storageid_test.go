@@ -9,6 +9,8 @@ import (
 )
 
 func TestStorageID_UnmarshalBinary(t *testing.T) {
+	t.Parallel()
+
 	orig := testStrgID1Rule2
 
 	data, err := orig.AppendBinary(nil)

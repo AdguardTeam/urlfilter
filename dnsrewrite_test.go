@@ -21,6 +21,8 @@ var (
 )
 
 func TestDNSResult_DNSRewrites(t *testing.T) {
+	t.Parallel()
+
 	const rulesText = `
 |disable-one^$dnsrewrite=127.0.0.1
 |disable-one^$dnsrewrite=127.0.0.2
@@ -251,7 +253,23 @@ func TestDNSResult_DNSRewrites(t *testing.T) {
 	})
 }
 
+// findWhitelistRule is a helper that returns first whitelist rule from given
+// slice.
+func findWhitelistRule(tb testing.TB, dnsr []*rules.NetworkRule) (r *rules.NetworkRule) {
+	tb.Helper()
+
+	for _, r := range dnsr {
+		if r.Whitelist {
+			return r
+		}
+	}
+
+	return nil
+}
+
 func TestDNSEngine_MatchRequest_dnsRewrite(t *testing.T) {
+	t.Parallel()
+
 	const rulesText = `
 |short-v4^$dnsrewrite=127.0.0.1
 |short-v4-multiple^$dnsrewrite=127.0.0.1
@@ -613,13 +631,7 @@ func TestDNSEngine_MatchRequest_dnsRewrite(t *testing.T) {
 		dnsr := res.DNSRewritesAll()
 		require.Len(t, dnsr, 3)
 
-		var allowListCase *rules.NetworkRule
-		for _, r := range dnsr {
-			if r.Whitelist {
-				allowListCase = r
-			}
-		}
-
+		allowListCase := findWhitelistRule(t, dnsr)
 		require.NotNil(t, allowListCase)
 
 		dr := allowListCase.DNSRewrite
@@ -635,13 +647,7 @@ func TestDNSEngine_MatchRequest_dnsRewrite(t *testing.T) {
 		dnsr := res.DNSRewritesAll()
 		require.Len(t, dnsr, 3)
 
-		var allowListCase *rules.NetworkRule
-		for _, r := range dnsr {
-			if r.Whitelist {
-				allowListCase = r
-			}
-		}
-
+		allowListCase := findWhitelistRule(t, dnsr)
 		require.NotNil(t, allowListCase)
 		assert.Equal(t, &rules.DNSRewrite{}, allowListCase.DNSRewrite)
 	})
@@ -653,13 +659,7 @@ func TestDNSEngine_MatchRequest_dnsRewrite(t *testing.T) {
 		dnsr := res.DNSRewritesAll()
 		require.Len(t, dnsr, 3)
 
-		var allowListCase *rules.NetworkRule
-		for _, r := range dnsr {
-			if r.Whitelist {
-				allowListCase = r
-			}
-		}
-
+		allowListCase := findWhitelistRule(t, dnsr)
 		require.NotNil(t, allowListCase)
 		assert.Equal(t, &rules.DNSRewrite{}, allowListCase.DNSRewrite)
 	})
@@ -721,6 +721,8 @@ func TestDNSEngine_MatchRequest_dnsRewrite(t *testing.T) {
 }
 
 func TestDNSResult_DNSRewrites_exceptionShift(t *testing.T) {
+	t.Parallel()
+
 	const rulesText = `
 	@@||excluded.example^$dnsrewrite=127.0.0.1
 	@@||excluded.example^$dnsrewrite=127.0.0.2

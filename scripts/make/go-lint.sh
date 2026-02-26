@@ -166,34 +166,9 @@ else
 	run_linter govulncheck ./...
 fi
 
-# TODO(e.burkov): Enable for all.
-run_linter gocyclo --over 18 \
-	./proxy/ \
-	./rules/ \
-	;
-run_linter gocyclo --over 10 \
-	-ignore "_test|internal/|proxy/|rules/" \
-	./ \
-	;
+run_linter gocyclo --over 10 ./
 
-# TODO(e.burkov): Enable for all.
-run_linter gocognit --over 10 \
-	./cmd/ \
-	./cosmeticengine_test.go \
-	./dnsengine.go \
-	./dnsengine_test.go \
-	./dnsrewrite.go \
-	./engine.go \
-	./engine_test.go \
-	./examples/ \
-	./filterlist/ \
-	./internal/lookup/ \
-	./internal/ufnet/ \
-	./networkengine.go \
-	./rules \
-	./urlfilter.go \
-	./urlfilter_test.go \
-	;
+run_linter gocognit --over 10 ./
 
 run_linter ineffassign ./...
 

@@ -9,6 +9,8 @@ import (
 )
 
 func TestRemoveDNSRewriteRules(t *testing.T) {
+	t.Parallel()
+
 	rs := []*NetworkRule{
 		newNetworkRule(t, "host1"),
 		newNetworkRule(t, "host2"),

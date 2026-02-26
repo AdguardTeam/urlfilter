@@ -11,8 +11,8 @@ import (
 	"github.com/AdguardTeam/gomitmproxy/proxyutil"
 )
 
-// onRequest handles the outgoing HTTP requests
-func (s *Server) onRequest(sess *gomitmproxy.Session) (*http.Request, *http.Response) {
+// onRequest handles the outgoing HTTP requests.  sess must not be nil.
+func (s *Server) onRequest(sess *gomitmproxy.Session) (req *http.Request, resp *http.Response) {
 	r := sess.Request()
 	session := NewSession(sess.ID(), r)
 
@@ -20,7 +20,7 @@ func (s *Server) onRequest(sess *gomitmproxy.Session) (*http.Request, *http.Resp
 	sess.SetProp(sessionPropKey, session)
 
 	if r.Method == http.MethodConnect {
-		// Do nothing for CONNECT requests
+		// Do nothing for CONNECT requests.
 		return nil, nil
 	}
 
@@ -34,7 +34,8 @@ func (s *Server) onRequest(sess *gomitmproxy.Session) (*http.Request, *http.Resp
 	if rule != nil && !rule.Whitelist {
 		log.Debug("urlfilter: id=%s: blocked by %s: %s", session.ID, rule.String(), session.Request.URL)
 
-		// Mark this request as blocked so that we didn't modify it in the onResponse handler
+		// Mark this request as blocked so that we didn't modify it in the
+		// onResponse handler.
 		sess.SetProp(requestBlockedKey, true)
 
 		return nil, newBlockedResponse(session, rule)
@@ -47,8 +48,8 @@ func (s *Server) onRequest(sess *gomitmproxy.Session) (*http.Request, *http.Resp
 	return r, nil
 }
 
-// onResponse handles all the responses
-func (s *Server) onResponse(sess *gomitmproxy.Session) *http.Response {
+// onResponse handles all the responses.  sess must not be nil.
+func (s *Server) onResponse(sess *gomitmproxy.Session) (res *http.Response) {
 	if _, ok := sess.GetProp(requestBlockedKey); ok {
 		// request was already blocked
 		return nil
@@ -62,6 +63,7 @@ func (s *Server) onResponse(sess *gomitmproxy.Session) *http.Response {
 	v, ok := sess.GetProp(sessionPropKey)
 	if !ok {
 		log.Error("urlfilter: id=%s: session not found", sess.ID())
+
 		return nil
 	}
 
@@ -69,21 +71,27 @@ func (s *Server) onResponse(sess *gomitmproxy.Session) *http.Response {
 
 	if !ok {
 		log.Error("urlfilter: id=%s: session not found (wrong type)", sess.ID())
+
 		return nil
 	}
 
-	// Update the session -- this will cause requestType re-calc
 	session.SetResponse(sess.Response())
 
-	// Now once we received the response, we must re-calculate the result
 	session.Result = s.engine.MatchRequest(session.Request)
 	rule := session.Result.GetBasicResult()
 	if rule != nil && !rule.Whitelist {
 		log.Debug("urlfilter: id=%s: blocked by %s: %s", session.ID, rule.String(), session.Request.URL)
+
 		return newBlockedResponse(session, rule)
 	}
 
-	// Filter HTML for main frames and iframes.
+	return s.applyHTMLFiltering(session)
+}
+
+// applyHTMLFiltering applies HTML filtering to documents and subdocuments.
+// It Returns a modified response if filtering was applied, nil otherwise.
+// session must not be nil.
+func (s *Server) applyHTMLFiltering(session *Session) (resp *http.Response) {
 	rt := session.Request.RequestType
 	if (rt == rules.TypeDocument || rt == rules.TypeSubdocument) &&
 		session.Result.GetCosmeticOption() != rules.CosmeticOptionNone {
@@ -91,14 +99,15 @@ func (s *Server) onResponse(sess *gomitmproxy.Session) *http.Response {
 		if err != nil {
 			return proxyutil.NewErrorResponse(session.HTTPRequest, err)
 		}
+
 		return session.HTTPResponse
 	}
 
 	return nil
 }
 
-// onConnect - the only purpose is to intercept and suppress connections to InjectionHost
-func (s *Server) onConnect(session *gomitmproxy.Session, proto, addr string) net.Conn {
+// onConnect intercepts and suppresses connections to injection host.
+func (s *Server) onConnect(_ *gomitmproxy.Session, proto, addr string) (conn net.Conn) {
 	host, _, err := net.SplitHostPort(addr)
 
 	if err == nil && host == s.InjectionHost {

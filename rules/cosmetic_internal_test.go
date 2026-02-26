@@ -8,6 +8,8 @@ import (
 )
 
 func TestNewCosmeticRule(t *testing.T) {
+	t.Parallel()
+
 	r, err := NewCosmeticRule("##banner", testListID)
 	require.NotNil(t, r)
 	require.NoError(t, err)

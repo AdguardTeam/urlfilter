@@ -22,6 +22,8 @@ import (
 )
 
 func TestDNSEnginePriority(t *testing.T) {
+	t.Parallel()
+
 	rulesText := `@@||example.org^
 127.0.0.1  example.org
 `
@@ -41,6 +43,8 @@ func TestDNSEnginePriority(t *testing.T) {
 }
 
 func TestDNSEngineMatchHostname(t *testing.T) {
+	t.Parallel()
+
 	rulesText := `||example.org^
 ||example2.org/*
 ||example3.org|
@@ -99,6 +103,8 @@ func TestDNSEngineMatchHostname(t *testing.T) {
 }
 
 func TestHostLevelNetworkRuleWithProtocol(t *testing.T) {
+	t.Parallel()
+
 	rulesText := "://example.org"
 	ruleStorage := newTestRuleStorage(t, uftest.ListID1, rulesText)
 	dnsEngine := urlfilter.NewDNSEngine(ruleStorage)
@@ -110,6 +116,8 @@ func TestHostLevelNetworkRuleWithProtocol(t *testing.T) {
 }
 
 func TestRegexp(t *testing.T) {
+	t.Parallel()
+
 	text := "/^stats?\\./"
 	ruleStorage := newTestRuleStorage(t, uftest.ListID1, text)
 	dnsEngine := urlfilter.NewDNSEngine(ruleStorage)
@@ -126,6 +134,8 @@ func TestRegexp(t *testing.T) {
 }
 
 func TestMultipleIPPerHost(t *testing.T) {
+	t.Parallel()
+
 	text := `1.1.1.1 example.org
 2.2.2.2 example.org`
 	ruleStorage := newTestRuleStorage(t, uftest.ListID1, text)
@@ -137,6 +147,8 @@ func TestMultipleIPPerHost(t *testing.T) {
 }
 
 func TestClientTags(t *testing.T) {
+	t.Parallel()
+
 	rulesText := `||host1^$ctag=pc|printer
 ||host1^
 ||host2^$ctag=pc|printer
@@ -252,6 +264,8 @@ func TestClientTags(t *testing.T) {
 }
 
 func TestClient(t *testing.T) {
+	t.Parallel()
+
 	ruleTexts := []string{
 		"||host0^$client=127.0.0.1",
 		"||host1^$client=~127.0.0.1",
@@ -379,6 +393,8 @@ func TestClient(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
 			res, ok := dnsEngine.MatchRequest(tc.req)
 			if tc.wantRes == "" {
 				assert.False(t, ok)
@@ -390,6 +406,8 @@ func TestClient(t *testing.T) {
 }
 
 func TestBadfilterRules(t *testing.T) {
+	t.Parallel()
+
 	rulesText := "||example.org^\n||example.org^$badfilter"
 	ruleStorage := newTestRuleStorage(t, uftest.ListID1, rulesText)
 	dnsEngine := urlfilter.NewDNSEngine(ruleStorage)
@@ -401,6 +419,8 @@ func TestBadfilterRules(t *testing.T) {
 }
 
 func TestDNSEngine_MatchRequest_dnsType(t *testing.T) {
+	t.Parallel()
+
 	const rulesText = `
 ||simple^$dnstype=AAAA
 ||simple_case^$dnstype=aaaa
@@ -418,6 +438,8 @@ func TestDNSEngine_MatchRequest_dnsType(t *testing.T) {
 	assert.NotNil(t, dnsEngine)
 
 	t.Run("simple", func(t *testing.T) {
+		t.Parallel()
+
 		r := &urlfilter.DNSRequest{Hostname: "simple", DNSType: dns.TypeAAAA}
 		_, ok := dnsEngine.MatchRequest(r)
 		assert.True(t, ok)
@@ -428,6 +450,8 @@ func TestDNSEngine_MatchRequest_dnsType(t *testing.T) {
 	})
 
 	t.Run("simple_case", func(t *testing.T) {
+		t.Parallel()
+
 		r := &urlfilter.DNSRequest{Hostname: "simple_case", DNSType: dns.TypeAAAA}
 		_, ok := dnsEngine.MatchRequest(r)
 		assert.True(t, ok)
@@ -438,6 +462,8 @@ func TestDNSEngine_MatchRequest_dnsType(t *testing.T) {
 	})
 
 	t.Run("reverse", func(t *testing.T) {
+		t.Parallel()
+
 		r := &urlfilter.DNSRequest{Hostname: "reverse", DNSType: dns.TypeAAAA}
 		_, ok := dnsEngine.MatchRequest(r)
 		assert.False(t, ok)
@@ -448,6 +474,8 @@ func TestDNSEngine_MatchRequest_dnsType(t *testing.T) {
 	})
 
 	t.Run("multiple", func(t *testing.T) {
+		t.Parallel()
+
 		r := &urlfilter.DNSRequest{Hostname: "multiple", DNSType: dns.TypeAAAA}
 		_, ok := dnsEngine.MatchRequest(r)
 		assert.True(t, ok)
@@ -462,6 +490,8 @@ func TestDNSEngine_MatchRequest_dnsType(t *testing.T) {
 	})
 
 	t.Run("multiple_reverse", func(t *testing.T) {
+		t.Parallel()
+
 		r := &urlfilter.DNSRequest{
 			Hostname: "multiple_reverse",
 			DNSType:  dns.TypeAAAA,
@@ -480,6 +510,8 @@ func TestDNSEngine_MatchRequest_dnsType(t *testing.T) {
 	})
 
 	t.Run("multiple_different", func(t *testing.T) {
+		t.Parallel()
+
 		// Should be the same as simple.
 		r := &urlfilter.DNSRequest{
 			Hostname: "multiple_different",
@@ -499,6 +531,8 @@ func TestDNSEngine_MatchRequest_dnsType(t *testing.T) {
 	})
 
 	t.Run("simple_client", func(t *testing.T) {
+		t.Parallel()
+
 		r := &urlfilter.DNSRequest{
 			Hostname: "simple_client",
 			DNSType:  dns.TypeAAAA,
@@ -526,6 +560,8 @@ func TestDNSEngine_MatchRequest_dnsType(t *testing.T) {
 	})
 
 	t.Run("priority", func(t *testing.T) {
+		t.Parallel()
+
 		r := &urlfilter.DNSRequest{
 			Hostname: "priority",
 			DNSType:  dns.TypeAAAA,
@@ -548,6 +584,8 @@ func TestDNSEngine_MatchRequest_dnsType(t *testing.T) {
 }
 
 func TestSlash(t *testing.T) {
+	t.Parallel()
+
 	ruleStorage := newTestRuleStorage(t, uftest.ListID1, "/$client=127.0.0.1")
 	dnsEngine := urlfilter.NewDNSEngine(ruleStorage)
 	assert.NotNil(t, dnsEngine)

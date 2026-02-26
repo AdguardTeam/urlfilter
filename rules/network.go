@@ -274,12 +274,23 @@ func NewNetworkRule(ruleText string, id ListID) (r *NetworkRule, err error) {
 func (r *NetworkRule) isTooWide(pattern string) (ok bool) {
 	// Rule matches too much and does not have any domain, client or ctag
 	// restrictions.  We should not allow this kind of rules.
-	return (pattern == MaskStartURL ||
+
+	return isPatternTooWide(pattern) && r.hasNoRestrictions()
+}
+
+// isPatternTooWide returns true if the pattern is too generic.
+func isPatternTooWide(pattern string) (ok bool) {
+	return pattern == MaskStartURL ||
 		pattern == MaskPipe ||
 		pattern == MaskAnyCharacter ||
 		pattern == "" ||
-		len(pattern) < 3) &&
-		len(r.permittedDomains) == 0 &&
+		len(pattern) < 3
+}
+
+// hasNoRestrictions returns true if the rule has no domain, client, or DNS
+// restrictions.
+func (r *NetworkRule) hasNoRestrictions() (ok bool) {
+	return len(r.permittedDomains) == 0 &&
 		len(r.restrictedDomains) == 0 &&
 		r.permittedClients.len() == 0 &&
 		r.restrictedClients.len() == 0 &&
@@ -423,15 +434,15 @@ func (r *NetworkRule) IsHigherPriority(other *NetworkRule) (ok bool) {
 
 // isHigherPriorityImportant compares rules with the $important modifier.
 // Returns true if r has higher priority than the other.  done is true if the
-// comparison is finished.
+// comparison is finished.  other must not be nil.
 func (r *NetworkRule) isHigherPriorityImportant(other *NetworkRule) (ok, done bool) {
 	important := r.IsOptionEnabled(OptionImportant)
 	otherImportant := other.IsOptionEnabled(OptionImportant)
 
 	switch {
-	case important && r.Whitelist && !other.Whitelist:
+	case r.isImportantWhitelist(other):
 		return true, true
-	case otherImportant && other.Whitelist && !r.Whitelist:
+	case other.isImportantWhitelist(r):
 		return false, true
 	case important && !otherImportant:
 		return true, true
@@ -440,6 +451,12 @@ func (r *NetworkRule) isHigherPriorityImportant(other *NetworkRule) (ok, done bo
 	default:
 		return false, false
 	}
+}
+
+// isImportantWhitelist returns true if r is an important whitelist rule and
+// other is a blocklist rule.  other must not be nil.
+func (r *NetworkRule) isImportantWhitelist(other *NetworkRule) (ok bool) {
+	return r.IsOptionEnabled(OptionImportant) && r.Whitelist && !other.Whitelist
 }
 
 // isHigherPrioritySpec compares the number of the rule's dedicated specifiers.

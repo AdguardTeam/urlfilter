@@ -9,6 +9,8 @@ import (
 )
 
 func TestBuildBlockedPage(t *testing.T) {
+	t.Parallel()
+
 	s := &Session{
 		Request: rules.NewRequest(uftest.URLStrHost, "", rules.TypeDocument),
 	}

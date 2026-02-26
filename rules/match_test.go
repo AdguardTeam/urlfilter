@@ -201,6 +201,8 @@ func TestMatchingResult_GetCosmeticOption(t *testing.T) {
 // TODO(ameshkov):  Add more tests!
 
 func TestGetDNSBasicRule(t *testing.T) {
+	t.Parallel()
+
 	blockRule := uftest.NewNetworkRule(t, "example.block")
 	allowlistRule := uftest.NewNetworkRule(t, "@@||example.allow^")
 	importantBlockRule := uftest.NewNetworkRule(t, "example.block$important")
@@ -245,6 +247,8 @@ func TestGetDNSBasicRule(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
 			r := rules.GetDNSBasicRule(tc.rs)
 			assert.Equal(t, tc.want, r)
 		})
