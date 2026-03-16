@@ -1,17 +1,20 @@
 package main
 
 import (
+	"context"
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
 	"net"
 	"net/http"
+	"net/netip"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
 	"github.com/AdguardTeam/golibs/log"
+	"github.com/AdguardTeam/golibs/netutil/httputil"
 	"github.com/AdguardTeam/gomitmproxy"
 	"github.com/AdguardTeam/gomitmproxy/mitm"
 	"github.com/AdguardTeam/urlfilter/proxy"
@@ -22,17 +25,23 @@ func main() {
 	log.SetLevel(log.DEBUG)
 
 	go func() {
-		lsnr, err := net.Listen("tcp", "localhost:6060")
+		addr, err := netip.ParseAddr("127.0.0.1")
 		if err != nil {
 			log.Fatal(err)
 		}
+		srv := httputil.NewServer(&httputil.ServerConfig{
+			Server: &http.Server{
+				ReadTimeout:  10 * time.Second,
+				WriteTimeout: 10 * time.Second,
+			},
+			InitialAddress: netip.AddrPortFrom(
+				addr,
+				6060,
+			),
+		})
 
-		srv := &http.Server{
-			ReadTimeout:  10 * time.Second,
-			WriteTimeout: 10 * time.Second,
-		}
-
-		log.Println(srv.Serve(lsnr))
+		ctx := context.Background()
+		log.Println(srv.Start(ctx))
 	}()
 
 	// READ CERT AND KEY

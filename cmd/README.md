@@ -4,7 +4,7 @@ This is a MITM proxy that is able to apply AdGuard content blocking rules to the
 
 Here's what you'll need to build and run the proxy:
 
-- Go v1.25 or newer
+- Go v1.26 or newer
 - openssl (or any other tool to generate the root CA)
 
 > **Limitations**

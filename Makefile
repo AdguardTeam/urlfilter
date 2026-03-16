@@ -7,7 +7,7 @@
 # This comment is used to simplify checking local copies of the Makefile.  Bump
 # this number every time a significant change is made to this Makefile.
 #
-# AdGuard-Project-Version: 11
+# AdGuard-Project-Version: 13
 
 # Don't name these macros "GO" etc., because GNU Make apparently makes them
 # exported environment variables with the literal value of "${GO:-go}" and so
@@ -22,7 +22,7 @@ BRANCH = $${BRANCH:-$$(git rev-parse --abbrev-ref HEAD)}
 GOAMD64 = v1
 GOPROXY = https://proxy.golang.org|direct
 GOTELEMETRY = off
-GOTOOLCHAIN = go1.25.7
+GOTOOLCHAIN = go1.26.1
 RACE = 0
 REVISION = $${REVISION:-$$(git rev-parse --short HEAD)}
 VERSION = 0
@@ -51,7 +51,7 @@ ENV_MISC = env\
 # Keep this target first, so that a naked make invocation triggers a
 # check
 .PHONY: check
-check: go-deps go-tools go-lint test
+check: go-deps go-lint test
 
 .PHONY: init
 init: ; git config core.hooksPath ./scripts/hooks
@@ -59,18 +59,17 @@ init: ; git config core.hooksPath ./scripts/hooks
 .PHONY: test
 test: go-test
 
-.PHONY: go-bench go-deps go-env go-fuzz go-lint go-test go-tools go-upd-tools
+.PHONY: go-bench go-deps go-env go-fuzz go-lint go-test go-upd-tools
 go-bench:     ; $(ENV)          "$(SHELL)" ./scripts/make/go-bench.sh
 go-deps:      ; $(ENV)          "$(SHELL)" ./scripts/make/go-deps.sh
 go-env:       ; $(ENV)          "$(GO.MACRO)" env
 go-fuzz:      ; $(ENV)          "$(SHELL)" ./scripts/make/go-fuzz.sh
 go-lint:      ; $(ENV)          "$(SHELL)" ./scripts/make/go-lint.sh
 go-test:      ; $(ENV) RACE='1' "$(SHELL)" ./scripts/make/go-test.sh
-go-tools:     ; $(ENV)          "$(SHELL)" ./scripts/make/go-tools.sh
 go-upd-tools: ; $(ENV)          "$(SHELL)" ./scripts/make/go-upd-tools.sh
 
 .PHONY: go-check
-go-check: go-tools go-lint go-test
+go-check: go-lint go-test
 
 # A quick check to make sure that all operating systems relevant to the
 # development of the project can be typechecked and built successfully.
