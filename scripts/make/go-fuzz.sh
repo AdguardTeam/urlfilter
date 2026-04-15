@@ -1,5 +1,7 @@
 #!/bin/sh
 
+set -e -f -o 'pipefail' -u
+
 verbose="${VERBOSE:-0}"
 readonly verbose
 
@@ -22,8 +24,6 @@ else
 fi
 readonly v_flags x_flags
 
-set -e -f -u
-
 if [ "${RACE:-1}" -eq '0' ]; then
 	race_flags='--race=0'
 else
@@ -31,16 +31,13 @@ else
 fi
 readonly race_flags
 
-go="${GO:-go}"
-readonly go
-
 count_flags='--count=1'
 fuzztime_flags="${FUZZTIME_FLAGS:---fuzztime=20s}"
+go="${GO:-go}"
 run_flags='--run=^$'
 shuffle_flags='--shuffle=on'
 timeout_flags="${TIMEOUT_FLAGS:---timeout=30s}"
-
-readonly count_flags fuzztime_flags shuffle_flags timeout_flags
+readonly count_flags fuzztime_flags go run_flags shuffle_flags timeout_flags
 
 # TODO(a.garipov): File an issue about using --fuzz with multiple packages.
 while read -r pkg fuzzname; do

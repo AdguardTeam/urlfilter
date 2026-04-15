@@ -7,7 +7,7 @@
 # This comment is used to simplify checking local copies of the Makefile.  Bump
 # this number every time a significant change is made to this Makefile.
 #
-# AdGuard-Project-Version: 13
+# AdGuard-Project-Version: 16
 
 # Don't name these macros "GO" etc., because GNU Make apparently makes them
 # exported environment variables with the literal value of "${GO:-go}" and so
@@ -22,29 +22,27 @@ BRANCH = $${BRANCH:-$$(git rev-parse --abbrev-ref HEAD)}
 GOAMD64 = v1
 GOPROXY = https://proxy.golang.org|direct
 GOTELEMETRY = off
-GOTOOLCHAIN = go1.26.1
+GOTOOLCHAIN = go1.26.2
 RACE = 0
 REVISION = $${REVISION:-$$(git rev-parse --short HEAD)}
-VERSION = 0
 
-ENV = env\
-	BRANCH="$(BRANCH)"\
-	GO="$(GO.MACRO)"\
-	GOAMD64='$(GOAMD64)'\
-	GOPROXY='$(GOPROXY)'\
-	GOTELEMETRY='$(GOTELEMETRY)'\
-	GOTOOLCHAIN='$(GOTOOLCHAIN)'\
-	PATH="$${PWD}/bin:$$("$(GO.MACRO)" env GOPATH)/bin:$${PATH}"\
-	RACE='$(RACE)'\
-	REVISION="$(REVISION)"\
-	VERBOSE="$(VERBOSE.MACRO)"\
-	VERSION="$(VERSION)"\
+ENV = env \
+	BRANCH="$(BRANCH)" \
+	GO="$(GO.MACRO)" \
+	GOAMD64='$(GOAMD64)' \
+	GOPROXY='$(GOPROXY)' \
+	GOTELEMETRY='$(GOTELEMETRY)' \
+	GOTOOLCHAIN='$(GOTOOLCHAIN)' \
+	PATH="$${PWD}/bin:$$("$(GO.MACRO)" env GOPATH)/bin:$${PATH}" \
+	RACE='$(RACE)' \
+	REVISION="$(REVISION)" \
+	VERBOSE="$(VERBOSE.MACRO)" \
 
 # Keep the line above blank.
 
-ENV_MISC = env\
-	PATH="$${PWD}/bin:$$("$(GO.MACRO)" env GOPATH)/bin:$${PATH}"\
-	VERBOSE="$(VERBOSE.MACRO)"\
+ENV_MISC = env \
+	PATH="$${PWD}/bin:$$("$(GO.MACRO)" env GOPATH)/bin:$${PATH}" \
+	VERBOSE="$(VERBOSE.MACRO)" \
 
 # Keep the line above blank.
 

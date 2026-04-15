@@ -3,7 +3,7 @@
 # This comment is used to simplify checking local copies of the Dockerfile.
 # Bump this number every time a significant change is made to this Dockerfile.
 #
-# AdGuard-Project-Version: 11
+# AdGuard-Project-Version: 13
 
 # Dockerfile guidelines:
 #
@@ -28,7 +28,7 @@
 #    needed.  Keep it in sync with bamboo-specs/bamboo.yaml.
 
 # NOTE:  Keep in sync with bamboo-specs/bamboo.yaml.
-ARG BASE_IMAGE=adguard/go-builder:1.26.1--1
+ARG BASE_IMAGE=adguard/go-builder:1.26.2--1
 
 # The dependencies stage is needed to install packages and tool dependencies.
 # This is also where binaries like osslsigncode, which may be required for tests
@@ -46,7 +46,7 @@ RUN \
 	--mount=type=cache,id=gocache,target=/root/.cache/go-build \
 	--mount=type=cache,id=gopath,target=/go \
 <<-'EOF'
-set -e -f -u -x
+set -e -f -o 'pipefail' -u -x
 make \
 	BRANCH='master' \
 	REVISION='0000000000000000000000000000000000000000' \
@@ -60,7 +60,8 @@ EOF
 # failures easier.
 #
 # Use fake BRANCH and REVISION values to both prevent git calls and also not
-# ruin the caching with ARGs.
+# ruin the caching with ARGs.  IGNORE_NON_REPRODUCIBLE is set to 1 to make this
+# stage reproducible even when linters that query external sources fail.
 FROM dependencies AS linter
 ADD . /app
 WORKDIR /app
@@ -68,18 +69,27 @@ RUN \
 	--mount=type=cache,id=gocache,target=/root/.cache/go-build \
 	--mount=type=cache,id=gopath,target=/go \
 <<-'EOF'
-set -e -f -u -x
+set -e -f -o 'pipefail' -u -x
 export GOMAXPROCS=2
 make \
 	BRANCH='master' \
+	IGNORE_NON_REPRODUCIBLE='1' \
 	REVISION='0000000000000000000000000000000000000000' \
 	VERBOSE=1 \
 	go-lint \
 	md-lint \
 	sh-lint \
 	txt-lint \
+	2>&1 \
+	| tee /lint-output.txt \
 	;
 EOF
+
+# linter-exporter exports the test result to the host machine so that it could
+# parse and analyze it.  This stage should only used in a CI.
+FROM scratch AS linter-exporter
+ARG CACHE_BUSTER=0
+COPY --from=linter /lint-output.txt /lint-output.txt
 
 # The test stage.  TEST_REPORTS_DIR is set to create JUnit reports for the
 # tester-exporter stage; run with --build-arg TEST_REPORTS_DIR='' if you don't
@@ -101,9 +111,8 @@ RUN \
 	--mount=type=cache,id=gocache,target=/root/.cache/go-build \
 	--mount=type=cache,id=gopath,target=/go \
 <<-'EOF'
-set -e -f -u -x
+set -e -f -o 'pipefail' -u -x
 export GOMAXPROCS=2
-
 make \
 	BRANCH='master' \
 	REVISION='0000000000000000000000000000000000000000' \
@@ -111,10 +120,8 @@ make \
 	VERBOSE=1 \
 	go-test \
 	;
-
 exit_code="$(cat "${TEST_REPORTS_DIR}/test-exit-code.txt")"
 readonly exit_code
-
 make \
 	BRANCH='master' \
 	REVISION='0000000000000000000000000000000000000000' \
@@ -122,7 +129,6 @@ make \
 	go-fuzz \
 	go-bench \
 	;
-
 exit "$exit_code"
 EOF
 
