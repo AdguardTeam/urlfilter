@@ -5,7 +5,8 @@
 #
 # AdGuard-Project-Version: 19
 
-set -e -f -o 'pipefail' -u
+# TODO(d.kolyshev):  Add -o 'pipefail' when it's supported on GitHub Actions.
+set -e -f -u
 
 verbose="${VERBOSE:-0}"
 readonly verbose

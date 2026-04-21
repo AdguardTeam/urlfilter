@@ -1,7 +1,15 @@
 'name': 'test urlfilter'
+# Permissions are disabled for all the jobs by default, and then overridden for
+# specific jobs if needed.  This is a recommended practice for security reasons,
+# and also allows to avoid mistakes with permissions when creating new jobs.
+#
+# See https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#permissions.
+'permissions': {}
 'on': 'push'
 'jobs':
   'tests':
+    'permissions':
+      'contents': 'read'
     'runs-on': '${{ matrix.os }}'
     'strategy':
       'matrix':
@@ -10,6 +18,12 @@
           - 'ubuntu-latest'
     'steps':
       - 'uses': 'actions/checkout@master'
+        'with':
+          'fetch-depth': 0
+          # Set to false to avoid  GITHUB_TOKEN leaking.
+          #
+          # See https://github.com/actions/checkout/issues/485#issuecomment-934422611.
+          'persist-credentials': false
       - 'uses': 'actions/setup-go@v3'
         'with':
           'go-version': '1.26.x'
@@ -36,6 +50,10 @@
           github.event.pull_request.head.repo.full_name == github.repository
         )
       }}
+    'permissions':
+      # Required by workflow-conclusion-action to check workflow status.
+      'actions': 'read'
+      'contents': 'read'
     'runs-on': 'ubuntu-latest'
     'steps':
       - 'name': 'Conclusion'
