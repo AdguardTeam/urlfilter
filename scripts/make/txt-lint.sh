@@ -96,7 +96,6 @@ readonly go
 "$go" tool yamlfmt \
 	--lint \
 	./.github/workflows/*.yaml \
-	./bamboo-specs/*.yaml \
 	;
 
 find_with_ignore \
