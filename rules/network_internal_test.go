@@ -196,7 +196,7 @@ func TestNetworkRule_requestTypeModifiers(t *testing.T) {
 			t.Parallel()
 
 			checkRequestType(t, tc.modifier, tc.want, true)
-			checkRequestType(t, "~"+tc.modifier, tc.want, false)
+			checkRequestType(t, restrictionMarker+tc.modifier, tc.want, false)
 		})
 	}
 }
@@ -484,7 +484,7 @@ func TestParseClients_invalid(t *testing.T) {
 	_, _, err = parseClients("~''", '|')
 	assert.Error(t, err)
 
-	_, _, err = parseClients("~", '|')
+	_, _, err = parseClients(restrictionMarker, '|')
 	assert.Error(t, err)
 }
 

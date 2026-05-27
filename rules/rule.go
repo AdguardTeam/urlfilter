@@ -6,9 +6,13 @@ import (
 
 	"github.com/AdguardTeam/golibs/container"
 	"github.com/AdguardTeam/golibs/errors"
+	"github.com/AdguardTeam/urlfilter/internal/geoip"
 	"github.com/AdguardTeam/urlfilter/internal/ufnet"
 	"github.com/miekg/dns"
 )
+
+// restrictionMarker is a character that marks a rule or value as a restriction.
+const restrictionMarker = "~"
 
 // Rule is a base interface for all filtering rules.
 //
@@ -86,7 +90,7 @@ func parseDomains(domains, sep string) (permittedDomains, restrictedDomains []st
 	for i := range list {
 		d := list[i]
 		restricted := false
-		if strings.HasPrefix(d, "~") {
+		if strings.HasPrefix(d, restrictionMarker) {
 			restricted = true
 			d = d[1:]
 		}
@@ -182,6 +186,74 @@ func isValidCTag(s string) (ok bool) {
 	return true
 }
 
+// parseGeoIP parses the GeoIP data from the $respgeo modifier.  rule must not
+// be nil.
+func parseGeoIP(rule *NetworkRule, value, sep string) (err error) {
+	list := strings.Split(value, sep)
+	for _, value := range list {
+		err = parseGeoIPValue(rule, value)
+		if err != nil {
+			// Don't wrap the error, because it's informative enough as is.
+			return err
+		}
+	}
+
+	return nil
+}
+
+// parseGeoIPValue parses a single ASN or Country value from $respgeo modifier.
+// rule must not be nil.
+func parseGeoIPValue(rule *NetworkRule, value string) (err error) {
+	isRestricted := false
+	if strings.HasPrefix(value, restrictionMarker) {
+		isRestricted = true
+		value = value[1:]
+	}
+
+	if value == "" {
+		appendGeoIPValue(rule, false, isRestricted, geoip.CountryUnrecognized, 0)
+		appendGeoIPValue(rule, true, isRestricted, "", geoip.ASNUnrecognized)
+
+		return nil
+	}
+
+	isASN := false
+	var asnVal geoip.ASN
+	if strings.HasPrefix(value, geoip.ASNPrefix) {
+		asnVal, err = geoip.NewASN(value)
+		if err != nil {
+			return fmt.Errorf("parsing asn: %w", err)
+		}
+
+		isASN = true
+	}
+
+	appendGeoIPValue(rule, isASN, isRestricted, strings.ToLower(value), asnVal)
+
+	return nil
+}
+
+// appendGeoIPValue appends an ASN or country value to rule.  rule must not be
+// nil.
+func appendGeoIPValue(
+	rule *NetworkRule,
+	isASN bool,
+	isRestricted bool,
+	country geoip.Country,
+	asn geoip.ASN,
+) {
+	switch {
+	case !isASN && isRestricted:
+		rule.restrictedCountries = append(rule.restrictedCountries, country)
+	case !isASN && !isRestricted:
+		rule.permittedCountries = append(rule.permittedCountries, country)
+	case isASN && isRestricted:
+		rule.restrictedASNs = append(rule.restrictedASNs, asn)
+	case isASN && !isRestricted:
+		rule.permittedASNs = append(rule.permittedASNs, asn)
+	}
+}
+
 // parseCTags parses tags from the $ctag modifier.  sep is the separator
 // character; for network rules it is '|'.
 func parseCTags(value, sep string) (permittedSet, restrictedSet *container.SortedSliceSet[string], err error) {
@@ -194,7 +266,7 @@ func parseCTags(value, sep string) (permittedSet, restrictedSet *container.Sorte
 	for i := range list {
 		d := list[i]
 		isRestricted := false
-		if strings.HasPrefix(d, "~") {
+		if strings.HasPrefix(d, restrictionMarker) {
 			isRestricted = true
 			d = d[1:]
 		}
@@ -306,7 +378,7 @@ func parseClient(input string) (client string, isRestricted bool, err error) {
 	client = input
 
 	// 1. Check if this is a restricted or permitted client.
-	if strings.HasPrefix(client, "~") {
+	if strings.HasPrefix(client, restrictionMarker) {
 		isRestricted = true
 		client = client[1:]
 	}

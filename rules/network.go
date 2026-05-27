@@ -12,6 +12,7 @@ import (
 	"github.com/AdguardTeam/golibs/container"
 	"github.com/AdguardTeam/golibs/mathutil"
 	"github.com/AdguardTeam/golibs/netutil"
+	"github.com/AdguardTeam/urlfilter/internal/geoip"
 )
 
 // Parts of rules.
@@ -174,6 +175,20 @@ type NetworkRule struct {
 	// text is the original rule text.
 	text string
 
+	// permittedASNs is a list of permitted ASNs from the $respgeo modifier.
+	permittedASNs []geoip.ASN
+
+	// restrictedASNs is a list of restricted ASNs from the $respgeo modifier.
+	restrictedASNs []geoip.ASN
+
+	// permittedCountries is a list of permitted countries from the $respgeo
+	// modifier.
+	permittedCountries []geoip.Country
+
+	// restrictedCountries is a list of restricted countries from the $respgeo
+	// modifier.
+	restrictedCountries []geoip.Country
+
 	// Shortcut is the longest substring of the rule pattern with no special
 	// characters.
 	Shortcut string
@@ -241,6 +256,7 @@ type NetworkRule struct {
 func NewNetworkRule(ruleText string, id ListID) (r *NetworkRule, err error) {
 	pattern, options, whitelist, err := parseRuleText(ruleText)
 	if err != nil {
+		// Don't wrap the error, because it's informative enough as is.
 		return nil, err
 	}
 
@@ -253,6 +269,7 @@ func NewNetworkRule(ruleText string, id ListID) (r *NetworkRule, err error) {
 	}
 
 	if err = r.loadOptions(options); err != nil {
+		// Don't wrap the error, because it's informative enough as is.
 		return nil, err
 	}
 
@@ -287,8 +304,8 @@ func isPatternTooWide(pattern string) (ok bool) {
 		len(pattern) < 3
 }
 
-// hasNoRestrictions returns true if the rule has no domain, client, or DNS
-// restrictions.
+// hasNoRestrictions returns true if the rule has no domain, GeoIP, client, or
+// DNS restrictions.
 func (r *NetworkRule) hasNoRestrictions() (ok bool) {
 	return len(r.permittedDomains) == 0 &&
 		len(r.restrictedDomains) == 0 &&
@@ -298,7 +315,17 @@ func (r *NetworkRule) hasNoRestrictions() (ok bool) {
 		r.restrictedClientTags.Len() == 0 &&
 		len(r.permittedDNSTypes) == 0 &&
 		len(r.restrictedDNSTypes) == 0 &&
-		len(r.denyAllowDomains) == 0
+		len(r.denyAllowDomains) == 0 &&
+		r.hasNoGeoIPRestrictions()
+}
+
+// hasNoGeoIPRestrictions returns true if the rule has no ASN or Country
+// restriction.
+func (r *NetworkRule) hasNoGeoIPRestrictions() (ok bool) {
+	return len(r.restrictedASNs) == 0 &&
+		len(r.permittedASNs) == 0 &&
+		len(r.restrictedCountries) == 0 &&
+		len(r.permittedCountries) == 0
 }
 
 // type check
@@ -333,7 +360,8 @@ func (r *NetworkRule) Match(req *Request) (ok bool) {
 		!r.matchDNSType(req.DNSType),
 		!r.matchClientTags(req.ClientTags),
 		!r.matchClient(req.ClientIdentifiers, req.ClientIP),
-		!r.matchPattern(req):
+		!r.matchPattern(req),
+		!r.matchGeoIP(req.ClientASN, req.ClientCountry):
 		return false
 	}
 
@@ -720,6 +748,51 @@ func (r *NetworkRule) matchClient(ids *container.SortedSliceSet[string], ip neti
 	return true
 }
 
+// matchGeoIP returns true if r matches geoip data.
+func (r *NetworkRule) matchGeoIP(asn geoip.ASN, country geoip.Country) (ok bool) {
+	return r.matchASN(asn) && r.matchCountry(country)
+}
+
+// matchASN returns true if r matches given ASN.
+func (r *NetworkRule) matchASN(asn geoip.ASN) (ok bool) {
+	restLen := len(r.restrictedASNs)
+	permLen := len(r.permittedASNs)
+	if restLen == 0 && permLen == 0 {
+		return true
+	}
+
+	if slices.Contains(r.restrictedASNs, asn) {
+		return false
+	}
+
+	if permLen != 0 {
+		return slices.Contains(r.permittedASNs, asn)
+	}
+
+	return true
+}
+
+// matchCountry returns true if r matches given country.
+func (r *NetworkRule) matchCountry(country geoip.Country) (ok bool) {
+	country = strings.ToLower(country)
+
+	restLen := len(r.restrictedCountries)
+	permLen := len(r.permittedCountries)
+	if restLen == 0 && permLen == 0 {
+		return true
+	}
+
+	if slices.Contains(r.restrictedCountries, country) {
+		return false
+	}
+
+	if permLen != 0 {
+		return slices.Contains(r.permittedCountries, country)
+	}
+
+	return true
+}
+
 // matchRequestType returns true if rt matches the rule properties.
 func (r *NetworkRule) matchRequestType(rt RequestType) (ok bool) {
 	if r.permittedRequestTypes != 0 {
@@ -866,6 +939,8 @@ var optionHandlers = map[string]optionHandler{
 	"client":    setClientOptionHandler,
 	// $document.
 	"document": setDocumentOptionHandler,
+	// $respgeo
+	"respgeo": setRespGeoOptionHandler,
 }
 
 // newSetRequestTypeHandler returns new [optionHandler] that permits or forbids
@@ -898,6 +973,7 @@ func setDNSTypeOptionHandler(r *NetworkRule, value string) (err error) {
 	r.permittedDNSTypes = permitted
 	r.restrictedDNSTypes = restricted
 
+	// Don't wrap the error, because it's informative enough as is.
 	return err
 }
 
@@ -908,6 +984,7 @@ func setDNSRewriteOptionHandler(r *NetworkRule, value string) (err error) {
 	rewrite, err := parseDNSRewrite(value)
 	r.DNSRewrite = rewrite
 
+	// Don't wrap the error, because it's informative enough as is.
 	return err
 }
 
@@ -918,6 +995,7 @@ func setDomainOptionHandler(r *NetworkRule, value string) (err error) {
 	r.permittedDomains = permitted
 	r.restrictedDomains = restricted
 
+	// Don't wrap the error, because it's informative enough as is.
 	return err
 }
 
@@ -926,6 +1004,7 @@ func setDomainOptionHandler(r *NetworkRule, value string) (err error) {
 func setDenyAllowOptionHandler(r *NetworkRule, value string) (err error) {
 	permitted, restricted, err := parseDomains(value, "|")
 	if err != nil {
+		// Don't wrap the error, because it's informative enough as is.
 		return err
 	}
 
@@ -947,6 +1026,7 @@ func setCTagOptionHandler(r *NetworkRule, value string) (err error) {
 		r.restrictedClientTags = restricted
 	}
 
+	// Don't wrap the error, because it's informative enough as is.
 	return err
 }
 
@@ -959,6 +1039,7 @@ func setClientOptionHandler(r *NetworkRule, value string) (err error) {
 		r.restrictedClients = restricted
 	}
 
+	// Don't wrap the error, because it's informative enough as is.
 	return err
 }
 
@@ -972,6 +1053,16 @@ func setDocumentOptionHandler(r *NetworkRule, _ string) (err error) {
 	_ = r.setOptionEnabled(OptionContent, true)
 	_ = r.setOptionEnabled(OptionExtension, true)
 
+	// Don't wrap the error, because it's informative enough as is.
+	return err
+}
+
+// setRespGeoOptionHandler is an [optionHandler] that parses respgeo option
+// value and sets allowed ASNs and countries.
+func setRespGeoOptionHandler(r *NetworkRule, value string) (err error) {
+	err = parseGeoIP(r, value, "|")
+
+	// Don't wrap the error, because it's informative enough as is.
 	return err
 }
 

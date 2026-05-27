@@ -10,6 +10,7 @@ import (
 	"github.com/AdguardTeam/golibs/netutil"
 	"github.com/AdguardTeam/golibs/netutil/urlutil"
 	"github.com/AdguardTeam/golibs/testutil"
+	"github.com/AdguardTeam/urlfilter/internal/geoip"
 	"github.com/AdguardTeam/urlfilter/internal/uftest"
 	"github.com/AdguardTeam/urlfilter/rules"
 	"github.com/miekg/dns"
@@ -352,6 +353,186 @@ func TestNetworkRule_Match_domainRestrictions(t *testing.T) {
 	r = uftest.NewNetworkRule(t, "$domain="+uftest.Host)
 	req = rules.NewRequest(uftest.URLStrHostOther, uftest.URLStrHost, rules.TypeScript)
 	assert.True(t, r.Match(req))
+}
+
+func TestNetworkRule_Match_geoIP(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		wantMatch  assert.BoolAssertionFunc
+		name       string
+		rule       string
+		reqCountry geoip.Country
+		reqASN     geoip.ASN
+	}{{
+		name:       "permit_country",
+		rule:       "$respgeo=" + uftest.CountryFR,
+		reqCountry: uftest.CountryFR,
+		reqASN:     geoip.ASNUnrecognized,
+		wantMatch:  assert.True,
+	}, {
+		name:       "permit_country_case_insensitive",
+		rule:       "$respgeo=" + uftest.CountryFR,
+		reqCountry: "fr",
+		reqASN:     geoip.ASNUnrecognized,
+		wantMatch:  assert.True,
+	}, {
+		name:       "permit_country_mismatch",
+		rule:       "$respgeo=" + uftest.CountryFR,
+		reqCountry: uftest.CountryRU,
+		reqASN:     geoip.ASNUnrecognized,
+		wantMatch:  assert.False,
+	}, {
+		name:       "restrict_country",
+		rule:       "$respgeo=~" + uftest.CountryFR,
+		reqCountry: uftest.CountryFR,
+		reqASN:     geoip.ASNUnrecognized,
+		wantMatch:  assert.False,
+	}, {
+		name:       "restrict_country_mismatch",
+		rule:       "$respgeo=~" + uftest.CountryFR,
+		reqCountry: uftest.CountryRU,
+		reqASN:     geoip.ASNUnrecognized,
+		wantMatch:  assert.True,
+	}, {
+		name:       "restrict_multiple_countries",
+		rule:       "$respgeo=~" + uftest.CountryFR + "|~" + uftest.CountryRU,
+		reqCountry: uftest.CountryRU,
+		reqASN:     geoip.ASNUnrecognized,
+		wantMatch:  assert.False,
+	}, {
+		name:       "restrict_multiple_countries_mismatch",
+		rule:       "$respgeo=~" + uftest.CountryFR + "|~" + uftest.CountryRU,
+		reqCountry: uftest.CountryDE,
+		reqASN:     geoip.ASNUnrecognized,
+		wantMatch:  assert.True,
+	}, {
+		name:       "permit_multiple_countries",
+		rule:       "$respgeo=" + uftest.CountryFR + "|" + uftest.CountryRU,
+		reqCountry: uftest.CountryRU,
+		reqASN:     geoip.ASNUnrecognized,
+		wantMatch:  assert.True,
+	}, {
+		name:       "permit_multiple_countries_mismatch",
+		rule:       "$respgeo=" + uftest.CountryFR + "|" + uftest.CountryRU,
+		reqCountry: uftest.CountryDE,
+		reqASN:     geoip.ASNUnrecognized,
+		wantMatch:  assert.False,
+	}, {
+		name:       "permit_asn",
+		rule:       "$respgeo=" + uftest.ASN1Str,
+		reqCountry: geoip.CountryUnrecognized,
+		reqASN:     uftest.ASN1,
+		wantMatch:  assert.True,
+	}, {
+		name:       "permit_asn_mismatch",
+		rule:       "$respgeo=" + uftest.ASN1Str,
+		reqCountry: geoip.CountryUnrecognized,
+		reqASN:     uftest.ASN2,
+		wantMatch:  assert.False,
+	}, {
+		name:       "restrict_asn",
+		rule:       "$respgeo=~" + uftest.ASN1Str,
+		reqCountry: geoip.CountryUnrecognized,
+		reqASN:     uftest.ASN1,
+		wantMatch:  assert.False,
+	}, {
+		name:       "restrict_asn_mismatch",
+		rule:       "$respgeo=~" + uftest.ASN1Str,
+		reqCountry: geoip.CountryUnrecognized,
+		reqASN:     uftest.ASN2,
+		wantMatch:  assert.True,
+	}, {
+		name:       "restrict_multiple_asns",
+		rule:       "$respgeo=~" + uftest.ASN1Str + "|~" + uftest.ASN2Str,
+		reqCountry: geoip.CountryUnrecognized,
+		reqASN:     uftest.ASN1,
+		wantMatch:  assert.False,
+	}, {
+		name:       "restrict_multiple_asns_mismatch",
+		rule:       "$respgeo=~" + uftest.ASN1Str + "|~" + uftest.ASN2Str,
+		reqCountry: geoip.CountryUnrecognized,
+		reqASN:     uftest.ASN2,
+		wantMatch:  assert.False,
+	}, {
+		name:       "permit_multiple_asns",
+		rule:       "$respgeo=" + uftest.ASN1Str + "|" + uftest.ASN2Str,
+		reqCountry: geoip.CountryUnrecognized,
+		reqASN:     uftest.ASN1,
+		wantMatch:  assert.True,
+	}, {
+		name:       "permit_multiple_asns_mismatch",
+		rule:       "$respgeo=" + uftest.ASN1Str + "|" + uftest.ASN2Str,
+		reqCountry: geoip.CountryUnrecognized,
+		reqASN:     123,
+		wantMatch:  assert.False,
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			r := uftest.NewNetworkRule(t, uftest.RuleHost+tc.rule)
+			req := rules.NewRequest(uftest.URLStrHost, "", rules.TypeScript)
+			req.ClientCountry = tc.reqCountry
+			req.ClientASN = tc.reqASN
+			tc.wantMatch(t, r.Match(req))
+		})
+	}
+}
+
+func TestNetworkRule_Match_geoIPUnknownLocation(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		wantMatch  assert.BoolAssertionFunc
+		name       string
+		rule       string
+		reqCountry geoip.Country
+		reqASN     geoip.ASN
+	}{{
+		name:       "permit_unknown",
+		rule:       "$respgeo=",
+		reqCountry: geoip.CountryUnrecognized,
+		reqASN:     geoip.ASNUnrecognized,
+		wantMatch:  assert.True,
+	}, {
+		name:       "permit_unknown_mismatch",
+		rule:       "$respgeo=",
+		reqCountry: uftest.CountryDE,
+		reqASN:     geoip.ASNUnrecognized,
+		wantMatch:  assert.False,
+	}, {
+		name:       "restrict_unknown",
+		rule:       "$respgeo=~",
+		reqCountry: geoip.CountryUnrecognized,
+		reqASN:     geoip.ASNUnrecognized,
+		wantMatch:  assert.False,
+	}, {
+		name:       "restrict_unknown_mismatch",
+		rule:       "$respgeo=~",
+		reqCountry: geoip.CountryUnrecognized,
+		reqASN:     uftest.ASN1,
+		wantMatch:  assert.False,
+	}, {
+		name:       "no_restrictions",
+		rule:       "",
+		reqCountry: geoip.CountryUnrecognized,
+		reqASN:     geoip.ASNUnrecognized,
+		wantMatch:  assert.True,
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			r := uftest.NewNetworkRule(t, uftest.RuleHost+tc.rule)
+			req := rules.NewRequest(uftest.URLStrHost, "", rules.TypeScript)
+			req.ClientCountry = tc.reqCountry
+			req.ClientASN = tc.reqASN
+			tc.wantMatch(t, r.Match(req))
+		})
+	}
 }
 
 func TestNetworkRule_Match_denyallow(t *testing.T) {

@@ -6,7 +6,9 @@ package uftest
 import (
 	"testing"
 
+	"github.com/AdguardTeam/golibs/errors"
 	"github.com/AdguardTeam/golibs/netutil/urlutil"
+	"github.com/AdguardTeam/urlfilter/internal/geoip"
 	"github.com/AdguardTeam/urlfilter/rules"
 	"github.com/stretchr/testify/require"
 )
@@ -35,6 +37,22 @@ const (
 const (
 	ListID1 rules.ListID = 1
 	ListID2 rules.ListID = 2
+)
+
+// Common GeoIP data for tests.
+const (
+	ASN1Str = geoip.ASNPrefix + "12345"
+	ASN2Str = geoip.ASNPrefix + "54321"
+
+	CountryRU geoip.Country = "RU"
+	CountryFR geoip.Country = "FR"
+	CountryDE geoip.Country = "DE"
+)
+
+// Common ASN values for tests.
+var (
+	ASN1 = errors.Must(geoip.NewASN(ASN1Str))
+	ASN2 = errors.Must(geoip.NewASN(ASN2Str))
 )
 
 // NewNetworkRule is a helper that wraps [rules.NewNetworkRule].  It uses
