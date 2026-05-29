@@ -15,16 +15,15 @@ const ASNPrefix = "AS"
 // ASN is a convenient alias for ASN values.
 type ASN = uint32
 
-// ASNUnrecognized is a common ASN value for requests that do not have GeoIP
-// data.
-const ASNUnrecognized ASN = 0
+// ASNUnknown is a common ASN value for requests that do not have GeoIP data.
+const ASNUnknown ASN = 0
 
 // Country is a convenient alias for country alpha-2 ISO codes.
 type Country = string
 
-// CountryUnrecognized is a common Country value for requests that do not have
-// GeoIP data.
-const CountryUnrecognized Country = ""
+// CountryUnknown is a common Country value for requests that do not have GeoIP
+// data.
+const CountryUnknown Country = ""
 
 // NewASN converts uint32 into an ASN and makes sure that it is valid.  This
 // should be preferred to a simple parsing.

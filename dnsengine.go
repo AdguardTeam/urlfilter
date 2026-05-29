@@ -6,6 +6,7 @@ import (
 	"github.com/AdguardTeam/golibs/container"
 	"github.com/AdguardTeam/golibs/syncutil"
 	"github.com/AdguardTeam/urlfilter/filterlist"
+	"github.com/AdguardTeam/urlfilter/internal/geoip"
 	"github.com/AdguardTeam/urlfilter/rules"
 )
 
@@ -71,6 +72,9 @@ func (r *DNSRequest) Reset() {
 
 	r.ClientIdentifiers.Clear()
 	r.Hostname = ""
+
+	r.ClientCountry = geoip.CountryUnknown
+	r.ClientASN = geoip.ASNUnknown
 
 	r.ClientTags.Clear()
 

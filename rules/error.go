@@ -10,7 +10,7 @@ const (
 	// ErrTooWideRule is returned if the rule matches all URLs but has no
 	// domain, denyallow, client, or ctag restrictions.
 	ErrTooWideRule errors.Error = "the rule is too wide, add domain, denyallow, client, " +
-		"or ctag restrictions or make it more specific"
+		"respgeo or ctag restrictions or make it more specific"
 
 	// ErrUnsupportedRule signals that this might be a valid rule type, but it
 	// is not yet supported by this module.

@@ -175,19 +175,21 @@ type NetworkRule struct {
 	// text is the original rule text.
 	text string
 
-	// permittedASNs is a list of permitted ASNs from the $respgeo modifier.
-	permittedASNs []geoip.ASN
-
-	// restrictedASNs is a list of restricted ASNs from the $respgeo modifier.
-	restrictedASNs []geoip.ASN
-
-	// permittedCountries is a list of permitted countries from the $respgeo
+	// permittedASNs is a sorted list of permitted ASNs from the $respgeo
 	// modifier.
-	permittedCountries []geoip.Country
+	permittedASNs *container.SortedSliceSet[geoip.ASN]
 
-	// restrictedCountries is a list of restricted countries from the $respgeo
+	// restrictedASNs is a sorted list of restricted ASNs from the $respgeo
 	// modifier.
-	restrictedCountries []geoip.Country
+	restrictedASNs *container.SortedSliceSet[geoip.ASN]
+
+	// permittedCountries is a sorted list of permitted countries from the
+	// $respgeo modifier.
+	permittedCountries *container.SortedSliceSet[geoip.Country]
+
+	// restrictedCountries is a sorted list of restricted countries from the
+	// $respgeo modifier.
+	restrictedCountries *container.SortedSliceSet[geoip.Country]
 
 	// Shortcut is the longest substring of the rule pattern with no special
 	// characters.
@@ -250,6 +252,14 @@ type NetworkRule struct {
 
 	// matchesNothing shows if the rule matches nothing.
 	matchesNothing bool
+
+	// allowUnknownLocation determines whether requests with unknown location
+	// must be allowed.
+	allowUnknownLocation bool
+
+	// hasUnknownLocationRestriction determines whether the rule has any
+	// restrictions for requests with an unknown location.
+	hasUnknownLocationRestriction bool
 }
 
 // NewNetworkRule parses the rule text and returns a filter rule.
@@ -322,10 +332,11 @@ func (r *NetworkRule) hasNoRestrictions() (ok bool) {
 // hasNoGeoIPRestrictions returns true if the rule has no ASN or Country
 // restriction.
 func (r *NetworkRule) hasNoGeoIPRestrictions() (ok bool) {
-	return len(r.restrictedASNs) == 0 &&
-		len(r.permittedASNs) == 0 &&
-		len(r.restrictedCountries) == 0 &&
-		len(r.permittedCountries) == 0
+	return r.restrictedASNs.Len() == 0 &&
+		r.permittedASNs.Len() == 0 &&
+		r.restrictedCountries.Len() == 0 &&
+		r.permittedCountries.Len() == 0 &&
+		!r.hasUnknownLocationRestriction
 }
 
 // type check
@@ -511,7 +522,12 @@ func (r *NetworkRule) calcRuleSpecs() (prio int) {
 		mathutil.BoolToNumber[int](
 			r.permittedClients.len() != 0 || r.restrictedClients.len() != 0,
 		) +
-		mathutil.BoolToNumber[int](len(r.denyAllowDomains) != 0)
+		mathutil.BoolToNumber[int](len(r.denyAllowDomains) != 0) +
+		mathutil.BoolToNumber[int](
+			r.permittedASNs.Len() != 0 || r.restrictedASNs.Len() != 0 ||
+				r.permittedCountries.Len() != 0 || r.restrictedCountries.Len() != 0 ||
+				r.hasUnknownLocationRestriction,
+		)
 }
 
 // negatesBadfilter only makes sense when r has a `badfilter` modifier.  It
@@ -531,7 +547,13 @@ func (r *NetworkRule) negatesBadfilter(other *NetworkRule) (ok bool) {
 		!r.permittedClientTags.Equal(other.permittedClientTags),
 		!r.restrictedClientTags.Equal(other.restrictedClientTags),
 		!r.permittedClients.equal(other.permittedClients),
-		!r.restrictedClients.equal(other.restrictedClients):
+		!r.restrictedClients.equal(other.restrictedClients),
+		!r.permittedASNs.Equal(other.permittedASNs),
+		!r.restrictedASNs.Equal(other.restrictedASNs),
+		!r.permittedCountries.Equal(other.permittedCountries),
+		!r.restrictedCountries.Equal(other.restrictedCountries),
+		r.hasUnknownLocationRestriction != other.hasUnknownLocationRestriction,
+		r.allowUnknownLocation != other.allowUnknownLocation:
 		return false
 	}
 
@@ -750,47 +772,41 @@ func (r *NetworkRule) matchClient(ids *container.SortedSliceSet[string], ip neti
 
 // matchGeoIP returns true if r matches geoip data.
 func (r *NetworkRule) matchGeoIP(asn geoip.ASN, country geoip.Country) (ok bool) {
-	return r.matchASN(asn) && r.matchCountry(country)
-}
+	if r.hasUnknownLocationRestriction {
+		return r.matchUnknownLocationRestriction(asn, country)
+	}
 
-// matchASN returns true if r matches given ASN.
-func (r *NetworkRule) matchASN(asn geoip.ASN) (ok bool) {
-	restLen := len(r.restrictedASNs)
-	permLen := len(r.permittedASNs)
-	if restLen == 0 && permLen == 0 {
+	if r.hasNoGeoIPRestrictions() {
 		return true
 	}
 
-	if slices.Contains(r.restrictedASNs, asn) {
-		return false
-	}
-
-	if permLen != 0 {
-		return slices.Contains(r.permittedASNs, asn)
-	}
-
-	return true
-}
-
-// matchCountry returns true if r matches given country.
-func (r *NetworkRule) matchCountry(country geoip.Country) (ok bool) {
 	country = strings.ToLower(country)
-
-	restLen := len(r.restrictedCountries)
-	permLen := len(r.permittedCountries)
-	if restLen == 0 && permLen == 0 {
-		return true
-	}
-
-	if slices.Contains(r.restrictedCountries, country) {
+	if r.restrictedASNs.Has(asn) || r.restrictedCountries.Has(country) {
 		return false
 	}
 
-	if permLen != 0 {
-		return slices.Contains(r.permittedCountries, country)
+	asnPermLen := r.permittedASNs.Len()
+	countryPermLen := r.permittedCountries.Len()
+	if asnPermLen == 0 && countryPermLen == 0 {
+		return true
+	} else if asnPermLen == 0 {
+		return r.permittedCountries.Has(country)
+	} else if countryPermLen == 0 {
+		return r.permittedASNs.Has(asn)
 	}
 
-	return true
+	return r.permittedCountries.Has(country) || r.permittedASNs.Has(asn)
+}
+
+// matchUnknownLocationRestriction returns true if given asn and country match
+// r's unknown location restriction.
+func (r *NetworkRule) matchUnknownLocationRestriction(
+	asn geoip.ASN,
+	country geoip.Country,
+) (ok bool) {
+	hasLocation := asn != geoip.ASNUnknown || country != geoip.CountryUnknown
+
+	return r.allowUnknownLocation == !hasLocation
 }
 
 // matchRequestType returns true if rt matches the rule properties.
