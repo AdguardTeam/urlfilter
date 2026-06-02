@@ -140,6 +140,24 @@ func (o NetworkRuleOption) Count() (n int) {
 	return bits.OnesCount64(uint64(o))
 }
 
+// unknownLocationPolicy determines the match behavior for requests with unknown
+// location.
+type unknownLocationPolicy = uint8
+
+const (
+	// unknownLocationPolicyNone means that there is no special behavior for
+	// matching requests with unknown location.
+	unknownLocationPolicyNone = iota
+
+	// unknownLocationPolicyPermit means that only requests with unknown
+	// location must be permitted.
+	unknownLocationPolicyPermit
+
+	// unknownLocationPolicyRestrict means that requests with unknown location
+	// must be restricted.
+	unknownLocationPolicyRestrict
+)
+
 // NetworkRule is a basic filtering rule.
 //
 // See https://adguard.com/kb/general/ad-filtering/create-own-filters/#basic-rules.
@@ -242,6 +260,10 @@ type NetworkRule struct {
 	// means NONE.
 	restrictedRequestTypes RequestType
 
+	// unknownLocationPolicy determines the strategy for matching requests with
+	// unknown location.
+	unknownLocationPolicy unknownLocationPolicy
+
 	// Whitelist is true if this is an exception rule.
 	//
 	// TODO(a.garipov):  Consider unexporting.
@@ -252,14 +274,6 @@ type NetworkRule struct {
 
 	// matchesNothing shows if the rule matches nothing.
 	matchesNothing bool
-
-	// allowUnknownLocation determines whether requests with unknown location
-	// must be allowed.
-	allowUnknownLocation bool
-
-	// hasUnknownLocationRestriction determines whether the rule has any
-	// restrictions for requests with an unknown location.
-	hasUnknownLocationRestriction bool
 }
 
 // NewNetworkRule parses the rule text and returns a filter rule.
@@ -316,6 +330,8 @@ func isPatternTooWide(pattern string) (ok bool) {
 
 // hasNoRestrictions returns true if the rule has no domain, GeoIP, client, or
 // DNS restrictions.
+//
+// TODO(f.setrakov): Invert the condition.
 func (r *NetworkRule) hasNoRestrictions() (ok bool) {
 	return len(r.permittedDomains) == 0 &&
 		len(r.restrictedDomains) == 0 &&
@@ -326,17 +342,17 @@ func (r *NetworkRule) hasNoRestrictions() (ok bool) {
 		len(r.permittedDNSTypes) == 0 &&
 		len(r.restrictedDNSTypes) == 0 &&
 		len(r.denyAllowDomains) == 0 &&
-		r.hasNoGeoIPRestrictions()
+		!r.hasGeoIPRestrictions()
 }
 
-// hasNoGeoIPRestrictions returns true if the rule has no ASN or Country
-// restriction.
-func (r *NetworkRule) hasNoGeoIPRestrictions() (ok bool) {
-	return r.restrictedASNs.Len() == 0 &&
-		r.permittedASNs.Len() == 0 &&
-		r.restrictedCountries.Len() == 0 &&
-		r.permittedCountries.Len() == 0 &&
-		!r.hasUnknownLocationRestriction
+// hasGeoIPRestrictions returns true if the rule has ASN or Country
+// restrictions.
+func (r *NetworkRule) hasGeoIPRestrictions() (ok bool) {
+	return r.restrictedASNs.Len() > 0 ||
+		r.permittedASNs.Len() > 0 ||
+		r.restrictedCountries.Len() > 0 ||
+		r.permittedCountries.Len() > 0 ||
+		r.unknownLocationPolicy != unknownLocationPolicyNone
 }
 
 // type check
@@ -526,7 +542,7 @@ func (r *NetworkRule) calcRuleSpecs() (prio int) {
 		mathutil.BoolToNumber[int](
 			r.permittedASNs.Len() != 0 || r.restrictedASNs.Len() != 0 ||
 				r.permittedCountries.Len() != 0 || r.restrictedCountries.Len() != 0 ||
-				r.hasUnknownLocationRestriction,
+				r.unknownLocationPolicy != unknownLocationPolicyNone,
 		)
 }
 
@@ -552,8 +568,7 @@ func (r *NetworkRule) negatesBadfilter(other *NetworkRule) (ok bool) {
 		!r.restrictedASNs.Equal(other.restrictedASNs),
 		!r.permittedCountries.Equal(other.permittedCountries),
 		!r.restrictedCountries.Equal(other.restrictedCountries),
-		r.hasUnknownLocationRestriction != other.hasUnknownLocationRestriction,
-		r.allowUnknownLocation != other.allowUnknownLocation:
+		r.unknownLocationPolicy != other.unknownLocationPolicy:
 		return false
 	}
 
@@ -772,11 +787,11 @@ func (r *NetworkRule) matchClient(ids *container.SortedSliceSet[string], ip neti
 
 // matchGeoIP returns true if r matches geoip data.
 func (r *NetworkRule) matchGeoIP(asn geoip.ASN, country geoip.Country) (ok bool) {
-	if r.hasUnknownLocationRestriction {
+	if r.unknownLocationPolicy != unknownLocationPolicyNone {
 		return r.matchUnknownLocationRestriction(asn, country)
 	}
 
-	if r.hasNoGeoIPRestrictions() {
+	if !r.hasGeoIPRestrictions() {
 		return true
 	}
 
@@ -805,8 +820,11 @@ func (r *NetworkRule) matchUnknownLocationRestriction(
 	country geoip.Country,
 ) (ok bool) {
 	hasLocation := asn != geoip.ASNUnknown || country != geoip.CountryUnknown
+	if hasLocation {
+		return r.unknownLocationPolicy == unknownLocationPolicyRestrict
+	}
 
-	return r.allowUnknownLocation == !hasLocation
+	return r.unknownLocationPolicy == unknownLocationPolicyPermit
 }
 
 // matchRequestType returns true if rt matches the rule properties.

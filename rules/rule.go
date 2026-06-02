@@ -199,12 +199,14 @@ type geoIPData struct {
 func parseGeoIP(rule *NetworkRule, value, sep string) (err error) {
 	data := geoIPData{}
 
-	list := strings.Split(value, sep)
-	for i, value := range list {
+	idx := 0
+	for value := range strings.SplitSeq(value, sep) {
 		err = parseGeoIPValue(rule, &data, value)
 		if err != nil {
-			return fmt.Errorf("parsing geoip value at index %d: %w", i, err)
+			return fmt.Errorf("parsing geoip value at index %d: %w", idx, err)
 		}
+
+		idx++
 	}
 
 	rule.permittedASNs = container.NewSortedSliceSet(data.permittedASNs...)
@@ -225,8 +227,13 @@ func parseGeoIPValue(rule *NetworkRule, data *geoIPData, value string) (err erro
 	}
 
 	if value == "" {
-		rule.hasUnknownLocationRestriction = true
-		rule.allowUnknownLocation = !isRestricted
+		if isRestricted {
+			rule.unknownLocationPolicy = unknownLocationPolicyRestrict
+
+			return nil
+		}
+
+		rule.unknownLocationPolicy = unknownLocationPolicyPermit
 
 		return nil
 	}
@@ -256,14 +263,18 @@ func appendGeoIPValue(
 	country geoip.Country,
 	asn geoip.ASN,
 ) {
-	if !isASN && isRestricted {
-		data.restrictedCountries = append(data.restrictedCountries, country)
-	} else if !isASN && !isRestricted {
-		data.permittedCountries = append(data.permittedCountries, country)
-	} else if isASN && isRestricted {
-		data.restrictedASNs = append(data.restrictedASNs, asn)
-	} else if isASN && !isRestricted {
-		data.permittedASNs = append(data.permittedASNs, asn)
+	if isASN {
+		if isRestricted {
+			data.restrictedASNs = append(data.restrictedASNs, asn)
+		} else {
+			data.permittedASNs = append(data.permittedASNs, asn)
+		}
+	} else {
+		if isRestricted {
+			data.restrictedCountries = append(data.restrictedCountries, country)
+		} else {
+			data.permittedCountries = append(data.permittedCountries, country)
+		}
 	}
 }
 
