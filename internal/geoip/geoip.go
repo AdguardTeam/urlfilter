@@ -25,7 +25,7 @@ type Country = string
 // data.
 const CountryUnknown Country = ""
 
-// NewASN converts uint32 into an ASN and makes sure that it is valid.  This
+// NewASN converts string into an ASN and makes sure that it is valid.  This
 // should be preferred to a simple parsing.
 func NewASN(s string) (asn ASN, err error) {
 	v, ok := strings.CutPrefix(s, ASNPrefix)

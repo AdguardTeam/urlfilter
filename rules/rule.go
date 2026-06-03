@@ -161,7 +161,7 @@ func parseDNSType(rrStr string) (rrType RRType, isRestricted bool, err error) {
 		return 0, false, errors.ErrEmptyValue
 	}
 
-	isRestricted = rrStr[0] == '~'
+	isRestricted = rrStr[0:1] == restrictionMarker
 	if isRestricted {
 		rrStr = rrStr[1:]
 	}
@@ -249,7 +249,7 @@ func parseGeoIPValue(rule *NetworkRule, data *geoIPData, value string) (err erro
 		isASN = true
 	}
 
-	appendGeoIPValue(data, isASN, isRestricted, strings.ToLower(value), asnVal)
+	appendGeoIPValue(data, isASN, isRestricted, value, asnVal)
 
 	return nil
 }

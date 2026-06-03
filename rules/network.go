@@ -795,8 +795,7 @@ func (r *NetworkRule) matchGeoIP(asn geoip.ASN, country geoip.Country) (ok bool)
 		return true
 	}
 
-	country = strings.ToLower(country)
-	if r.restrictedASNs.Has(asn) || r.restrictedCountries.Has(country) {
+	if r.restrictedASNs.Has(asn) || countriesHasFold(r.restrictedCountries, country) {
 		return false
 	}
 
@@ -805,12 +804,31 @@ func (r *NetworkRule) matchGeoIP(asn geoip.ASN, country geoip.Country) (ok bool)
 	if asnPermLen == 0 && countryPermLen == 0 {
 		return true
 	} else if asnPermLen == 0 {
-		return r.permittedCountries.Has(country)
+		return countriesHasFold(r.permittedCountries, country)
 	} else if countryPermLen == 0 {
 		return r.permittedASNs.Has(asn)
 	}
 
 	return r.permittedCountries.Has(country) || r.permittedASNs.Has(asn)
+}
+
+// countriesHasFold returns true if the set contains the country, using
+// case-insensitive comparison.
+func countriesHasFold(
+	set *container.SortedSliceSet[geoip.Country],
+	country geoip.Country,
+) (ok bool) {
+	values := set.Values()
+
+	_, ok = slices.BinarySearchFunc(values, country, func(a, b string) (res int) {
+		if strings.EqualFold(a, b) {
+			return 0
+		}
+
+		return strings.Compare(a, b)
+	})
+
+	return ok
 }
 
 // matchUnknownLocationRestriction returns true if given asn and country match
@@ -1001,7 +1019,7 @@ func newSetOptionEnabledHandler(option NetworkRuleOption, enabled bool) (handler
 }
 
 // setDNSTypeOptionHandler is an [optionHandler] that parses dnstype option
-// value and sets permitted and restricted dns types.
+// value and sets permitted and restricted dns types.  r must not be nil.
 func setDNSTypeOptionHandler(r *NetworkRule, value string) (err error) {
 	permitted, restricted, err := parseDNSTypes(value)
 	r.permittedDNSTypes = permitted
@@ -1012,7 +1030,7 @@ func setDNSTypeOptionHandler(r *NetworkRule, value string) (err error) {
 }
 
 // setDNSRewriteOptionHandler is an [optionHandler] that parses dnsrewrite value
-// and fills [NetworkRule.DNSRewrite].
+// and fills [NetworkRule.DNSRewrite].  r must not be nil.
 func setDNSRewriteOptionHandler(r *NetworkRule, value string) (err error) {
 	// $dnsrewrite, the DNS request rewrite filter.
 	rewrite, err := parseDNSRewrite(value)
@@ -1023,7 +1041,7 @@ func setDNSRewriteOptionHandler(r *NetworkRule, value string) (err error) {
 }
 
 // setDomainOptionHandler is an [optionHandler] that parses domains and sets
-// permitted and restricted domains.
+// permitted and restricted domains.  r must not be nil.
 func setDomainOptionHandler(r *NetworkRule, value string) (err error) {
 	permitted, restricted, err := parseDomains(value, "|")
 	r.permittedDomains = permitted
@@ -1034,7 +1052,7 @@ func setDomainOptionHandler(r *NetworkRule, value string) (err error) {
 }
 
 // setDenyallowOptionHandler is an [optionHandler] that parses domains and sets
-// [NetworkRule.denyAllowDomains].
+// [NetworkRule.denyAllowDomains].  r must not be nil.
 func setDenyAllowOptionHandler(r *NetworkRule, value string) (err error) {
 	permitted, restricted, err := parseDomains(value, "|")
 	if err != nil {
@@ -1052,7 +1070,7 @@ func setDenyAllowOptionHandler(r *NetworkRule, value string) (err error) {
 }
 
 // setCtagOptionHandler is an [optionHandler] that parses CTags from value and
-// sets permitted and restricted client tags.
+// sets permitted and restricted client tags.  r must not be nil.
 func setCTagOptionHandler(r *NetworkRule, value string) (err error) {
 	permitted, restricted, err := parseCTags(value, "|")
 	if err == nil {
@@ -1065,7 +1083,7 @@ func setCTagOptionHandler(r *NetworkRule, value string) (err error) {
 }
 
 // setClientOptionHandler is an [optionHandler] that parses clients from value
-// and sets permitted and restricted clients.
+// and sets permitted and restricted clients.  r must not be nil.
 func setClientOptionHandler(r *NetworkRule, value string) (err error) {
 	permitted, restricted, err := parseClients(value, '|')
 	if err == nil {
@@ -1078,7 +1096,7 @@ func setClientOptionHandler(r *NetworkRule, value string) (err error) {
 }
 
 // setDocumentOptionHandler is an [optionHandler] that enables such options as
-// jsinject, urlblock, content and extension.
+// jsinject, urlblock, content and extension.  r must not be nil.
 func setDocumentOptionHandler(r *NetworkRule, _ string) (err error) {
 	err = r.setOptionEnabled(OptionElemhide, true)
 	// Ignore others.
@@ -1092,7 +1110,7 @@ func setDocumentOptionHandler(r *NetworkRule, _ string) (err error) {
 }
 
 // setRespGeoOptionHandler is an [optionHandler] that parses respgeo option
-// value and sets allowed ASNs and countries.
+// value and sets allowed ASNs and countries.  r must not be nil.
 func setRespGeoOptionHandler(r *NetworkRule, value string) (err error) {
 	err = parseGeoIP(r, value, "|")
 
