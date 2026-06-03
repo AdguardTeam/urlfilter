@@ -414,7 +414,7 @@ func TestNetworkRule_Match_respgeoCountry(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			assertGeoIPMatch(t, tc.ruleSuffix, tc.reqCountry, geoip.ASNUnknown, tc.wantMatch)
+			assertGeoIPMatch(t, tc.ruleSuffix, tc.reqCountry, geoip.ASNNone, tc.wantMatch)
 		})
 	}
 }
@@ -492,7 +492,7 @@ func TestNetworkRule_Match_respgeoASN(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			assertGeoIPMatch(t, tc.ruleSuffix, geoip.CountryUnknown, tc.reqASN, tc.wantMatch)
+			assertGeoIPMatch(t, tc.ruleSuffix, geoip.CountryNone, tc.reqASN, tc.wantMatch)
 		})
 	}
 }
@@ -509,25 +509,25 @@ func TestNetworkRule_Match_respgeoOther(t *testing.T) {
 	}{{
 		name:       "permit_unknown",
 		ruleSuffix: "",
-		reqCountry: geoip.CountryUnknown,
-		reqASN:     geoip.ASNUnknown,
+		reqCountry: geoip.CountryNone,
+		reqASN:     geoip.ASNNone,
 		wantMatch:  assert.True,
 	}, {
 		name:       "permit_unknown_mismatch",
 		ruleSuffix: "",
 		reqCountry: uftest.CountryDE,
-		reqASN:     geoip.ASNUnknown,
+		reqASN:     geoip.ASNNone,
 		wantMatch:  assert.False,
 	}, {
 		name:       "restrict_unknown",
 		ruleSuffix: "~",
-		reqCountry: geoip.CountryUnknown,
-		reqASN:     geoip.ASNUnknown,
+		reqCountry: geoip.CountryNone,
+		reqASN:     geoip.ASNNone,
 		wantMatch:  assert.False,
 	}, {
 		name:       "restrict_country_unknown_mismatch",
 		ruleSuffix: "~",
-		reqCountry: geoip.CountryUnknown,
+		reqCountry: geoip.CountryNone,
 		reqASN:     uftest.ASN1,
 		wantMatch:  assert.True,
 	}, {
@@ -539,8 +539,8 @@ func TestNetworkRule_Match_respgeoOther(t *testing.T) {
 	}, {
 		name:       "restrict_and_permit_unknown",
 		ruleSuffix: "~|",
-		reqCountry: geoip.CountryUnknown,
-		reqASN:     geoip.ASNUnknown,
+		reqCountry: geoip.CountryNone,
+		reqASN:     geoip.ASNNone,
 		wantMatch:  assert.True,
 	}, {
 		name:       "partial_asn_match",

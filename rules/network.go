@@ -539,11 +539,7 @@ func (r *NetworkRule) calcRuleSpecs() (prio int) {
 			r.permittedClients.len() != 0 || r.restrictedClients.len() != 0,
 		) +
 		mathutil.BoolToNumber[int](len(r.denyAllowDomains) != 0) +
-		mathutil.BoolToNumber[int](
-			r.permittedASNs.Len() != 0 || r.restrictedASNs.Len() != 0 ||
-				r.permittedCountries.Len() != 0 || r.restrictedCountries.Len() != 0 ||
-				r.unknownLocationPolicy != unknownLocationPolicyNone,
-		)
+		mathutil.BoolToNumber[int](r.hasGeoIPRestrictions())
 }
 
 // negatesBadfilter only makes sense when r has a `badfilter` modifier.  It
@@ -729,6 +725,7 @@ func (r *NetworkRule) matchDNSType(rtype uint16) (allowed bool) {
 		return false
 	}
 
+	// TODO(f.setrakov): Add a helper to perform such checks.
 	if len(r.permittedDNSTypes) > 0 {
 		return slices.Contains(r.permittedDNSTypes, rtype)
 	}
@@ -837,7 +834,7 @@ func (r *NetworkRule) matchUnknownLocationRestriction(
 	asn geoip.ASN,
 	country geoip.Country,
 ) (ok bool) {
-	hasLocation := asn != geoip.ASNUnknown || country != geoip.CountryUnknown
+	hasLocation := asn != geoip.ASNNone || country != geoip.CountryNone
 	if hasLocation {
 		return r.unknownLocationPolicy == unknownLocationPolicyRestrict
 	}

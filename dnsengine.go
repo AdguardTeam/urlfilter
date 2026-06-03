@@ -73,8 +73,8 @@ func (r *DNSRequest) Reset() {
 	r.ClientIdentifiers.Clear()
 	r.Hostname = ""
 
-	r.ClientCountry = geoip.CountryUnknown
-	r.ClientASN = geoip.ASNUnknown
+	r.ClientCountry = geoip.CountryNone
+	r.ClientASN = geoip.ASNNone
 
 	r.ClientTags.Clear()
 
