@@ -17,11 +17,12 @@ import (
 
 // Parts of rules.
 const (
-	maskWhiteList    = "@@"
-	maskRegexRule    = "/"
-	replaceOption    = "replace"
-	optionsDelimiter = '$'
-	escapeCharacter  = '\\'
+	maskWhiteList     = "@@"
+	maskRegexRule     = "/"
+	replaceOption     = "replace"
+	optionsDelimiter  = '$'
+	escapeCharacter   = '\\'
+	restrictionMarker = "~"
 )
 
 // Common regular expressions.
@@ -818,14 +819,42 @@ func countriesHasFold(
 	values := set.Values()
 
 	_, ok = slices.BinarySearchFunc(values, country, func(a, b string) (res int) {
-		if strings.EqualFold(a, b) {
-			return 0
-		}
-
-		return strings.Compare(a, b)
+		return compareFold(a, b)
 	})
 
 	return ok
+}
+
+// compareFold compares a and b case-insensitively.
+func compareFold(a, b string) (res int) {
+	for i := 0; i < len(a) && i < len(b); i++ {
+		aFold := byteToLower(a[i])
+		bFold := byteToLower(b[i])
+
+		if aFold < bFold {
+			return -1
+		} else if bFold < aFold {
+			return 1
+		}
+	}
+
+	if len(a) < len(b) {
+		return -1
+	} else if len(b) < len(a) {
+		return 1
+	}
+
+	return 0
+}
+
+// byteToLower converts an uppercase ASCII byte to lowercase.  Other bytes are
+// not changed.
+func byteToLower(b byte) byte {
+	if b >= 'A' && b <= 'Z' {
+		return b + ('a' - 'A')
+	}
+
+	return b
 }
 
 // matchUnknownLocationRestriction returns true if given asn and country match
@@ -1109,10 +1138,7 @@ func setDocumentOptionHandler(r *NetworkRule, _ string) (err error) {
 // setRespGeoOptionHandler is an [optionHandler] that parses respgeo option
 // value and sets allowed ASNs and countries.  r must not be nil.
 func setRespGeoOptionHandler(r *NetworkRule, value string) (err error) {
-	err = parseGeoIP(r, value, "|")
-
-	// Don't wrap the error, because it's informative enough as is.
-	return err
+	return parseGeoIP(r, value, "|")
 }
 
 // setOption sets the specified option with its optional value.

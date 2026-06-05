@@ -11,9 +11,6 @@ import (
 	"github.com/miekg/dns"
 )
 
-// restrictionMarker is a character that marks a rule or value as a restriction.
-const restrictionMarker = "~"
-
 // Rule is a base interface for all filtering rules.
 //
 // TODO(a.garipov):  Rename to Interface.
