@@ -23,6 +23,8 @@ const (
 	optionsDelimiter  = '$'
 	escapeCharacter   = '\\'
 	restrictionMarker = "~"
+	emptyASN          = "AS" + emptyCountry
+	emptyCountry      = "--"
 )
 
 // Common regular expressions.
@@ -141,24 +143,6 @@ func (o NetworkRuleOption) Count() (n int) {
 	return bits.OnesCount64(uint64(o))
 }
 
-// unknownLocationPolicy determines the match behavior for requests with unknown
-// location.
-type unknownLocationPolicy = uint8
-
-const (
-	// unknownLocationPolicyNone means that there is no special behavior for
-	// matching requests with unknown location.
-	unknownLocationPolicyNone = iota
-
-	// unknownLocationPolicyPermit means that only requests with unknown
-	// location must be permitted.
-	unknownLocationPolicyPermit
-
-	// unknownLocationPolicyRestrict means that requests with unknown location
-	// must be restricted.
-	unknownLocationPolicyRestrict
-)
-
 // NetworkRule is a basic filtering rule.
 //
 // See https://adguard.com/kb/general/ad-filtering/create-own-filters/#basic-rules.
@@ -203,11 +187,11 @@ type NetworkRule struct {
 	restrictedASNs *container.SortedSliceSet[geoip.ASN]
 
 	// permittedCountries is a sorted list of permitted countries from the
-	// $respgeo modifier.
+	// $respgeo modifier.  It must contain only lowercase values.
 	permittedCountries *container.SortedSliceSet[geoip.Country]
 
 	// restrictedCountries is a sorted list of restricted countries from the
-	// $respgeo modifier.
+	// $respgeo modifier.  It must contain only lowercase values.
 	restrictedCountries *container.SortedSliceSet[geoip.Country]
 
 	// Shortcut is the longest substring of the rule pattern with no special
@@ -260,10 +244,6 @@ type NetworkRule struct {
 	// restrictedRequestTypes are the flags with all restricted request types. 0
 	// means NONE.
 	restrictedRequestTypes RequestType
-
-	// unknownLocationPolicy determines the strategy for matching requests with
-	// unknown location.
-	unknownLocationPolicy unknownLocationPolicy
 
 	// Whitelist is true if this is an exception rule.
 	//
@@ -352,8 +332,7 @@ func (r *NetworkRule) hasGeoIPRestrictions() (ok bool) {
 	return r.restrictedASNs.Len() > 0 ||
 		r.permittedASNs.Len() > 0 ||
 		r.restrictedCountries.Len() > 0 ||
-		r.permittedCountries.Len() > 0 ||
-		r.unknownLocationPolicy != unknownLocationPolicyNone
+		r.permittedCountries.Len() > 0
 }
 
 // type check
@@ -564,8 +543,7 @@ func (r *NetworkRule) negatesBadfilter(other *NetworkRule) (ok bool) {
 		!r.permittedASNs.Equal(other.permittedASNs),
 		!r.restrictedASNs.Equal(other.restrictedASNs),
 		!r.permittedCountries.Equal(other.permittedCountries),
-		!r.restrictedCountries.Equal(other.restrictedCountries),
-		r.unknownLocationPolicy != other.unknownLocationPolicy:
+		!r.restrictedCountries.Equal(other.restrictedCountries):
 		return false
 	}
 
@@ -785,14 +763,6 @@ func (r *NetworkRule) matchClient(ids *container.SortedSliceSet[string], ip neti
 
 // matchGeoIP returns true if r matches geoip data.
 func (r *NetworkRule) matchGeoIP(asn geoip.ASN, country geoip.Country) (ok bool) {
-	if r.unknownLocationPolicy != unknownLocationPolicyNone {
-		return r.matchUnknownLocationRestriction(asn, country)
-	}
-
-	if !r.hasGeoIPRestrictions() {
-		return true
-	}
-
 	if r.restrictedASNs.Has(asn) || countriesHasFold(r.restrictedCountries, country) {
 		return false
 	}
@@ -807,7 +777,7 @@ func (r *NetworkRule) matchGeoIP(asn geoip.ASN, country geoip.Country) (ok bool)
 		return r.permittedASNs.Has(asn)
 	}
 
-	return r.permittedCountries.Has(country) || r.permittedASNs.Has(asn)
+	return countriesHasFold(r.permittedCountries, country) || r.permittedASNs.Has(asn)
 }
 
 // countriesHasFold returns true if the set contains the country, using
@@ -855,20 +825,6 @@ func byteToLower(b byte) byte {
 	}
 
 	return b
-}
-
-// matchUnknownLocationRestriction returns true if given asn and country match
-// r's unknown location restriction.
-func (r *NetworkRule) matchUnknownLocationRestriction(
-	asn geoip.ASN,
-	country geoip.Country,
-) (ok bool) {
-	hasLocation := asn != geoip.ASNNone || country != geoip.CountryNone
-	if hasLocation {
-		return r.unknownLocationPolicy == unknownLocationPolicyRestrict
-	}
-
-	return r.unknownLocationPolicy == unknownLocationPolicyPermit
 }
 
 // matchRequestType returns true if rt matches the rule properties.

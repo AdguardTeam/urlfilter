@@ -500,6 +500,11 @@ func TestNetworkRule_Match_respgeoASN(t *testing.T) {
 func TestNetworkRule_Match_respgeoOther(t *testing.T) {
 	t.Parallel()
 
+	const (
+		emptyCountry = "--"
+		emptyASN     = "AS" + emptyCountry
+	)
+
 	testCases := []struct {
 		wantMatch  assert.BoolAssertionFunc
 		name       string
@@ -507,40 +512,52 @@ func TestNetworkRule_Match_respgeoOther(t *testing.T) {
 		reqCountry geoip.Country
 		reqASN     geoip.ASN
 	}{{
-		name:       "permit_unknown",
-		ruleSuffix: "",
+		name:       "permit_empty_country",
+		ruleSuffix: emptyCountry,
 		reqCountry: geoip.CountryNone,
 		reqASN:     geoip.ASNNone,
 		wantMatch:  assert.True,
 	}, {
-		name:       "permit_unknown_mismatch",
-		ruleSuffix: "",
+		name:       "permit_empty_country_mismatch",
+		ruleSuffix: emptyCountry,
 		reqCountry: uftest.CountryDE,
 		reqASN:     geoip.ASNNone,
 		wantMatch:  assert.False,
 	}, {
-		name:       "restrict_unknown",
-		ruleSuffix: "~",
+		name:       "restrict_empty_country",
+		ruleSuffix: "~" + emptyCountry,
 		reqCountry: geoip.CountryNone,
 		reqASN:     geoip.ASNNone,
 		wantMatch:  assert.False,
 	}, {
-		name:       "restrict_country_unknown_mismatch",
-		ruleSuffix: "~",
-		reqCountry: geoip.CountryNone,
-		reqASN:     uftest.ASN1,
+		name:       "restrict_empty_country_mismatch",
+		ruleSuffix: "~" + emptyCountry,
+		reqCountry: uftest.CountryFR,
+		reqASN:     geoip.ASNNone,
 		wantMatch:  assert.True,
 	}, {
-		name:       "restrict_country_and_asn_unknown_mismatch",
-		ruleSuffix: "~",
-		reqCountry: uftest.CountryRU,
-		reqASN:     uftest.ASN1,
-		wantMatch:  assert.True,
-	}, {
-		name:       "restrict_and_permit_unknown",
-		ruleSuffix: "~|",
+		name:       "permit_empty_asn",
+		ruleSuffix: emptyASN,
 		reqCountry: geoip.CountryNone,
 		reqASN:     geoip.ASNNone,
+		wantMatch:  assert.True,
+	}, {
+		name:       "permit_empty_asn_mismatch",
+		ruleSuffix: emptyASN,
+		reqCountry: geoip.CountryNone,
+		reqASN:     uftest.ASN1,
+		wantMatch:  assert.False,
+	}, {
+		name:       "restrict_empty_asn",
+		ruleSuffix: "~" + emptyASN,
+		reqCountry: geoip.CountryNone,
+		reqASN:     geoip.ASNNone,
+		wantMatch:  assert.False,
+	}, {
+		name:       "restrict_empty_asn_mismatch",
+		ruleSuffix: "~" + emptyASN,
+		reqCountry: geoip.CountryNone,
+		reqASN:     uftest.ASN1,
 		wantMatch:  assert.True,
 	}, {
 		name:       "partial_asn_match",
@@ -945,10 +962,6 @@ func TestNetworkRule_IsHigherPriority(t *testing.T) {
 	}, {
 		want:  assert.True,
 		left:  "||example.org$respgeo=FR",
-		right: "||example.org",
-	}, {
-		want:  assert.True,
-		left:  "||example.org$respgeo=~",
 		right: "||example.org",
 	}}
 

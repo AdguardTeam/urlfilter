@@ -198,7 +198,7 @@ func parseGeoIP(rule *NetworkRule, value, sep string) (err error) {
 
 	idx := 0
 	for value := range strings.SplitSeq(value, sep) {
-		err = parseGeoIPValue(rule, &data, value)
+		err = parseGeoIPValue(&data, value)
 		if err != nil {
 			return fmt.Errorf("parsing geoip value at index %d: %w", idx, err)
 		}
@@ -215,22 +215,21 @@ func parseGeoIP(rule *NetworkRule, value, sep string) (err error) {
 }
 
 // parseGeoIPValue parses a single ASN or Country value from $respgeo modifier.
-// rule and data must not be nil.
-func parseGeoIPValue(rule *NetworkRule, data *geoIPData, value string) (err error) {
+// data must not be nil.
+func parseGeoIPValue(data *geoIPData, value string) (err error) {
+	if value == "" {
+		return errors.ErrEmptyValue
+	}
+
 	isRestricted := false
 	if strings.HasPrefix(value, restrictionMarker) {
 		isRestricted = true
 		value = value[1:]
 	}
 
-	if value == "" {
-		if isRestricted {
-			rule.unknownLocationPolicy = unknownLocationPolicyRestrict
-
-			return nil
-		}
-
-		rule.unknownLocationPolicy = unknownLocationPolicyPermit
+	if value == emptyCountry || value == emptyASN {
+		isEmptyASN := value == emptyASN
+		appendGeoIPValue(data, isEmptyASN, isRestricted, geoip.CountryNone, geoip.ASNNone)
 
 		return nil
 	}
@@ -251,8 +250,8 @@ func parseGeoIPValue(rule *NetworkRule, data *geoIPData, value string) (err erro
 	return nil
 }
 
-// appendGeoIPValue appends an ASN or country value to data.  data must not be
-// nil.
+// appendGeoIPValue appends an ASN or country value to data.  The country value
+// will be lowercased first.  data must not be nil.
 func appendGeoIPValue(
 	data *geoIPData,
 	isASN bool,
@@ -267,6 +266,7 @@ func appendGeoIPValue(
 			data.permittedASNs = append(data.permittedASNs, asn)
 		}
 	} else {
+		country = strings.ToLower(country)
 		if isRestricted {
 			data.restrictedCountries = append(data.restrictedCountries, country)
 		} else {
