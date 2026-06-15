@@ -40,15 +40,18 @@ const (
 
 // Common GeoIP data for tests.
 const (
-	ASN1Str = geoip.ASNPrefix + "12345"
-	ASN2Str = geoip.ASNPrefix + "54321"
+	ASN1Str     = geoip.ASNPrefix + "12345"
+	ASN2Str     = geoip.ASNPrefix + "54321"
+	ASNEmptyStr = geoip.ASNPrefix + CountryEmpty
 
 	ASN1 geoip.ASN = 12345
 	ASN2 geoip.ASN = 54321
 
-	CountryRU geoip.Country = "RU"
-	CountryFR geoip.Country = "FR"
-	CountryDE geoip.Country = "DE"
+	CountryRU    geoip.Country = "RU"
+	CountryFR    geoip.Country = "FR"
+	CountryDE    geoip.Country = "DE"
+	CountryAS    geoip.Country = "AS"
+	CountryEmpty geoip.Country = "--"
 )
 
 // NewNetworkRule is a helper that wraps [rules.NewNetworkRule].  It uses

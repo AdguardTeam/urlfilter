@@ -23,7 +23,7 @@ const (
 	optionsDelimiter  = '$'
 	escapeCharacter   = '\\'
 	restrictionMarker = "~"
-	emptyASN          = "AS" + emptyCountry
+	emptyASN          = geoip.ASNPrefix + emptyCountry
 	emptyCountry      = "--"
 )
 
@@ -1094,7 +1094,24 @@ func setDocumentOptionHandler(r *NetworkRule, _ string) (err error) {
 // setRespGeoOptionHandler is an [optionHandler] that parses respgeo option
 // value and sets allowed ASNs and countries.  r must not be nil.
 func setRespGeoOptionHandler(r *NetworkRule, value string) (err error) {
-	return parseGeoIP(r, value, "|")
+	data := geoIPData{}
+
+	idx := 0
+	for value := range strings.SplitSeq(value, "|") {
+		err = parseGeoIPValue(&data, value)
+		if err != nil {
+			return fmt.Errorf("parsing geoip value at index %d: %w", idx, err)
+		}
+
+		idx++
+	}
+
+	r.permittedASNs = container.NewSortedSliceSet(data.permittedASNs...)
+	r.permittedCountries = container.NewSortedSliceSet(data.permittedCountries...)
+	r.restrictedASNs = container.NewSortedSliceSet(data.restrictedASNs...)
+	r.restrictedCountries = container.NewSortedSliceSet(data.restrictedCountries...)
+
+	return nil
 }
 
 // setOption sets the specified option with its optional value.

@@ -191,29 +191,6 @@ type geoIPData struct {
 	restrictedCountries []string
 }
 
-// parseGeoIP parses the GeoIP data from the $respgeo modifier.  rule must not
-// be nil.
-func parseGeoIP(rule *NetworkRule, value, sep string) (err error) {
-	data := geoIPData{}
-
-	idx := 0
-	for value := range strings.SplitSeq(value, sep) {
-		err = parseGeoIPValue(&data, value)
-		if err != nil {
-			return fmt.Errorf("parsing geoip value at index %d: %w", idx, err)
-		}
-
-		idx++
-	}
-
-	rule.permittedASNs = container.NewSortedSliceSet(data.permittedASNs...)
-	rule.permittedCountries = container.NewSortedSliceSet(data.permittedCountries...)
-	rule.restrictedASNs = container.NewSortedSliceSet(data.restrictedASNs...)
-	rule.restrictedCountries = container.NewSortedSliceSet(data.restrictedCountries...)
-
-	return nil
-}
-
 // parseGeoIPValue parses a single ASN or Country value from $respgeo modifier.
 // data must not be nil.
 func parseGeoIPValue(data *geoIPData, value string) (err error) {
@@ -236,7 +213,7 @@ func parseGeoIPValue(data *geoIPData, value string) (err error) {
 
 	isASN := false
 	var asnVal geoip.ASN
-	if strings.HasPrefix(value, geoip.ASNPrefix) {
+	if geoip.IsASNString(value) {
 		asnVal, err = geoip.NewASN(value)
 		if err != nil {
 			return fmt.Errorf("parsing asn: %w", err)

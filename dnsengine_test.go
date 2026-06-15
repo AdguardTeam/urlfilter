@@ -14,6 +14,7 @@ import (
 	"github.com/AdguardTeam/golibs/testutil"
 	"github.com/AdguardTeam/urlfilter"
 	"github.com/AdguardTeam/urlfilter/filterlist"
+	"github.com/AdguardTeam/urlfilter/internal/geoip"
 	"github.com/AdguardTeam/urlfilter/internal/uftest"
 	"github.com/AdguardTeam/urlfilter/rules"
 	"github.com/miekg/dns"
@@ -396,6 +397,207 @@ func TestClient(t *testing.T) {
 			t.Parallel()
 
 			res, ok := dnsEngine.MatchRequest(tc.req)
+			if tc.wantRes == "" {
+				assert.False(t, ok)
+			} else {
+				assertMatchRuleText(t, tc.wantRes, res, ok)
+			}
+		})
+	}
+}
+
+func TestRespGeo_country(t *testing.T) {
+	t.Parallel()
+
+	ruleTexts := []string{
+		"||host0^$respgeo=" + uftest.CountryFR,
+		"||host1^$respgeo=~" + uftest.CountryFR,
+		"||host2^$respgeo=" + uftest.CountryEmpty,
+		"||host3^$respgeo=~" + uftest.CountryEmpty,
+		"||host4^$respgeo=" + uftest.CountryFR + "|" + uftest.CountryDE,
+		"||host5^$respgeo=" + uftest.CountryAS,
+	}
+	ruleStorage := newTestRuleStorage(t, uftest.ListID1, strings.Join(ruleTexts, "\n"))
+	dnsEngine := urlfilter.NewDNSEngine(ruleStorage)
+	assert.NotNil(t, dnsEngine)
+
+	testCases := []struct {
+		host    string
+		country geoip.Country
+		wantRes string
+		name    string
+	}{{
+		host:    "host0",
+		country: uftest.CountryFR,
+		wantRes: ruleTexts[0],
+		name:    "match",
+	}, {
+		host:    "host0",
+		country: uftest.CountryDE,
+		wantRes: "",
+		name:    "mismatch",
+	}, {
+		host:    "host1",
+		country: uftest.CountryFR,
+		wantRes: "",
+		name:    "restricted",
+	}, {
+		host:    "host1",
+		country: uftest.CountryDE,
+		wantRes: ruleTexts[1],
+		name:    "non_restricted",
+	}, {
+		host:    "host2",
+		country: geoip.CountryNone,
+		wantRes: ruleTexts[2],
+		name:    "match_empty",
+	}, {
+		host:    "host2",
+		country: uftest.CountryFR,
+		wantRes: "",
+		name:    "mismatch_empty",
+	}, {
+		host:    "host3",
+		country: geoip.CountryNone,
+		wantRes: "",
+		name:    "restricted_empty",
+	}, {
+		host:    "host3",
+		country: uftest.CountryFR,
+		wantRes: ruleTexts[3],
+		name:    "non_restricted_empty",
+	}, {
+		host:    "host4",
+		country: uftest.CountryFR,
+		wantRes: ruleTexts[4],
+		name:    "match_multiple",
+	}, {
+		host:    "host4",
+		country: uftest.CountryDE,
+		wantRes: ruleTexts[4],
+		name:    "match_multiple_second",
+	}, {
+		host:    "host4",
+		country: uftest.CountryRU,
+		wantRes: "",
+		name:    "mismatch_multiple",
+	}, {
+		host:    "host5",
+		country: uftest.CountryAS,
+		wantRes: ruleTexts[5],
+		name:    "match_as_country",
+	}, {
+		host:    "host5",
+		country: uftest.CountryFR,
+		wantRes: "",
+		name:    "mismatch_as_country",
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			req := &urlfilter.DNSRequest{
+				Hostname:      tc.host,
+				ClientCountry: tc.country,
+			}
+
+			res, ok := dnsEngine.MatchRequest(req)
+			if tc.wantRes == "" {
+				assert.False(t, ok)
+			} else {
+				assertMatchRuleText(t, tc.wantRes, res, ok)
+			}
+		})
+	}
+}
+
+func TestRespGeo_asn(t *testing.T) {
+	t.Parallel()
+
+	ruleTexts := []string{
+		"||host0^$respgeo=" + uftest.ASN1Str,
+		"||host1^$respgeo=~" + uftest.ASN1Str,
+		"||host2^$respgeo=" + uftest.ASNEmptyStr,
+		"||host3^$respgeo=~" + uftest.ASNEmptyStr,
+		"||host4^$respgeo=" + uftest.ASN1Str + "|" + uftest.ASN2Str,
+	}
+	ruleStorage := newTestRuleStorage(t, uftest.ListID1, strings.Join(ruleTexts, "\n"))
+	dnsEngine := urlfilter.NewDNSEngine(ruleStorage)
+	assert.NotNil(t, dnsEngine)
+
+	testCases := []struct {
+		host    string
+		wantRes string
+		name    string
+		asn     geoip.ASN
+	}{{
+		host:    "host0",
+		asn:     uftest.ASN1,
+		wantRes: ruleTexts[0],
+		name:    "match",
+	}, {
+		host:    "host0",
+		asn:     uftest.ASN2,
+		wantRes: "",
+		name:    "mismatch",
+	}, {
+		host:    "host1",
+		asn:     uftest.ASN1,
+		wantRes: "",
+		name:    "restricted",
+	}, {
+		host:    "host1",
+		asn:     uftest.ASN2,
+		wantRes: ruleTexts[1],
+		name:    "non_restricted",
+	}, {
+		host:    "host2",
+		asn:     geoip.ASNNone,
+		wantRes: ruleTexts[2],
+		name:    "match_empty",
+	}, {
+		host:    "host2",
+		asn:     uftest.ASN1,
+		wantRes: "",
+		name:    "mismatch_empty",
+	}, {
+		host:    "host3",
+		asn:     geoip.ASNNone,
+		wantRes: "",
+		name:    "restricted_empty",
+	}, {
+		host:    "host3",
+		asn:     uftest.ASN1,
+		wantRes: ruleTexts[3],
+		name:    "non_restricted_empty",
+	}, {
+		host:    "host4",
+		asn:     uftest.ASN1,
+		wantRes: ruleTexts[4],
+		name:    "match_multiple",
+	}, {
+		host:    "host4",
+		asn:     uftest.ASN2,
+		wantRes: ruleTexts[4],
+		name:    "match_multiple_second",
+	}, {
+		host:    "host4",
+		asn:     99999,
+		wantRes: "",
+		name:    "mismatch_multiple",
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			req := &urlfilter.DNSRequest{
+				Hostname:  tc.host,
+				ClientASN: tc.asn,
+			}
+
+			res, ok := dnsEngine.MatchRequest(req)
 			if tc.wantRes == "" {
 				assert.False(t, ok)
 			} else {

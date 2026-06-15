@@ -41,3 +41,8 @@ func NewASN(s string) (asn ASN, err error) {
 
 	return uint32(asn64), nil
 }
+
+// IsASNString returns true if s is a valid ASN string.
+func IsASNString(s string) (ok bool) {
+	return strings.HasPrefix(s, ASNPrefix) && len(s) > len(ASNPrefix)
+}
