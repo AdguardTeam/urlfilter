@@ -76,6 +76,8 @@ run_test() {
 
 	# NOTE:  The pipe ignoring the exit code here is intentional, as
 	# go-junit-report will set the exit code to be saved.
+	#
+	# TODO(a.garipov):  Update after enabling set -o 'pipefail'.
 	"$@" 2>&1 \
 		| tee "${test_reports_dir}/test-output.txt"
 

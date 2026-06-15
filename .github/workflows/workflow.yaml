@@ -1,14 +1,21 @@
 'env':
   'BASE_IMAGE': |-
-    ${{ vars.BASE_IMAGE || 'adguard/go-builder:1.26.3--1' }}
+    ${{ vars.BASE_IMAGE || 'adguard/go-builder:1.26.4--1' }}
   'CACHE_BUSTER': |-
     ${{ vars.CACHE_BUSTER || '0' }}
 'jobs':
   'LintAndTestJob':
+    'permissions':
+      'contents': 'read'
     'runs-on': |
       ${{ case(github.repository_owner == 'AdGuardSoftwareLimited', 'team-go', 'ubuntu-latest') }}
     'steps':
       - 'uses': 'actions/checkout@v6'
+        'with':
+          # Set to false to avoid GITHUB_TOKEN leaking.
+          #
+          # See https://github.com/actions/checkout/issues/485#issuecomment-934422611.
+          'persist-credentials': false
       - 'name': 'Lint and test step'
         'run': |
           #!/bin/sh
@@ -24,13 +31,19 @@
               -f ./docker/ci.Dockerfile \
               .
 
-              exit_code="$(cat ./test-reports/test-exit-code.txt)"
-              readonly exit_code
+          exit_code="$(cat ./test-reports/test-exit-code.txt)"
+          readonly exit_code
 
-              exit "$exit_code"
+          exit "$exit_code"
 'name': 'Lint and test workflow'
 'on':
   'push':
     'branches':
       - '*'
   'workflow_dispatch': null
+# Permissions are disabled for all the jobs by default, and then overridden for
+# specific jobs if needed.  This is a recommended practice for security reasons,
+# and also allows to avoid mistakes with permissions when creating new jobs.
+#
+# See https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#permissions.
+'permissions': {}

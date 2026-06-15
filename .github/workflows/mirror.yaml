@@ -3,13 +3,15 @@
     'if': |
       ${{ github.repository_owner == 'AdGuardSoftwareLimited' }}
     'permissions':
+      'actions': 'write'
       'contents': 'read'
       'id-token': 'write'
     'uses': 'AdGuardSoftwareLimited/actions/.github/workflows/mirror.yml@master'
     'with':
+      'disable_workflows_source': 'workflow.yaml'
+      'disable_workflows_target': 'mirror.yaml'
       'target_repo': 'git@github.com:AdguardTeam/urlfilter.git'
-      'vault_role': 'github-mirroring'
-      'vault_secret': 'secret/data/ci-secrets/adguard-team-org-key#private'
+      'team': 'go'
 'name': 'Mirror'
 'on':
   'push':
