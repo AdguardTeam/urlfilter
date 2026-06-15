@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/AdguardTeam/golibs/container"
+	"github.com/AdguardTeam/golibs/errors"
 	"github.com/AdguardTeam/golibs/netutil"
 	"github.com/AdguardTeam/golibs/netutil/urlutil"
 	"github.com/AdguardTeam/golibs/testutil"
@@ -586,6 +587,23 @@ func TestNetworkRule_Match_respgeoOther(t *testing.T) {
 			assertGeoIPMatch(t, r, tc.reqCountry, tc.reqASN, tc.wantMatch)
 		})
 	}
+
+	wantErrMsg := "parsing geoip value at index 0: " + errors.ErrEmptyValue.Error()
+	t.Run("empty_rule", func(t *testing.T) {
+		t.Parallel()
+
+		r, err := rules.NewNetworkRule(uftest.RuleHost+"$respgeo=", uftest.ListID1)
+		testutil.AssertErrorMsg(t, wantErrMsg, err)
+		assert.Nil(t, r)
+	})
+
+	t.Run("empty_rule_with_restriction_marker", func(t *testing.T) {
+		t.Parallel()
+
+		r, err := rules.NewNetworkRule(uftest.RuleHost+"$respgeo=~", uftest.ListID1)
+		testutil.AssertErrorMsg(t, wantErrMsg, err)
+		assert.Nil(t, r)
+	})
 }
 
 func TestNetworkRule_Match_denyallow(t *testing.T) {

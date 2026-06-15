@@ -194,14 +194,14 @@ type geoIPData struct {
 // parseGeoIPValue parses a single ASN or Country value from $respgeo modifier.
 // data must not be nil.
 func parseGeoIPValue(data *geoIPData, value string) (err error) {
-	if value == "" {
-		return errors.ErrEmptyValue
-	}
-
 	isRestricted := false
 	if strings.HasPrefix(value, restrictionMarker) {
 		isRestricted = true
 		value = value[1:]
+	}
+
+	if value == "" {
+		return errors.ErrEmptyValue
 	}
 
 	if value == emptyCountry || value == emptyASN {
