@@ -6,6 +6,7 @@ import (
 	"github.com/AdguardTeam/golibs/container"
 	"github.com/AdguardTeam/golibs/syncutil"
 	"github.com/AdguardTeam/urlfilter/filterlist"
+	"github.com/AdguardTeam/urlfilter/internal/geoip"
 	"github.com/AdguardTeam/urlfilter/rules"
 )
 
@@ -46,8 +47,15 @@ type DNSRequest struct {
 	// default zero value won't be considered.
 	ClientIP netip.Addr
 
+	// ClientCountry is the country ISO code to match against $respgeo
+	// modifiers.
+	ClientCountry string
+
 	// Hostname is the hostname to filter.
 	Hostname string
+
+	// ClientASN is the client ASN to match against $respgeo modifiers.
+	ClientASN uint32
 
 	// DNSType is the type of the resource record (RR) of a DNS request, for
 	// example "A" or "AAAA".  See [rules.RRValue] for all acceptable constants
@@ -64,6 +72,9 @@ func (r *DNSRequest) Reset() {
 
 	r.ClientIdentifiers.Clear()
 	r.Hostname = ""
+
+	r.ClientCountry = geoip.CountryNone
+	r.ClientASN = geoip.ASNNone
 
 	r.ClientTags.Clear()
 
@@ -132,6 +143,8 @@ func (e *DNSEngine) getRequestFromPool(dReq *DNSRequest) (req *rules.Request) {
 
 	req.ClientTags = dReq.ClientTags
 	req.ClientIP = dReq.ClientIP
+	req.ClientCountry = dReq.ClientCountry
+	req.ClientASN = dReq.ClientASN
 	req.ClientIdentifiers = dReq.ClientIdentifiers
 	req.DNSType = dReq.DNSType
 

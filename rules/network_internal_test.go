@@ -196,7 +196,7 @@ func TestNetworkRule_requestTypeModifiers(t *testing.T) {
 			t.Parallel()
 
 			checkRequestType(t, tc.modifier, tc.want, true)
-			checkRequestType(t, "~"+tc.modifier, tc.want, false)
+			checkRequestType(t, restrictionMarker+tc.modifier, tc.want, false)
 		})
 	}
 }
@@ -481,10 +481,10 @@ func TestParseClients_invalid(t *testing.T) {
 	_, _, err = parseClients("''", '|')
 	assert.Error(t, err)
 
-	_, _, err = parseClients("~''", '|')
+	_, _, err = parseClients(restrictionMarker+"''", '|')
 	assert.Error(t, err)
 
-	_, _, err = parseClients("~", '|')
+	_, _, err = parseClients(restrictionMarker, '|')
 	assert.Error(t, err)
 }
 
@@ -586,6 +586,45 @@ func TestNetworkRule_negatesBadfilter(t *testing.T) {
 			b := newNetworkRule(t, tc.badfilter)
 
 			tc.want(t, b.negatesBadfilter(r))
+		})
+	}
+}
+
+func TestCompareFold(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		left  string
+		right string
+		want  int
+	}{{
+		left:  "aaaa",
+		right: "AAAA",
+		want:  0,
+	}, {
+		left:  "aaaa",
+		right: "BBBB",
+		want:  -1,
+	}, {
+		left:  "AAAA",
+		right: "bbBb",
+		want:  -1,
+	}, {
+		left:  "aAa",
+		right: "Aa",
+		want:  1,
+	}, {
+		left:  "",
+		right: "",
+		want:  0,
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.left+"_"+tc.right, func(t *testing.T) {
+			t.Parallel()
+
+			got := compareFold(tc.left, tc.right)
+			assert.Equal(t, tc.want, got)
 		})
 	}
 }

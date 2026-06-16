@@ -7,9 +7,11 @@ import (
 	"testing"
 
 	"github.com/AdguardTeam/golibs/container"
+	"github.com/AdguardTeam/golibs/errors"
 	"github.com/AdguardTeam/golibs/netutil"
 	"github.com/AdguardTeam/golibs/netutil/urlutil"
 	"github.com/AdguardTeam/golibs/testutil"
+	"github.com/AdguardTeam/urlfilter/internal/geoip"
 	"github.com/AdguardTeam/urlfilter/internal/uftest"
 	"github.com/AdguardTeam/urlfilter/rules"
 	"github.com/miekg/dns"
@@ -352,6 +354,256 @@ func TestNetworkRule_Match_domainRestrictions(t *testing.T) {
 	r = uftest.NewNetworkRule(t, "$domain="+uftest.Host)
 	req = rules.NewRequest(uftest.URLStrHostOther, uftest.URLStrHost, rules.TypeScript)
 	assert.True(t, r.Match(req))
+}
+
+func TestNetworkRule_Match_respgeoCountry(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		wantMatch  assert.BoolAssertionFunc
+		name       string
+		ruleSuffix string
+		reqCountry geoip.Country
+	}{{
+		name:       "permit_country",
+		ruleSuffix: uftest.CountryFR,
+		reqCountry: uftest.CountryFR,
+		wantMatch:  assert.True,
+	}, {
+		name:       "permit_country_case_insensitive",
+		ruleSuffix: uftest.CountryFR,
+		reqCountry: "fr",
+		wantMatch:  assert.True,
+	}, {
+		name:       "permit_country_mismatch",
+		ruleSuffix: uftest.CountryFR,
+		reqCountry: uftest.CountryRU,
+		wantMatch:  assert.False,
+	}, {
+		name:       "permit_country_as",
+		ruleSuffix: uftest.CountryAS,
+		reqCountry: uftest.CountryAS,
+		wantMatch:  assert.True,
+	}, {
+		name:       "restrict_country_as",
+		ruleSuffix: "~" + uftest.CountryAS,
+		reqCountry: uftest.CountryAS,
+		wantMatch:  assert.False,
+	}, {
+		name:       "restrict_country",
+		ruleSuffix: "~" + uftest.CountryFR,
+		reqCountry: uftest.CountryFR,
+		wantMatch:  assert.False,
+	}, {
+		name:       "restrict_country_mismatch",
+		ruleSuffix: "~" + uftest.CountryFR,
+		reqCountry: uftest.CountryRU,
+		wantMatch:  assert.True,
+	}, {
+		name:       "restrict_multiple_countries",
+		ruleSuffix: "~" + uftest.CountryFR + "|~" + uftest.CountryRU,
+		reqCountry: uftest.CountryRU,
+		wantMatch:  assert.False,
+	}, {
+		name:       "restrict_multiple_countries_mismatch",
+		ruleSuffix: "~" + uftest.CountryFR + "|~" + uftest.CountryRU,
+		reqCountry: uftest.CountryDE,
+		wantMatch:  assert.True,
+	}, {
+		name:       "permit_multiple_countries",
+		ruleSuffix: uftest.CountryFR + "|" + uftest.CountryRU,
+		reqCountry: uftest.CountryRU,
+		wantMatch:  assert.True,
+	}, {
+		name:       "permit_multiple_countries_mismatch",
+		ruleSuffix: uftest.CountryFR + "|" + uftest.CountryRU,
+		reqCountry: uftest.CountryDE,
+		wantMatch:  assert.False,
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			r := uftest.NewNetworkRule(t, uftest.RuleHost+"$respgeo="+tc.ruleSuffix)
+			assertGeoIPMatch(t, r, tc.reqCountry, geoip.ASNNone, tc.wantMatch)
+		})
+	}
+}
+
+// assertGeoIPMatch asserts that the given rule matches the request with the
+// given country and ASN using the provided assertion function.
+func assertGeoIPMatch(
+	tb testing.TB,
+	rule *rules.NetworkRule,
+	country geoip.Country,
+	asn geoip.ASN,
+	wantMatch assert.BoolAssertionFunc,
+) {
+	tb.Helper()
+
+	req := rules.NewRequest(uftest.URLStrHost, "", rules.TypeScript)
+	req.ClientCountry = country
+	req.ClientASN = asn
+	wantMatch(tb, rule.Match(req))
+}
+
+func TestNetworkRule_Match_respgeoASN(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		wantMatch  assert.BoolAssertionFunc
+		name       string
+		ruleSuffix string
+		reqASN     geoip.ASN
+	}{{
+		name:       "permit_asn",
+		ruleSuffix: uftest.ASN1Str,
+		reqASN:     uftest.ASN1,
+		wantMatch:  assert.True,
+	}, {
+		name:       "permit_asn_mismatch",
+		ruleSuffix: uftest.ASN1Str,
+		reqASN:     uftest.ASN2,
+		wantMatch:  assert.False,
+	}, {
+		name:       "restrict_asn",
+		ruleSuffix: "~" + uftest.ASN1Str,
+		reqASN:     uftest.ASN1,
+		wantMatch:  assert.False,
+	}, {
+		name:       "restrict_asn_mismatch",
+		ruleSuffix: "~" + uftest.ASN1Str,
+		reqASN:     uftest.ASN2,
+		wantMatch:  assert.True,
+	}, {
+		name:       "restrict_multiple_asns",
+		ruleSuffix: "~" + uftest.ASN1Str + "|~" + uftest.ASN2Str,
+		reqASN:     uftest.ASN1,
+		wantMatch:  assert.False,
+	}, {
+		name:       "restrict_multiple_asns_mismatch",
+		ruleSuffix: "~" + uftest.ASN1Str + "|~" + uftest.ASN2Str,
+		reqASN:     uftest.ASN2,
+		wantMatch:  assert.False,
+	}, {
+		name:       "permit_multiple_asns",
+		ruleSuffix: uftest.ASN1Str + "|" + uftest.ASN2Str,
+		reqASN:     uftest.ASN1,
+		wantMatch:  assert.True,
+	}, {
+		name:       "permit_multiple_asns_mismatch",
+		ruleSuffix: uftest.ASN1Str + "|" + uftest.ASN2Str,
+		reqASN:     123,
+		wantMatch:  assert.False,
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			r := uftest.NewNetworkRule(t, uftest.RuleHost+"$respgeo="+tc.ruleSuffix)
+			assertGeoIPMatch(t, r, geoip.CountryNone, tc.reqASN, tc.wantMatch)
+		})
+	}
+}
+
+func TestNetworkRule_Match_respgeoOther(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		wantMatch  assert.BoolAssertionFunc
+		name       string
+		ruleSuffix string
+		reqCountry geoip.Country
+		reqASN     geoip.ASN
+	}{{
+		name:       "permit_empty_country",
+		ruleSuffix: uftest.CountryEmpty,
+		reqCountry: geoip.CountryNone,
+		reqASN:     geoip.ASNNone,
+		wantMatch:  assert.True,
+	}, {
+		name:       "permit_empty_country_mismatch",
+		ruleSuffix: uftest.CountryEmpty,
+		reqCountry: uftest.CountryDE,
+		reqASN:     geoip.ASNNone,
+		wantMatch:  assert.False,
+	}, {
+		name:       "restrict_empty_country",
+		ruleSuffix: "~" + uftest.CountryEmpty,
+		reqCountry: geoip.CountryNone,
+		reqASN:     geoip.ASNNone,
+		wantMatch:  assert.False,
+	}, {
+		name:       "restrict_empty_country_mismatch",
+		ruleSuffix: "~" + uftest.CountryEmpty,
+		reqCountry: uftest.CountryFR,
+		reqASN:     geoip.ASNNone,
+		wantMatch:  assert.True,
+	}, {
+		name:       "permit_empty_asn",
+		ruleSuffix: uftest.ASNEmptyStr,
+		reqCountry: geoip.CountryNone,
+		reqASN:     geoip.ASNNone,
+		wantMatch:  assert.True,
+	}, {
+		name:       "permit_empty_asn_mismatch",
+		ruleSuffix: uftest.ASNEmptyStr,
+		reqCountry: geoip.CountryNone,
+		reqASN:     uftest.ASN1,
+		wantMatch:  assert.False,
+	}, {
+		name:       "restrict_empty_asn",
+		ruleSuffix: "~" + uftest.ASNEmptyStr,
+		reqCountry: geoip.CountryNone,
+		reqASN:     geoip.ASNNone,
+		wantMatch:  assert.False,
+	}, {
+		name:       "restrict_empty_asn_mismatch",
+		ruleSuffix: "~" + uftest.ASNEmptyStr,
+		reqCountry: geoip.CountryNone,
+		reqASN:     uftest.ASN1,
+		wantMatch:  assert.True,
+	}, {
+		name:       "partial_asn_match",
+		ruleSuffix: uftest.ASN1Str + "|" + uftest.CountryDE,
+		reqCountry: uftest.CountryFR,
+		reqASN:     uftest.ASN1,
+		wantMatch:  assert.True,
+	}, {
+		name:       "partial_country_match",
+		ruleSuffix: uftest.ASN1Str + "|" + uftest.CountryDE,
+		reqCountry: uftest.CountryDE,
+		reqASN:     uftest.ASN2,
+		wantMatch:  assert.True,
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			r := uftest.NewNetworkRule(t, uftest.RuleHost+"$respgeo="+tc.ruleSuffix)
+			assertGeoIPMatch(t, r, tc.reqCountry, tc.reqASN, tc.wantMatch)
+		})
+	}
+
+	wantErrMsg := "parsing geoip value at index 0: " + errors.ErrEmptyValue.Error()
+	t.Run("empty_rule", func(t *testing.T) {
+		t.Parallel()
+
+		r, err := rules.NewNetworkRule(uftest.RuleHost+"$respgeo=", uftest.ListID1)
+		testutil.AssertErrorMsg(t, wantErrMsg, err)
+		assert.Nil(t, r)
+	})
+
+	t.Run("empty_rule_with_restriction_marker", func(t *testing.T) {
+		t.Parallel()
+
+		r, err := rules.NewNetworkRule(uftest.RuleHost+"$respgeo=~", uftest.ListID1)
+		testutil.AssertErrorMsg(t, wantErrMsg, err)
+		assert.Nil(t, r)
+	})
 }
 
 func TestNetworkRule_Match_denyallow(t *testing.T) {
@@ -731,6 +983,10 @@ func TestNetworkRule_IsHigherPriority(t *testing.T) {
 		want:  assert.False,
 		left:  "||example.org$script",
 		right: "||example.org$client=123,denyallow=com",
+	}, {
+		want:  assert.True,
+		left:  "||example.org$respgeo=FR",
+		right: "||example.org",
 	}}
 
 	for _, tc := range testCases {

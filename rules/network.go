@@ -12,15 +12,19 @@ import (
 	"github.com/AdguardTeam/golibs/container"
 	"github.com/AdguardTeam/golibs/mathutil"
 	"github.com/AdguardTeam/golibs/netutil"
+	"github.com/AdguardTeam/urlfilter/internal/geoip"
 )
 
 // Parts of rules.
 const (
-	maskWhiteList    = "@@"
-	maskRegexRule    = "/"
-	replaceOption    = "replace"
-	optionsDelimiter = '$'
-	escapeCharacter  = '\\'
+	maskWhiteList     = "@@"
+	maskRegexRule     = "/"
+	replaceOption     = "replace"
+	optionsDelimiter  = '$'
+	escapeCharacter   = '\\'
+	restrictionMarker = "~"
+	emptyASN          = geoip.ASNPrefix + emptyCountry
+	emptyCountry      = "--"
 )
 
 // Common regular expressions.
@@ -174,6 +178,22 @@ type NetworkRule struct {
 	// text is the original rule text.
 	text string
 
+	// permittedASNs is a sorted list of permitted ASNs from the $respgeo
+	// modifier.
+	permittedASNs *container.SortedSliceSet[geoip.ASN]
+
+	// restrictedASNs is a sorted list of restricted ASNs from the $respgeo
+	// modifier.
+	restrictedASNs *container.SortedSliceSet[geoip.ASN]
+
+	// permittedCountries is a sorted list of permitted countries from the
+	// $respgeo modifier.  It must contain only lowercase values.
+	permittedCountries *container.SortedSliceSet[geoip.Country]
+
+	// restrictedCountries is a sorted list of restricted countries from the
+	// $respgeo modifier.  It must contain only lowercase values.
+	restrictedCountries *container.SortedSliceSet[geoip.Country]
+
 	// Shortcut is the longest substring of the rule pattern with no special
 	// characters.
 	Shortcut string
@@ -241,6 +261,7 @@ type NetworkRule struct {
 func NewNetworkRule(ruleText string, id ListID) (r *NetworkRule, err error) {
 	pattern, options, whitelist, err := parseRuleText(ruleText)
 	if err != nil {
+		// Don't wrap the error, because it's informative enough as is.
 		return nil, err
 	}
 
@@ -253,6 +274,7 @@ func NewNetworkRule(ruleText string, id ListID) (r *NetworkRule, err error) {
 	}
 
 	if err = r.loadOptions(options); err != nil {
+		// Don't wrap the error, because it's informative enough as is.
 		return nil, err
 	}
 
@@ -287,8 +309,10 @@ func isPatternTooWide(pattern string) (ok bool) {
 		len(pattern) < 3
 }
 
-// hasNoRestrictions returns true if the rule has no domain, client, or DNS
-// restrictions.
+// hasNoRestrictions returns true if the rule has no domain, GeoIP, client, or
+// DNS restrictions.
+//
+// TODO(f.setrakov): Invert the condition.
 func (r *NetworkRule) hasNoRestrictions() (ok bool) {
 	return len(r.permittedDomains) == 0 &&
 		len(r.restrictedDomains) == 0 &&
@@ -298,7 +322,17 @@ func (r *NetworkRule) hasNoRestrictions() (ok bool) {
 		r.restrictedClientTags.Len() == 0 &&
 		len(r.permittedDNSTypes) == 0 &&
 		len(r.restrictedDNSTypes) == 0 &&
-		len(r.denyAllowDomains) == 0
+		len(r.denyAllowDomains) == 0 &&
+		!r.hasGeoIPRestrictions()
+}
+
+// hasGeoIPRestrictions returns true if the rule has ASN or Country
+// restrictions.
+func (r *NetworkRule) hasGeoIPRestrictions() (ok bool) {
+	return r.restrictedASNs.Len() > 0 ||
+		r.permittedASNs.Len() > 0 ||
+		r.restrictedCountries.Len() > 0 ||
+		r.permittedCountries.Len() > 0
 }
 
 // type check
@@ -333,7 +367,8 @@ func (r *NetworkRule) Match(req *Request) (ok bool) {
 		!r.matchDNSType(req.DNSType),
 		!r.matchClientTags(req.ClientTags),
 		!r.matchClient(req.ClientIdentifiers, req.ClientIP),
-		!r.matchPattern(req):
+		!r.matchPattern(req),
+		!r.matchGeoIP(req.ClientASN, req.ClientCountry):
 		return false
 	}
 
@@ -483,7 +518,8 @@ func (r *NetworkRule) calcRuleSpecs() (prio int) {
 		mathutil.BoolToNumber[int](
 			r.permittedClients.len() != 0 || r.restrictedClients.len() != 0,
 		) +
-		mathutil.BoolToNumber[int](len(r.denyAllowDomains) != 0)
+		mathutil.BoolToNumber[int](len(r.denyAllowDomains) != 0) +
+		mathutil.BoolToNumber[int](r.hasGeoIPRestrictions())
 }
 
 // negatesBadfilter only makes sense when r has a `badfilter` modifier.  It
@@ -503,7 +539,11 @@ func (r *NetworkRule) negatesBadfilter(other *NetworkRule) (ok bool) {
 		!r.permittedClientTags.Equal(other.permittedClientTags),
 		!r.restrictedClientTags.Equal(other.restrictedClientTags),
 		!r.permittedClients.equal(other.permittedClients),
-		!r.restrictedClients.equal(other.restrictedClients):
+		!r.restrictedClients.equal(other.restrictedClients),
+		!r.permittedASNs.Equal(other.permittedASNs),
+		!r.restrictedASNs.Equal(other.restrictedASNs),
+		!r.permittedCountries.Equal(other.permittedCountries),
+		!r.restrictedCountries.Equal(other.restrictedCountries):
 		return false
 	}
 
@@ -664,6 +704,7 @@ func (r *NetworkRule) matchDNSType(rtype uint16) (allowed bool) {
 		return false
 	}
 
+	// TODO(f.setrakov): Add a helper to perform such checks.
 	if len(r.permittedDNSTypes) > 0 {
 		return slices.Contains(r.permittedDNSTypes, rtype)
 	}
@@ -718,6 +759,72 @@ func (r *NetworkRule) matchClient(ids *container.SortedSliceSet[string], ip neti
 	// If we got here, permitted list is empty and the client is not among
 	// restricted.
 	return true
+}
+
+// matchGeoIP returns true if r matches geoip data.
+func (r *NetworkRule) matchGeoIP(asn geoip.ASN, country geoip.Country) (ok bool) {
+	if r.restrictedASNs.Has(asn) || countriesHasFold(r.restrictedCountries, country) {
+		return false
+	}
+
+	asnPermLen := r.permittedASNs.Len()
+	countryPermLen := r.permittedCountries.Len()
+	if asnPermLen == 0 && countryPermLen == 0 {
+		return true
+	} else if asnPermLen == 0 {
+		return countriesHasFold(r.permittedCountries, country)
+	} else if countryPermLen == 0 {
+		return r.permittedASNs.Has(asn)
+	}
+
+	return countriesHasFold(r.permittedCountries, country) || r.permittedASNs.Has(asn)
+}
+
+// countriesHasFold returns true if the set contains the country, using
+// case-insensitive comparison.
+func countriesHasFold(
+	set *container.SortedSliceSet[geoip.Country],
+	country geoip.Country,
+) (ok bool) {
+	values := set.Values()
+
+	_, ok = slices.BinarySearchFunc(values, country, func(a, b string) (res int) {
+		return compareFold(a, b)
+	})
+
+	return ok
+}
+
+// compareFold compares a and b case-insensitively.
+func compareFold(a, b string) (res int) {
+	for i := 0; i < len(a) && i < len(b); i++ {
+		aFold := byteToLower(a[i])
+		bFold := byteToLower(b[i])
+
+		if aFold < bFold {
+			return -1
+		} else if bFold < aFold {
+			return 1
+		}
+	}
+
+	if len(a) < len(b) {
+		return -1
+	} else if len(b) < len(a) {
+		return 1
+	}
+
+	return 0
+}
+
+// byteToLower converts an uppercase ASCII byte to lowercase.  Other bytes are
+// not changed.
+func byteToLower(b byte) byte {
+	if b >= 'A' && b <= 'Z' {
+		return b + ('a' - 'A')
+	}
+
+	return b
 }
 
 // matchRequestType returns true if rt matches the rule properties.
@@ -866,6 +973,8 @@ var optionHandlers = map[string]optionHandler{
 	"client":    setClientOptionHandler,
 	// $document.
 	"document": setDocumentOptionHandler,
+	// $respgeo
+	"respgeo": setRespGeoOptionHandler,
 }
 
 // newSetRequestTypeHandler returns new [optionHandler] that permits or forbids
@@ -892,40 +1001,44 @@ func newSetOptionEnabledHandler(option NetworkRuleOption, enabled bool) (handler
 }
 
 // setDNSTypeOptionHandler is an [optionHandler] that parses dnstype option
-// value and sets permitted and restricted dns types.
+// value and sets permitted and restricted dns types.  r must not be nil.
 func setDNSTypeOptionHandler(r *NetworkRule, value string) (err error) {
 	permitted, restricted, err := parseDNSTypes(value)
 	r.permittedDNSTypes = permitted
 	r.restrictedDNSTypes = restricted
 
+	// Don't wrap the error, because it's informative enough as is.
 	return err
 }
 
 // setDNSRewriteOptionHandler is an [optionHandler] that parses dnsrewrite value
-// and fills [NetworkRule.DNSRewrite].
+// and fills [NetworkRule.DNSRewrite].  r must not be nil.
 func setDNSRewriteOptionHandler(r *NetworkRule, value string) (err error) {
 	// $dnsrewrite, the DNS request rewrite filter.
 	rewrite, err := parseDNSRewrite(value)
 	r.DNSRewrite = rewrite
 
+	// Don't wrap the error, because it's informative enough as is.
 	return err
 }
 
 // setDomainOptionHandler is an [optionHandler] that parses domains and sets
-// permitted and restricted domains.
+// permitted and restricted domains.  r must not be nil.
 func setDomainOptionHandler(r *NetworkRule, value string) (err error) {
 	permitted, restricted, err := parseDomains(value, "|")
 	r.permittedDomains = permitted
 	r.restrictedDomains = restricted
 
+	// Don't wrap the error, because it's informative enough as is.
 	return err
 }
 
 // setDenyallowOptionHandler is an [optionHandler] that parses domains and sets
-// [NetworkRule.denyAllowDomains].
+// [NetworkRule.denyAllowDomains].  r must not be nil.
 func setDenyAllowOptionHandler(r *NetworkRule, value string) (err error) {
 	permitted, restricted, err := parseDomains(value, "|")
 	if err != nil {
+		// Don't wrap the error, because it's informative enough as is.
 		return err
 	}
 
@@ -939,7 +1052,7 @@ func setDenyAllowOptionHandler(r *NetworkRule, value string) (err error) {
 }
 
 // setCtagOptionHandler is an [optionHandler] that parses CTags from value and
-// sets permitted and restricted client tags.
+// sets permitted and restricted client tags.  r must not be nil.
 func setCTagOptionHandler(r *NetworkRule, value string) (err error) {
 	permitted, restricted, err := parseCTags(value, "|")
 	if err == nil {
@@ -947,11 +1060,12 @@ func setCTagOptionHandler(r *NetworkRule, value string) (err error) {
 		r.restrictedClientTags = restricted
 	}
 
+	// Don't wrap the error, because it's informative enough as is.
 	return err
 }
 
 // setClientOptionHandler is an [optionHandler] that parses clients from value
-// and sets permitted and restricted clients.
+// and sets permitted and restricted clients.  r must not be nil.
 func setClientOptionHandler(r *NetworkRule, value string) (err error) {
 	permitted, restricted, err := parseClients(value, '|')
 	if err == nil {
@@ -959,11 +1073,12 @@ func setClientOptionHandler(r *NetworkRule, value string) (err error) {
 		r.restrictedClients = restricted
 	}
 
+	// Don't wrap the error, because it's informative enough as is.
 	return err
 }
 
 // setDocumentOptionHandler is an [optionHandler] that enables such options as
-// jsinject, urlblock, content and extension.
+// jsinject, urlblock, content and extension.  r must not be nil.
 func setDocumentOptionHandler(r *NetworkRule, _ string) (err error) {
 	err = r.setOptionEnabled(OptionElemhide, true)
 	// Ignore others.
@@ -972,7 +1087,31 @@ func setDocumentOptionHandler(r *NetworkRule, _ string) (err error) {
 	_ = r.setOptionEnabled(OptionContent, true)
 	_ = r.setOptionEnabled(OptionExtension, true)
 
+	// Don't wrap the error, because it's informative enough as is.
 	return err
+}
+
+// setRespGeoOptionHandler is an [optionHandler] that parses respgeo option
+// value and sets allowed ASNs and countries.  r must not be nil.
+func setRespGeoOptionHandler(r *NetworkRule, value string) (err error) {
+	data := geoIPData{}
+
+	idx := 0
+	for value := range strings.SplitSeq(value, "|") {
+		err = parseGeoIPValue(&data, value)
+		if err != nil {
+			return fmt.Errorf("parsing geoip value at index %d: %w", idx, err)
+		}
+
+		idx++
+	}
+
+	r.permittedASNs = container.NewSortedSliceSet(data.permittedASNs...)
+	r.permittedCountries = container.NewSortedSliceSet(data.permittedCountries...)
+	r.restrictedASNs = container.NewSortedSliceSet(data.restrictedASNs...)
+	r.restrictedCountries = container.NewSortedSliceSet(data.restrictedCountries...)
+
+	return nil
 }
 
 // setOption sets the specified option with its optional value.

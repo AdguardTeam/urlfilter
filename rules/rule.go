@@ -6,6 +6,7 @@ import (
 
 	"github.com/AdguardTeam/golibs/container"
 	"github.com/AdguardTeam/golibs/errors"
+	"github.com/AdguardTeam/urlfilter/internal/geoip"
 	"github.com/AdguardTeam/urlfilter/internal/ufnet"
 	"github.com/miekg/dns"
 )
@@ -86,7 +87,7 @@ func parseDomains(domains, sep string) (permittedDomains, restrictedDomains []st
 	for i := range list {
 		d := list[i]
 		restricted := false
-		if strings.HasPrefix(d, "~") {
+		if strings.HasPrefix(d, restrictionMarker) {
 			restricted = true
 			d = d[1:]
 		}
@@ -157,7 +158,7 @@ func parseDNSType(rrStr string) (rrType RRType, isRestricted bool, err error) {
 		return 0, false, errors.ErrEmptyValue
 	}
 
-	isRestricted = rrStr[0] == '~'
+	isRestricted = rrStr[0:1] == restrictionMarker
 	if isRestricted {
 		rrStr = rrStr[1:]
 	}
@@ -182,6 +183,75 @@ func isValidCTag(s string) (ok bool) {
 	return true
 }
 
+// geoIPData contains GeoIP restriction and permission lists.
+type geoIPData struct {
+	permittedASNs       []geoip.ASN
+	restrictedASNs      []geoip.ASN
+	permittedCountries  []string
+	restrictedCountries []string
+}
+
+// parseGeoIPValue parses a single ASN or Country value from $respgeo modifier.
+// data must not be nil.
+func parseGeoIPValue(data *geoIPData, value string) (err error) {
+	isRestricted := false
+	if strings.HasPrefix(value, restrictionMarker) {
+		isRestricted = true
+		value = value[1:]
+	}
+
+	if value == "" {
+		return errors.ErrEmptyValue
+	}
+
+	if value == emptyCountry || value == emptyASN {
+		isEmptyASN := value == emptyASN
+		appendGeoIPValue(data, isEmptyASN, isRestricted, geoip.CountryNone, geoip.ASNNone)
+
+		return nil
+	}
+
+	isASN := false
+	var asnVal geoip.ASN
+	if geoip.IsASNString(value) {
+		asnVal, err = geoip.NewASN(value)
+		if err != nil {
+			return fmt.Errorf("parsing asn: %w", err)
+		}
+
+		isASN = true
+	}
+
+	appendGeoIPValue(data, isASN, isRestricted, value, asnVal)
+
+	return nil
+}
+
+// appendGeoIPValue appends an ASN or country value to data.  The country value
+// will be lowercased first.  data must not be nil.
+func appendGeoIPValue(
+	data *geoIPData,
+	isASN bool,
+	isRestricted bool,
+	country geoip.Country,
+	asn geoip.ASN,
+) {
+	if isASN {
+		if isRestricted {
+			data.restrictedASNs = append(data.restrictedASNs, asn)
+		} else {
+			data.permittedASNs = append(data.permittedASNs, asn)
+		}
+	} else {
+		country = strings.ToLower(country)
+		if isRestricted {
+			data.restrictedCountries = append(data.restrictedCountries, country)
+		} else {
+			data.permittedCountries = append(data.permittedCountries, country)
+		}
+	}
+}
+
 // parseCTags parses tags from the $ctag modifier.  sep is the separator
 // character; for network rules it is '|'.
 func parseCTags(value, sep string) (permittedSet, restrictedSet *container.SortedSliceSet[string], err error) {
@@ -194,7 +264,7 @@ func parseCTags(value, sep string) (permittedSet, restrictedSet *container.Sorte
 	for i := range list {
 		d := list[i]
 		isRestricted := false
-		if strings.HasPrefix(d, "~") {
+		if strings.HasPrefix(d, restrictionMarker) {
 			isRestricted = true
 			d = d[1:]
 		}
@@ -306,7 +376,7 @@ func parseClient(input string) (client string, isRestricted bool, err error) {
 	client = input
 
 	// 1. Check if this is a restricted or permitted client.
-	if strings.HasPrefix(client, "~") {
+	if strings.HasPrefix(client, restrictionMarker) {
 		isRestricted = true
 		client = client[1:]
 	}
