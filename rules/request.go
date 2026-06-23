@@ -87,9 +87,9 @@ type Request struct {
 	// ClientIP is the IP address to match against $client modifiers, if any.
 	ClientIP netip.Addr
 
-	// ClientCountry is the ISO code of clients country to match against
-	// $respgeo modifiers, if any.
-	ClientCountry string
+	// ResponseCountry is the country ISO code of the DNS response to match
+	// the request target against rules with $respgeo modifiers, if any.
+	ResponseCountry string
 
 	// URL is the full request URL.
 	URL string
@@ -117,8 +117,9 @@ type Request struct {
 	// RequestType is the type of the filtering request.
 	RequestType RequestType
 
-	// ClientASN is the clients ASN to match against $respgeo modifiers, if any.
-	ClientASN uint32
+	// ResponseASN is the AS number of the DNS response to match the request
+	// target against rules with $respgeo modifiers, if any.
+	ResponseASN uint32
 
 	// DNSType is the type of the resource record (RR) of a DNS request, for
 	// example A or AAAA.  See [RRValue] for all acceptable constants and their

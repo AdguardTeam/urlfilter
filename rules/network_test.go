@@ -443,8 +443,8 @@ func assertGeoIPMatch(
 	tb.Helper()
 
 	req := rules.NewRequest(uftest.URLStrHost, "", rules.TypeScript)
-	req.ClientCountry = country
-	req.ClientASN = asn
+	req.ResponseCountry = country
+	req.ResponseASN = asn
 	wantMatch(tb, rule.Match(req))
 }
 

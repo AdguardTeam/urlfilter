@@ -368,7 +368,7 @@ func (r *NetworkRule) Match(req *Request) (ok bool) {
 		!r.matchClientTags(req.ClientTags),
 		!r.matchClient(req.ClientIdentifiers, req.ClientIP),
 		!r.matchPattern(req),
-		!r.matchGeoIP(req.ClientASN, req.ClientCountry):
+		!r.matchGeoIP(req.ResponseASN, req.ResponseCountry):
 		return false
 	}
 

@@ -498,8 +498,8 @@ func TestRespGeo_country(t *testing.T) {
 			t.Parallel()
 
 			req := &urlfilter.DNSRequest{
-				Hostname:      tc.host,
-				ClientCountry: tc.country,
+				Hostname:        tc.host,
+				ResponseCountry: tc.country,
 			}
 
 			res, ok := dnsEngine.MatchRequest(req)
@@ -593,8 +593,8 @@ func TestRespGeo_asn(t *testing.T) {
 			t.Parallel()
 
 			req := &urlfilter.DNSRequest{
-				Hostname:  tc.host,
-				ClientASN: tc.asn,
+				Hostname:    tc.host,
+				ResponseASN: tc.asn,
 			}
 
 			res, ok := dnsEngine.MatchRequest(req)
