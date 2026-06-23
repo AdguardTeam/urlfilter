@@ -1,12 +1,9 @@
 package urlfilter
 
 import (
-	"net/netip"
-
 	"github.com/AdguardTeam/golibs/container"
 	"github.com/AdguardTeam/golibs/syncutil"
 	"github.com/AdguardTeam/urlfilter/filterlist"
-	"github.com/AdguardTeam/urlfilter/internal/geoip"
 	"github.com/AdguardTeam/urlfilter/rules"
 )
 
@@ -32,55 +29,6 @@ type DNSEngine struct {
 
 	// rulesCount is the number of rules loaded to the engine.
 	rulesCount uint64
-}
-
-// DNSRequest represents a DNS query with associated metadata.
-type DNSRequest struct {
-	// ClientTags is the list of tags to match against $ctag modifiers.
-	ClientTags *container.SortedSliceSet[string]
-
-	// ClientIdentifiers is the list of client IDs to match against $client
-	// modifiers.
-	ClientIdentifiers *container.SortedSliceSet[string]
-
-	// ClientIP is the IP address to match against $client modifiers.  The
-	// default zero value won't be considered.
-	ClientIP netip.Addr
-
-	// ClientCountry is the country ISO code to match against $respgeo
-	// modifiers.
-	ClientCountry string
-
-	// Hostname is the hostname to filter.
-	Hostname string
-
-	// ClientASN is the client ASN to match against $respgeo modifiers.
-	ClientASN uint32
-
-	// DNSType is the type of the resource record (RR) of a DNS request, for
-	// example "A" or "AAAA".  See [rules.RRValue] for all acceptable constants
-	// and their corresponding values.
-	DNSType rules.RRType
-
-	// Answer if the filtering request is for filtering a DNS response.
-	Answer bool
-}
-
-// Reset makes r ready for reuse.
-func (r *DNSRequest) Reset() {
-	r.ClientIP = netip.Addr{}
-
-	r.ClientIdentifiers.Clear()
-	r.Hostname = ""
-
-	r.ClientCountry = geoip.CountryNone
-	r.ClientASN = geoip.ASNNone
-
-	r.ClientTags.Clear()
-
-	r.DNSType = 0
-
-	r.Answer = false
 }
 
 // bytesPerRuleEst is the estimate of how many bytes a single rule generally
@@ -143,8 +91,8 @@ func (e *DNSEngine) getRequestFromPool(dReq *DNSRequest) (req *rules.Request) {
 
 	req.ClientTags = dReq.ClientTags
 	req.ClientIP = dReq.ClientIP
-	req.ClientCountry = dReq.ClientCountry
-	req.ClientASN = dReq.ClientASN
+	req.ResponseCountry = dReq.ResponseCountry
+	req.ResponseASN = dReq.ResponseASN
 	req.ClientIdentifiers = dReq.ClientIdentifiers
 	req.DNSType = dReq.DNSType
 

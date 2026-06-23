@@ -1,4 +1,4 @@
-// Package geoip contains utilities for working with client location.
+// Package geoip contains utilities for working with locations.
 package geoip
 
 import (
