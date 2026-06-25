@@ -360,65 +360,65 @@ func TestNetworkRule_Match_respgeoCountry(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
-		wantMatch  assert.BoolAssertionFunc
-		name       string
-		ruleSuffix string
-		reqCountry geoip.Country
+		wantMatch   assert.BoolAssertionFunc
+		name        string
+		ruleSuffix  string
+		respCountry geoip.Country
 	}{{
-		name:       "permit_country",
-		ruleSuffix: uftest.CountryFR,
-		reqCountry: uftest.CountryFR,
-		wantMatch:  assert.True,
+		name:        "permit_country",
+		ruleSuffix:  uftest.CountryFR,
+		respCountry: uftest.CountryFR,
+		wantMatch:   assert.True,
 	}, {
-		name:       "permit_country_case_insensitive",
-		ruleSuffix: uftest.CountryFR,
-		reqCountry: "fr",
-		wantMatch:  assert.True,
+		name:        "permit_country_case_insensitive",
+		ruleSuffix:  uftest.CountryFR,
+		respCountry: "fr",
+		wantMatch:   assert.True,
 	}, {
-		name:       "permit_country_mismatch",
-		ruleSuffix: uftest.CountryFR,
-		reqCountry: uftest.CountryRU,
-		wantMatch:  assert.False,
+		name:        "permit_country_mismatch",
+		ruleSuffix:  uftest.CountryFR,
+		respCountry: uftest.CountryRU,
+		wantMatch:   assert.False,
 	}, {
-		name:       "permit_country_as",
-		ruleSuffix: uftest.CountryAS,
-		reqCountry: uftest.CountryAS,
-		wantMatch:  assert.True,
+		name:        "permit_country_as",
+		ruleSuffix:  uftest.CountryAS,
+		respCountry: uftest.CountryAS,
+		wantMatch:   assert.True,
 	}, {
-		name:       "restrict_country_as",
-		ruleSuffix: "~" + uftest.CountryAS,
-		reqCountry: uftest.CountryAS,
-		wantMatch:  assert.False,
+		name:        "restrict_country_as",
+		ruleSuffix:  "~" + uftest.CountryAS,
+		respCountry: uftest.CountryAS,
+		wantMatch:   assert.False,
 	}, {
-		name:       "restrict_country",
-		ruleSuffix: "~" + uftest.CountryFR,
-		reqCountry: uftest.CountryFR,
-		wantMatch:  assert.False,
+		name:        "restrict_country",
+		ruleSuffix:  "~" + uftest.CountryFR,
+		respCountry: uftest.CountryFR,
+		wantMatch:   assert.False,
 	}, {
-		name:       "restrict_country_mismatch",
-		ruleSuffix: "~" + uftest.CountryFR,
-		reqCountry: uftest.CountryRU,
-		wantMatch:  assert.True,
+		name:        "restrict_country_mismatch",
+		ruleSuffix:  "~" + uftest.CountryFR,
+		respCountry: uftest.CountryRU,
+		wantMatch:   assert.True,
 	}, {
-		name:       "restrict_multiple_countries",
-		ruleSuffix: "~" + uftest.CountryFR + "|~" + uftest.CountryRU,
-		reqCountry: uftest.CountryRU,
-		wantMatch:  assert.False,
+		name:        "restrict_multiple_countries",
+		ruleSuffix:  "~" + uftest.CountryFR + "|~" + uftest.CountryRU,
+		respCountry: uftest.CountryRU,
+		wantMatch:   assert.False,
 	}, {
-		name:       "restrict_multiple_countries_mismatch",
-		ruleSuffix: "~" + uftest.CountryFR + "|~" + uftest.CountryRU,
-		reqCountry: uftest.CountryDE,
-		wantMatch:  assert.True,
+		name:        "restrict_multiple_countries_mismatch",
+		ruleSuffix:  "~" + uftest.CountryFR + "|~" + uftest.CountryRU,
+		respCountry: uftest.CountryDE,
+		wantMatch:   assert.True,
 	}, {
-		name:       "permit_multiple_countries",
-		ruleSuffix: uftest.CountryFR + "|" + uftest.CountryRU,
-		reqCountry: uftest.CountryRU,
-		wantMatch:  assert.True,
+		name:        "permit_multiple_countries",
+		ruleSuffix:  uftest.CountryFR + "|" + uftest.CountryRU,
+		respCountry: uftest.CountryRU,
+		wantMatch:   assert.True,
 	}, {
-		name:       "permit_multiple_countries_mismatch",
-		ruleSuffix: uftest.CountryFR + "|" + uftest.CountryRU,
-		reqCountry: uftest.CountryDE,
-		wantMatch:  assert.False,
+		name:        "permit_multiple_countries_mismatch",
+		ruleSuffix:  uftest.CountryFR + "|" + uftest.CountryRU,
+		respCountry: uftest.CountryDE,
+		wantMatch:   assert.False,
 	}}
 
 	for _, tc := range testCases {
@@ -426,7 +426,7 @@ func TestNetworkRule_Match_respgeoCountry(t *testing.T) {
 			t.Parallel()
 
 			r := uftest.NewNetworkRule(t, uftest.RuleHost+"$respgeo="+tc.ruleSuffix)
-			assertGeoIPMatch(t, r, tc.reqCountry, geoip.ASNNone, tc.wantMatch)
+			assertGeoIPMatch(t, r, tc.respCountry, geoip.ASNNone, tc.wantMatch)
 		})
 	}
 }
@@ -445,7 +445,12 @@ func assertGeoIPMatch(
 	req := rules.NewRequest(uftest.URLStrHost, "", rules.TypeScript)
 	req.ResponseCountry = country
 	req.ResponseASN = asn
+	req.IsAnswer = true
+
 	wantMatch(tb, rule.Match(req))
+
+	req.IsAnswer = false
+	assert.False(tb, rule.Match(req))
 }
 
 func TestNetworkRule_Match_respgeoASN(t *testing.T) {
@@ -455,46 +460,46 @@ func TestNetworkRule_Match_respgeoASN(t *testing.T) {
 		wantMatch  assert.BoolAssertionFunc
 		name       string
 		ruleSuffix string
-		reqASN     geoip.ASN
+		respASN    geoip.ASN
 	}{{
 		name:       "permit_asn",
 		ruleSuffix: uftest.ASN1Str,
-		reqASN:     uftest.ASN1,
+		respASN:    uftest.ASN1,
 		wantMatch:  assert.True,
 	}, {
 		name:       "permit_asn_mismatch",
 		ruleSuffix: uftest.ASN1Str,
-		reqASN:     uftest.ASN2,
+		respASN:    uftest.ASN2,
 		wantMatch:  assert.False,
 	}, {
 		name:       "restrict_asn",
 		ruleSuffix: "~" + uftest.ASN1Str,
-		reqASN:     uftest.ASN1,
+		respASN:    uftest.ASN1,
 		wantMatch:  assert.False,
 	}, {
 		name:       "restrict_asn_mismatch",
 		ruleSuffix: "~" + uftest.ASN1Str,
-		reqASN:     uftest.ASN2,
+		respASN:    uftest.ASN2,
 		wantMatch:  assert.True,
 	}, {
 		name:       "restrict_multiple_asns",
 		ruleSuffix: "~" + uftest.ASN1Str + "|~" + uftest.ASN2Str,
-		reqASN:     uftest.ASN1,
+		respASN:    uftest.ASN1,
 		wantMatch:  assert.False,
 	}, {
 		name:       "restrict_multiple_asns_mismatch",
 		ruleSuffix: "~" + uftest.ASN1Str + "|~" + uftest.ASN2Str,
-		reqASN:     uftest.ASN2,
+		respASN:    uftest.ASN2,
 		wantMatch:  assert.False,
 	}, {
 		name:       "permit_multiple_asns",
 		ruleSuffix: uftest.ASN1Str + "|" + uftest.ASN2Str,
-		reqASN:     uftest.ASN1,
+		respASN:    uftest.ASN1,
 		wantMatch:  assert.True,
 	}, {
 		name:       "permit_multiple_asns_mismatch",
 		ruleSuffix: uftest.ASN1Str + "|" + uftest.ASN2Str,
-		reqASN:     123,
+		respASN:    123,
 		wantMatch:  assert.False,
 	}}
 
@@ -503,7 +508,7 @@ func TestNetworkRule_Match_respgeoASN(t *testing.T) {
 			t.Parallel()
 
 			r := uftest.NewNetworkRule(t, uftest.RuleHost+"$respgeo="+tc.ruleSuffix)
-			assertGeoIPMatch(t, r, geoip.CountryNone, tc.reqASN, tc.wantMatch)
+			assertGeoIPMatch(t, r, geoip.CountryNone, tc.respASN, tc.wantMatch)
 		})
 	}
 }
@@ -512,71 +517,71 @@ func TestNetworkRule_Match_respgeoOther(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
-		wantMatch  assert.BoolAssertionFunc
-		name       string
-		ruleSuffix string
-		reqCountry geoip.Country
-		reqASN     geoip.ASN
+		wantMatch   assert.BoolAssertionFunc
+		name        string
+		ruleSuffix  string
+		respCountry geoip.Country
+		respASN     geoip.ASN
 	}{{
-		name:       "permit_empty_country",
-		ruleSuffix: uftest.CountryEmpty,
-		reqCountry: geoip.CountryNone,
-		reqASN:     geoip.ASNNone,
-		wantMatch:  assert.True,
+		name:        "permit_empty_country",
+		ruleSuffix:  uftest.CountryEmpty,
+		respCountry: geoip.CountryNone,
+		respASN:     geoip.ASNNone,
+		wantMatch:   assert.True,
 	}, {
-		name:       "permit_empty_country_mismatch",
-		ruleSuffix: uftest.CountryEmpty,
-		reqCountry: uftest.CountryDE,
-		reqASN:     geoip.ASNNone,
-		wantMatch:  assert.False,
+		name:        "permit_empty_country_mismatch",
+		ruleSuffix:  uftest.CountryEmpty,
+		respCountry: uftest.CountryDE,
+		respASN:     geoip.ASNNone,
+		wantMatch:   assert.False,
 	}, {
-		name:       "restrict_empty_country",
-		ruleSuffix: "~" + uftest.CountryEmpty,
-		reqCountry: geoip.CountryNone,
-		reqASN:     geoip.ASNNone,
-		wantMatch:  assert.False,
+		name:        "restrict_empty_country",
+		ruleSuffix:  "~" + uftest.CountryEmpty,
+		respCountry: geoip.CountryNone,
+		respASN:     geoip.ASNNone,
+		wantMatch:   assert.False,
 	}, {
-		name:       "restrict_empty_country_mismatch",
-		ruleSuffix: "~" + uftest.CountryEmpty,
-		reqCountry: uftest.CountryFR,
-		reqASN:     geoip.ASNNone,
-		wantMatch:  assert.True,
+		name:        "restrict_empty_country_mismatch",
+		ruleSuffix:  "~" + uftest.CountryEmpty,
+		respCountry: uftest.CountryFR,
+		respASN:     geoip.ASNNone,
+		wantMatch:   assert.True,
 	}, {
-		name:       "permit_empty_asn",
-		ruleSuffix: uftest.ASNEmptyStr,
-		reqCountry: geoip.CountryNone,
-		reqASN:     geoip.ASNNone,
-		wantMatch:  assert.True,
+		name:        "permit_empty_asn",
+		ruleSuffix:  uftest.ASNEmptyStr,
+		respCountry: geoip.CountryNone,
+		respASN:     geoip.ASNNone,
+		wantMatch:   assert.True,
 	}, {
-		name:       "permit_empty_asn_mismatch",
-		ruleSuffix: uftest.ASNEmptyStr,
-		reqCountry: geoip.CountryNone,
-		reqASN:     uftest.ASN1,
-		wantMatch:  assert.False,
+		name:        "permit_empty_asn_mismatch",
+		ruleSuffix:  uftest.ASNEmptyStr,
+		respCountry: geoip.CountryNone,
+		respASN:     uftest.ASN1,
+		wantMatch:   assert.False,
 	}, {
-		name:       "restrict_empty_asn",
-		ruleSuffix: "~" + uftest.ASNEmptyStr,
-		reqCountry: geoip.CountryNone,
-		reqASN:     geoip.ASNNone,
-		wantMatch:  assert.False,
+		name:        "restrict_empty_asn",
+		ruleSuffix:  "~" + uftest.ASNEmptyStr,
+		respCountry: geoip.CountryNone,
+		respASN:     geoip.ASNNone,
+		wantMatch:   assert.False,
 	}, {
-		name:       "restrict_empty_asn_mismatch",
-		ruleSuffix: "~" + uftest.ASNEmptyStr,
-		reqCountry: geoip.CountryNone,
-		reqASN:     uftest.ASN1,
-		wantMatch:  assert.True,
+		name:        "restrict_empty_asn_mismatch",
+		ruleSuffix:  "~" + uftest.ASNEmptyStr,
+		respCountry: geoip.CountryNone,
+		respASN:     uftest.ASN1,
+		wantMatch:   assert.True,
 	}, {
-		name:       "partial_asn_match",
-		ruleSuffix: uftest.ASN1Str + "|" + uftest.CountryDE,
-		reqCountry: uftest.CountryFR,
-		reqASN:     uftest.ASN1,
-		wantMatch:  assert.True,
+		name:        "partial_asn_match",
+		ruleSuffix:  uftest.ASN1Str + "|" + uftest.CountryDE,
+		respCountry: uftest.CountryFR,
+		respASN:     uftest.ASN1,
+		wantMatch:   assert.True,
 	}, {
-		name:       "partial_country_match",
-		ruleSuffix: uftest.ASN1Str + "|" + uftest.CountryDE,
-		reqCountry: uftest.CountryDE,
-		reqASN:     uftest.ASN2,
-		wantMatch:  assert.True,
+		name:        "partial_country_match",
+		ruleSuffix:  uftest.ASN1Str + "|" + uftest.CountryDE,
+		respCountry: uftest.CountryDE,
+		respASN:     uftest.ASN2,
+		wantMatch:   assert.True,
 	}}
 
 	for _, tc := range testCases {
@@ -584,7 +589,7 @@ func TestNetworkRule_Match_respgeoOther(t *testing.T) {
 			t.Parallel()
 
 			r := uftest.NewNetworkRule(t, uftest.RuleHost+"$respgeo="+tc.ruleSuffix)
-			assertGeoIPMatch(t, r, tc.reqCountry, tc.reqASN, tc.wantMatch)
+			assertGeoIPMatch(t, r, tc.respCountry, tc.respASN, tc.wantMatch)
 		})
 	}
 

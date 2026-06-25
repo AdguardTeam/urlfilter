@@ -88,7 +88,8 @@ type Request struct {
 	ClientIP netip.Addr
 
 	// ResponseCountry is the country ISO code of the DNS response to match
-	// the request target against rules with $respgeo modifiers, if any.
+	// the request target against rules with $respgeo modifiers, if any.  It is
+	// ignored if [Request.IsAnswer] is false.
 	ResponseCountry string
 
 	// URL is the full request URL.
@@ -118,7 +119,8 @@ type Request struct {
 	RequestType RequestType
 
 	// ResponseASN is the AS number of the DNS response to match the request
-	// target against rules with $respgeo modifiers, if any.
+	// target against rules with $respgeo modifiers, if any.  It is ignored if
+	// [Request.IsAnswer] is false.
 	ResponseASN uint32
 
 	// DNSType is the type of the resource record (RR) of a DNS request, for
@@ -126,14 +128,18 @@ type Request struct {
 	// corresponding values.
 	DNSType uint16
 
-	// ThirdParty is true if the filtering request should consider $third-party
-	// modifier.
-	ThirdParty bool
+	// IsAnswer is true if the filtering request is for filtering a DNS
+	// response.
+	IsAnswer bool
 
 	// IsHostnameRequest means that the request is for a given Hostname, and not
 	// for a URL, and we don't really know what protocol it is.  This can be
 	// true for DNS requests, for HTTP CONNECT, or for SNI matching.
 	IsHostnameRequest bool
+
+	// ThirdParty is true if the filtering request should consider $third-party
+	// modifier.
+	ThirdParty bool
 }
 
 // NewRequest returns a properly initialized *Request.

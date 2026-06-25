@@ -22,14 +22,16 @@ type DNSRequest struct {
 	ClientIP netip.Addr
 
 	// ResponseCountry is the country ISO code of the DNS response to match
-	// the request target against rules with $respgeo modifiers.
+	// the request target against rules with $respgeo modifiers.  It is ignored
+	// if [DNSRequest.Answer] is false.
 	ResponseCountry string
 
 	// Hostname is the hostname to filter.
 	Hostname string
 
 	// ResponseASN is the AS number of the DNS response to match the request
-	// target against rules with $respgeo modifiers.
+	// target against rules with $respgeo modifiers.  It is ignored if
+	// [DNSRequest.Answer] is false.
 	ResponseASN uint32
 
 	// DNSType is the type of the resource record (RR) of a DNS request, for
@@ -37,7 +39,7 @@ type DNSRequest struct {
 	// and their corresponding values.
 	DNSType rules.RRType
 
-	// Answer if the filtering request is for filtering a DNS response.
+	// Answer is true if the filtering request is for filtering a DNS response.
 	Answer bool
 }
 

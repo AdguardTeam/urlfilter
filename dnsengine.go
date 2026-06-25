@@ -95,6 +95,7 @@ func (e *DNSEngine) getRequestFromPool(dReq *DNSRequest) (req *rules.Request) {
 	req.ResponseASN = dReq.ResponseASN
 	req.ClientIdentifiers = dReq.ClientIdentifiers
 	req.DNSType = dReq.DNSType
+	req.IsAnswer = dReq.Answer
 
 	rules.FillRequestForHostname(req, dReq.Hostname)
 

@@ -367,8 +367,8 @@ func (r *NetworkRule) Match(req *Request) (ok bool) {
 		!r.matchDNSType(req.DNSType),
 		!r.matchClientTags(req.ClientTags),
 		!r.matchClient(req.ClientIdentifiers, req.ClientIP),
-		!r.matchPattern(req),
-		!r.matchGeoIP(req.ResponseASN, req.ResponseCountry):
+		!r.matchGeoIP(req.ResponseASN, req.ResponseCountry, req.IsAnswer),
+		!r.matchPattern(req):
 		return false
 	}
 
@@ -762,7 +762,11 @@ func (r *NetworkRule) matchClient(ids *container.SortedSliceSet[string], ip neti
 }
 
 // matchGeoIP returns true if r matches geoip data.
-func (r *NetworkRule) matchGeoIP(asn geoip.ASN, country geoip.Country) (ok bool) {
+func (r *NetworkRule) matchGeoIP(asn geoip.ASN, country geoip.Country, isAnswer bool) (ok bool) {
+	if !isAnswer {
+		return !r.hasGeoIPRestrictions()
+	}
+
 	if r.restrictedASNs.Has(asn) || countriesHasFold(r.restrictedCountries, country) {
 		return false
 	}

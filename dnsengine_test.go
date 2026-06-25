@@ -419,7 +419,7 @@ func TestRespGeo_country(t *testing.T) {
 	}
 	ruleStorage := newTestRuleStorage(t, uftest.ListID1, strings.Join(ruleTexts, "\n"))
 	dnsEngine := urlfilter.NewDNSEngine(ruleStorage)
-	assert.NotNil(t, dnsEngine)
+	require.NotNil(t, dnsEngine)
 
 	testCases := []struct {
 		host    string
@@ -500,6 +500,7 @@ func TestRespGeo_country(t *testing.T) {
 			req := &urlfilter.DNSRequest{
 				Hostname:        tc.host,
 				ResponseCountry: tc.country,
+				Answer:          true,
 			}
 
 			res, ok := dnsEngine.MatchRequest(req)
@@ -595,6 +596,7 @@ func TestRespGeo_asn(t *testing.T) {
 			req := &urlfilter.DNSRequest{
 				Hostname:    tc.host,
 				ResponseASN: tc.asn,
+				Answer:      true,
 			}
 
 			res, ok := dnsEngine.MatchRequest(req)
