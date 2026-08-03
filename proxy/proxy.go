@@ -51,7 +51,7 @@ func (c *Config) String() string {
 	str += fmt.Sprintf("Run as HTTPS proxy: %v\n", c.ProxyConfig.TLSConfig != nil)
 
 	if c.ProxyConfig.Username != "" {
-		str += fmt.Sprintf("Proxy auth: %s/%s\n", c.ProxyConfig.Username, c.ProxyConfig.Password)
+		str += "Proxy auth: enabled\n"
 	}
 	if c.ProxyConfig.APIHost != "" {
 		str += fmt.Sprintf("API host: %s\n", c.ProxyConfig.APIHost)
