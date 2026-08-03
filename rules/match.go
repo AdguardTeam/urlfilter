@@ -274,12 +274,19 @@ func removeBadfilterRules(rules []*NetworkRule) (res []*NetworkRule) {
 
 // filterNegatedRules filters out rules that are negated by badfilter rules.
 func filterNegatedRules(badfilterRules, rules []*NetworkRule) (res []*NetworkRule) {
-	for _, badfilter := range badfilterRules {
-		for _, rule := range rules {
-			if !badfilter.negatesBadfilter(rule) && !rule.IsOptionEnabled(OptionBadfilter) {
-				res = append(res, rule)
+rulesLoop:
+	for _, rule := range rules {
+		if rule.IsOptionEnabled(OptionBadfilter) {
+			continue
+		}
+
+		for _, badfilter := range badfilterRules {
+			if badfilter.negatesBadfilter(rule) {
+				continue rulesLoop
 			}
 		}
+
+		res = append(res, rule)
 	}
 
 	return res
