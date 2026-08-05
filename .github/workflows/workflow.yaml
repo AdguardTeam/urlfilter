@@ -1,14 +1,10 @@
-'env':
-  'BASE_IMAGE': |-
-    ${{ vars.BASE_IMAGE || 'adguard/go-builder:1.26.4--1' }}
-  'CACHE_BUSTER': |-
-    ${{ vars.CACHE_BUSTER || '0' }}
 'jobs':
-  'LintAndTestJob':
+  'TestJob':
+    'if': |
+      ${{ github.repository_owner != 'AdGuardSoftwareLimited' }}
     'permissions':
       'contents': 'read'
-    'runs-on': |
-      ${{ case(github.repository_owner == 'AdGuardSoftwareLimited', 'team-go', 'ubuntu-latest') }}
+    'runs-on': 'ubuntu-latest'
     'steps':
       - 'uses': 'actions/checkout@v6'
         'with':
@@ -16,31 +12,28 @@
           #
           # See https://github.com/actions/checkout/issues/485#issuecomment-934422611.
           'persist-credentials': false
+      - 'uses': 'actions/setup-go@v6'
+        'with':
+          'go-version': '1.26.x'
       - 'name': 'Lint and test step'
         'run': |
           #!/bin/sh
 
           set -e -f -u -x
 
-          docker build \
-              --build-arg "BASE_IMAGE=${BASE_IMAGE}" \
-              --build-arg "CACHE_BUSTER=${CACHE_BUSTER}" \
-              --output '.' \
-              --progress 'plain' \
-              --target 'tester-exporter' \
-              -f ./docker/ci.Dockerfile \
-              .
-
-          exit_code="$(cat ./test-reports/test-exit-code.txt)"
-          readonly exit_code
-
-          exit "$exit_code"
+          # NOTE: Only run those checks that only need Go and Go tools.
+          make \
+              VERBOSE=1 \
+              go-deps \
+              go-os-check \
+              go-lint \
+              go-test \
+              go-bench \
+              go-fuzz \
+              ;
+        'shell': 'bash'
 'name': 'Lint and test workflow'
-'on':
-  'push':
-    'branches':
-      - '*'
-  'workflow_dispatch': null
+'on': 'push'
 # Permissions are disabled for all the jobs by default, and then overridden for
 # specific jobs if needed.  This is a recommended practice for security reasons,
 # and also allows to avoid mistakes with permissions when creating new jobs.
