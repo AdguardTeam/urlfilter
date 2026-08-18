@@ -9,6 +9,8 @@ github.com/AdguardTeam/golibs v0.35.15 h1:KjksvvzlQqxdNvrz+O3FgMbZKZAQdcoCkgBz0m
 github.com/AdguardTeam/golibs v0.35.15/go.mod h1:lScOIavWuRFL0vls26jKfQXaITP7OKO1qw75WYp5nYk=
 github.com/AdguardTeam/gomitmproxy v0.2.1 h1:p9gr8Er1TYvf+7ic81Ax1sZ62UNCsMTZNbm7tC59S9o=
 github.com/AdguardTeam/gomitmproxy v0.2.1/go.mod h1:Qdv0Mktnzer5zpdpi5rAwixNJzW2FN91LjKJCkVbYGU=
+github.com/AdguardTeam/gomitmproxy v0.2.2-0.20260818112532-3ba2cd5e1569 h1:0N9JjVV828Tb7MOCEkMMtsvKgVOwT3/s11iYmokAnvM=
+github.com/AdguardTeam/gomitmproxy v0.2.2-0.20260818112532-3ba2cd5e1569/go.mod h1:NvhR5hynqRlLB39bWIEKEL3d5bZ9LeyCiPJxmk0OThg=
 github.com/BurntSushi/toml v1.6.0 h1:dRaEfpa2VI55EwlIW72hMRHdWouJeRF7TPYhI+AUQjk=
 github.com/BurntSushi/toml v1.6.0/go.mod h1:ukJfTF/6rtPPRCnwkur4qwRxa8vTRFBF0uk2lLoLwho=
 github.com/Masterminds/semver/v3 v3.5.0 h1:kQceYJfbupGfZOKZQg0kou0DgAKhzDg2NZPAwZ/2OOE=

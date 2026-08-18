@@ -7,6 +7,7 @@ import (
 	"github.com/AdguardTeam/urlfilter/rules"
 
 	"github.com/AdguardTeam/golibs/log"
+	//lint:ignore SA1019 See AGH-21.
 	"github.com/AdguardTeam/gomitmproxy"
 	"github.com/AdguardTeam/gomitmproxy/proxyutil"
 )
