@@ -14,8 +14,11 @@ import (
 	"time"
 
 	"github.com/AdguardTeam/golibs/log"
+	//lint:ignore SA1019 See AGH-21.
 	"github.com/AdguardTeam/gomitmproxy"
 	"github.com/AdguardTeam/gomitmproxy/mitm"
+
+	//lint:ignore SA1019 See AGH-21.
 	"github.com/AdguardTeam/urlfilter/proxy"
 	"github.com/AdguardTeam/urlfilter/rules"
 	goFlags "github.com/jessevdk/go-flags"

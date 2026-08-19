@@ -1,3 +1,5 @@
+// Deprecated: since proxy package is deprecated, this package will be removed
+// in the near future.
 package main
 
 import (
@@ -15,8 +17,12 @@ import (
 
 	"github.com/AdguardTeam/golibs/log"
 	"github.com/AdguardTeam/golibs/netutil/httputil"
+
+	//lint:ignore SA1019 See AGH-21.
 	"github.com/AdguardTeam/gomitmproxy"
 	"github.com/AdguardTeam/gomitmproxy/mitm"
+
+	//lint:ignore SA1019 See AGH-21.
 	"github.com/AdguardTeam/urlfilter/proxy"
 	"github.com/AdguardTeam/urlfilter/rules"
 )

@@ -1,5 +1,7 @@
 // Package proxy implements a MITM proxy that uses urlfilter to filter content.
-// TODO(ameshkov): extract to a submodule
+//
+// Deprecated: this package is no longer supported.  It will be removed in the
+// near future.
 package proxy
 
 import (
@@ -7,6 +9,7 @@ import (
 	"time"
 
 	"github.com/AdguardTeam/golibs/log"
+	//lint:ignore SA1019 See AGH-21.
 	"github.com/AdguardTeam/gomitmproxy"
 	"github.com/AdguardTeam/urlfilter"
 	"github.com/AdguardTeam/urlfilter/filterlist"

@@ -4,7 +4,7 @@ go 1.26.5
 
 require (
 	github.com/AdguardTeam/golibs v0.35.15
-	github.com/AdguardTeam/gomitmproxy v0.2.1
+	github.com/AdguardTeam/gomitmproxy v0.2.2
 	github.com/c2h5oh/datasize v0.0.0-20231215233829-aa82cc1e6500
 	github.com/fxamacker/cbor/v2 v2.9.2
 	github.com/jessevdk/go-flags v1.6.1
