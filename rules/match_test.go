@@ -255,6 +255,41 @@ func TestGetDNSBasicRule(t *testing.T) {
 	}
 }
 
+func TestGetDNSBasicRule_badfilterCollisions(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name  string
+		lines []string
+	}{
+		{
+			name: "colliding_rules",
+			lines: []string{
+				"||github.io^",
+				"||*.io^",
+				"||github.io^$badfilter",
+				"||*.io^$badfilter",
+			},
+		},
+		{
+			name: "unrelated_badfilter",
+			lines: []string{
+				"||blogspot.com^",
+				"||blogspot.com^$badfilter",
+				"||*.com^$badfilter",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Nil(t, rules.GetDNSBasicRule(newTestNetworkRules(t, tc.lines)))
+		})
+	}
+}
+
 // newTestNetworkRules returns network rules created from the given lines.
 func newTestNetworkRules(tb testing.TB, lines []string) (rs []*rules.NetworkRule) {
 	tb.Helper()
