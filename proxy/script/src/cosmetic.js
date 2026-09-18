@@ -3,7 +3,7 @@ import * as utils from './utils';
 /**
  * Cosmetic rules object.
  *
- * @typedef {Object} Cosmeticresult
+ * @typedef {Object} CosmeticResult
  * @property {StylesResult} elementHiding - Element hiding rules
  * @property {StylesResult} css - CSS rules
  * @property {ScriptsResult} js - JS rules
@@ -22,7 +22,7 @@ import * as utils from './utils';
 /**
  * Scripts result object
  *
- * @typedef {Object} StylesResult
+ * @typedef {Object} ScriptsResult
  * @property {Array<function>} generic - Generic functions
  * @property {Array<function>} specific - Functions specific to this website
  */
