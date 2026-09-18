@@ -83,7 +83,7 @@ type ScriptsResult struct {
 	Specific []string
 }
 
-// CosmeticResult represents all scripts and styles that needs to be injected
+// CosmeticResult represents all scripts and styles that need to be injected
 // into the page.
 type CosmeticResult struct {
 	ElementHiding StylesResult
@@ -91,7 +91,7 @@ type CosmeticResult struct {
 	JS            ScriptsResult
 }
 
-// Match builds scripts and styles that needs to be injected into the specified
+// Match builds scripts and styles that need to be injected into the specified
 // page.  hostname is the page hostname.  includeCSS defines if we should inject
 // any CSS and element hiding rules (see $elemhide).  includeJS defines if we
 // should inject JS into the page (see $jsinject).  includeGenericCSS defines if
@@ -139,7 +139,7 @@ type cosmeticLookupTable struct {
 	// byHostname is a map with rules grouped by the permitted domains names.
 	byHostname map[string][]*rules.CosmeticRule
 
-	// whiteList is a map with whitelist rules. It's key is the rule content.
+	// whiteList is a map with whitelist rules. Its key is the rule content.
 	whitelist map[string][]*rules.CosmeticRule
 
 	// genericRules is the list of generic cosmetic rules.
@@ -179,7 +179,7 @@ func (c *cosmeticLookupTable) addRule(r *rules.CosmeticRule) {
 }
 
 // findByHostname looks for matching domain-specific rules.  Returns nil if
-// there is no matching rules.
+// there are no matching rules.
 func (c *cosmeticLookupTable) findByHostname(hostname string) (rules []*rules.CosmeticRule) {
 	rulesByHostname, found := c.byHostname[hostname]
 	if !found {

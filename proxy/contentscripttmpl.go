@@ -20,7 +20,7 @@ const contentScript = "/* content-script v1.0.0 Sun Sep 08 2019 */\n" +
 	"    /**\n" +
 	"     * Cosmetic rules object.\n" +
 	"     *\n" +
-	"     * @typedef {Object} Cosmeticresult\n" +
+	"     * @typedef {Object} CosmeticResult\n" +
 	"     * @property {StylesResult} elementHiding - Element hiding rules\n" +
 	"     * @property {StylesResult} css - CSS rules\n" +
 	"     * @property {ScriptsResult} js - JS rules\n" +
@@ -39,7 +39,7 @@ const contentScript = "/* content-script v1.0.0 Sun Sep 08 2019 */\n" +
 	"    /**\n" +
 	"     * Scripts result object\n" +
 	"     *\n" +
-	"     * @typedef {Object} StylesResult\n" +
+	"     * @typedef {Object} ScriptsResult\n" +
 	"     * @property {Array<function>} generic - Generic functions\n" +
 	"     * @property {Array<function>} specific - Functions specific to this website\n" +
 	"     */\n" +

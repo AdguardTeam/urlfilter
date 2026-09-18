@@ -28,7 +28,7 @@ type shortcut string
 //     characters; this string is the [shortcut].
 //  2. It uses a sliding window of [shortcutLength] and puts it into its map.
 //  3. When it matches a request, it takes all substrings of length
-//     [shortcutsLength] from it and checks if there are any rules in the map.
+//     [shortcutLength] from it and checks if there are any rules in the map.
 //
 // NOTE: only the rules with a shortcut are eligible for this index.
 //
