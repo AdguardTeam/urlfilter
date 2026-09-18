@@ -81,7 +81,7 @@ func (e *DNSEngine) Match(hostname string) (res *DNSResult, matched bool) {
 }
 
 // getRequestFromPool returns an instance of request from the engine's pool.
-// Fills it's properties to match the given DNS request.
+// Fills its properties to match the given DNS request.
 func (e *DNSEngine) getRequestFromPool(dReq *DNSRequest) (req *rules.Request) {
 	req = e.reqPool.Get()
 
