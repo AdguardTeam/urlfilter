@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"regexp"
 	"testing"
 
 	"github.com/AdguardTeam/golibs/container"
@@ -626,5 +627,57 @@ func TestCompareFold(t *testing.T) {
 			got := compareFold(tc.left, tc.right)
 			assert.Equal(t, tc.want, got)
 		})
+	}
+}
+
+func TestMatchSimpleDomainPattern_equivalence(t *testing.T) {
+	t.Parallel()
+
+	patterns := []string{
+		"||example.org^",
+		"||sub.example.org^",
+		"||Example.Org^",
+		"||a_b-c.test^",
+	}
+
+	urls := []string{
+		"http://example.org",
+		"https://example.org/",
+		"ws://sub.example.org:8080/path",
+		"wss://a.b.example.org?q=1",
+		"HTTP://EXAMPLE.ORG/PATH",
+		"https://SUB.example.org/",
+		"http://notexample.org",
+		"http://example.org.evil.com",
+		"http://example.org%20",
+		"http://example.org foo",
+		"http://.example.org",
+		"http://..example.org",
+		"http://other.com/sub.example.org",
+		"ftp://example.org",
+		"http://a_b-c.test/ok",
+		"http://x.a_b-c.test",
+		"http://example.org/path",
+		"http://sub.sub.example.org/a",
+		"",
+	}
+
+	for _, pat := range patterns {
+		domain, ok := extractSimpleDomainPattern(pat)
+		require.True(t, ok, pat)
+
+		for _, matchCase := range []bool{false, true} {
+			reStr := patternToRegexp(pat)
+			if !matchCase {
+				reStr = "(?i)" + reStr
+			}
+
+			re := regexp.MustCompile(reStr)
+			for _, u := range urls {
+				got := matchSimpleDomainPattern(u, domain, matchCase)
+				want := re.MatchString(u)
+				assert.Equalf(t, want, got, "pattern=%q matchCase=%v url=%q", pat, matchCase, u)
+			}
+		}
 	}
 }
