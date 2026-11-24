@@ -58,6 +58,27 @@ func TestRuleScanner_fileReader(t *testing.T) {
 	assert.False(t, scanner.Scan())
 }
 
+func TestRuleScanner_longLine(t *testing.T) {
+	t.Parallel()
+
+	longRule := "||" + strings.Repeat("a", 5000) + ".example^"
+	nextRule := "||next.example^"
+	r := strings.NewReader(longRule + "\n" + nextRule)
+	scanner := filterlist.NewRuleScanner(r, uftest.ListID1, false)
+
+	require.True(t, scanner.Scan())
+	f, idx := scanner.Rule()
+	assert.Equal(t, longRule, f.Text())
+	assert.Equal(t, int64(0), idx)
+
+	require.True(t, scanner.Scan())
+	f, idx = scanner.Rule()
+	assert.Equal(t, nextRule, f.Text())
+	assert.Equal(t, int64(len(longRule)+1), idx)
+
+	assert.False(t, scanner.Scan())
+}
+
 func BenchmarkRuleScanner_Scan(b *testing.B) {
 	r := strings.NewReader(testRuleText)
 	s := filterlist.NewRuleScanner(r, uftest.ListID1, false)

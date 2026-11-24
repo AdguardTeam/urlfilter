@@ -70,20 +70,39 @@ func (s *RuleScanner) Rule() (r rules.Rule, idx int64) {
 func (s *RuleScanner) readNextLine() (line string, idx int64, err error) {
 	lineIndex := s.currentPos
 
-	for {
-		var bytes []byte
-		bytes, err = s.reader.ReadBytes('\n')
-		if len(bytes) > 0 {
-			s.currentPos += int64(len(bytes))
-
-			return string(bytes), lineIndex, nil
+	chunk, err := s.reader.ReadSlice('\n')
+	if err != bufio.ErrBufferFull {
+		if err != nil && err != io.EOF {
+			return "", lineIndex, err
 		}
 
-		// TODO(d.kolyshev):  Do not overwrite error?
+		if len(chunk) > 0 {
+			s.currentPos += int64(len(chunk))
+
+			return string(chunk), lineIndex, nil
+		}
+
 		if err != nil {
 			return "", lineIndex, io.EOF
 		}
+
+		return "", lineIndex, nil
 	}
+
+	full := make([]byte, len(chunk), len(chunk)*2)
+	copy(full, chunk)
+	for err == bufio.ErrBufferFull {
+		chunk, err = s.reader.ReadSlice('\n')
+		full = append(full, chunk...)
+	}
+
+	if err != nil && err != io.EOF {
+		return "", lineIndex, err
+	}
+
+	s.currentPos += int64(len(full))
+
+	return string(full), lineIndex, nil
 }
 
 // isIgnored checks if the rule should be ignored by this scanner.
