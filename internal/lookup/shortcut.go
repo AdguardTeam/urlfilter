@@ -98,7 +98,7 @@ func appendRuleShortcuts(orig []shortcut, r *rules.NetworkRule) (res []shortcut)
 		return res
 	}
 
-	for i := range len(r.Shortcut) - shortcutLength {
+	for i := range len(r.Shortcut) - shortcutLength + 1 {
 		res = append(res, shortcut(r.Shortcut[i:i+shortcutLength]))
 	}
 
@@ -185,7 +185,7 @@ func (idx *ShortcutIndex) AppendMatching(
 		return res
 	}
 
-	for i := range l - shortcutLength {
+	for i := range l - shortcutLength + 1 {
 		sc := shortcut(r.URLLowerCase[i : i+shortcutLength])
 		ids := idx.shortcuts[sc]
 		if len(ids) == 0 {
