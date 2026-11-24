@@ -136,21 +136,27 @@ func (f *File) readLine(offset int64) (line string, err error) {
 	bufPtr := f.bytesPool.Get()
 	defer f.bytesPool.Put(bufPtr)
 
-	var n int
+	buf := *bufPtr
 	var read int
 	for {
-		n, err = f.file.ReadAt((*bufPtr)[read:], offset+int64(n))
-		if n == 0 {
-			return string(*bufPtr), err
+		if read == len(buf) {
+			grown := make([]byte, len(buf)*2)
+			copy(grown, buf)
+			buf = grown
 		}
 
-		idx := bytes.IndexByte((*bufPtr)[read:read+n], '\n')
-		if idx == -1 {
+		var n int
+		n, err = f.file.ReadAt(buf[read:], offset+int64(read))
+		if n > 0 {
+			if idx := bytes.IndexByte(buf[read:read+n], '\n'); idx != -1 {
+				return string(buf[:read+idx]), nil
+			}
+
 			read += n
-
-			continue
 		}
 
-		return string((*bufPtr)[:read+idx]), nil
+		if err != nil {
+			return string(buf[:read]), err
+		}
 	}
 }
