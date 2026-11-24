@@ -590,6 +590,10 @@ func (r *NetworkRule) preparePattern() {
 // matchPattern uses the regex pattern to match the request URL.  req must not
 // be nil.
 func (r *NetworkRule) matchPattern(req *Request) (matched bool) {
+	if domain, ok := extractSimpleDomainPattern(r.pattern); ok {
+		return matchSimpleDomainPattern(req.URL, domain, r.IsOptionEnabled(OptionMatchCase))
+	}
+
 	r.initOnce.Do(r.preparePattern)
 	if r.matchesNothing {
 		return false
@@ -602,6 +606,112 @@ func (r *NetworkRule) matchPattern(req *Request) (matched bool) {
 	}
 
 	return r.regexp.MatchString(req.URL)
+}
+
+// extractSimpleDomainPattern reports whether pattern has the simple form
+// "||<domain>^" containing only ASCII letters, digits, '.', '-', and '_'.
+// When true, it can be matched directly without compiling a regular expression.
+func extractSimpleDomainPattern(pattern string) (domain string, ok bool) {
+	if len(pattern) <= len(MaskStartURL)+len(MaskSeparator) ||
+		!strings.HasPrefix(pattern, MaskStartURL) ||
+		!strings.HasSuffix(pattern, MaskSeparator) {
+		return "", false
+	}
+
+	domain = pattern[len(MaskStartURL) : len(pattern)-len(MaskSeparator)]
+	for i := range len(domain) {
+		c := domain[i]
+		isValid := (c >= 'a' && c <= 'z') ||
+			(c >= 'A' && c <= 'Z') ||
+			(c >= '0' && c <= '9') ||
+			c == '.' || c == '-' || c == '_'
+		if !isValid {
+			return "", false
+		}
+	}
+
+	return domain, true
+}
+
+// matchSimpleDomainPattern matches url against the equivalent of
+// `^(http|https|ws|wss)://([a-z0-9-_.]+\.)?<domain>([^ a-zA-Z0-9.%_-]|$)`
+// (case-insensitively when matchCase is false) without compiling a regexp.
+func matchSimpleDomainPattern(url, domain string, matchCase bool) (matched bool) {
+	rest, ok := stripURLScheme(url, matchCase)
+	if !ok {
+		return false
+	}
+
+	if hasDomainPrefixAt(rest, domain, matchCase) {
+		return true
+	}
+
+	for i := range len(rest) {
+		c := rest[i]
+		if c == '.' && i > 0 && hasDomainPrefixAt(rest[i+1:], domain, matchCase) {
+			return true
+		}
+
+		if !isSubdomainByte(c, matchCase) {
+			return false
+		}
+	}
+
+	return false
+}
+
+// stripURLScheme strips a leading http://, https://, ws://, or wss:// prefix
+// from url.
+func stripURLScheme(url string, matchCase bool) (rest string, ok bool) {
+	for _, scheme := range [...]string{"http://", "https://", "ws://", "wss://"} {
+		if len(url) < len(scheme) {
+			continue
+		}
+
+		prefix := url[:len(scheme)]
+		if (matchCase && prefix == scheme) || (!matchCase && strings.EqualFold(prefix, scheme)) {
+			return url[len(scheme):], true
+		}
+	}
+
+	return "", false
+}
+
+// hasDomainPrefixAt reports whether s starts with domain followed by either
+// end-of-string or a separator byte matching [RegexSeparator].
+func hasDomainPrefixAt(s, domain string, matchCase bool) (ok bool) {
+	if len(s) < len(domain) {
+		return false
+	}
+
+	prefix := s[:len(domain)]
+	if matchCase {
+		if prefix != domain {
+			return false
+		}
+	} else if !strings.EqualFold(prefix, domain) {
+		return false
+	}
+
+	return len(s) == len(domain) || isSeparatorByte(s[len(domain)])
+}
+
+// isSubdomainByte reports whether c belongs to the subdomain character class in
+// [RegexStartURL] (`[a-z0-9-_.]`, plus `A-Z` when case-insensitive).
+func isSubdomainByte(c byte, matchCase bool) (ok bool) {
+	return (c >= 'a' && c <= 'z') ||
+		(!matchCase && c >= 'A' && c <= 'Z') ||
+		(c >= '0' && c <= '9') ||
+		c == '-' || c == '_' || c == '.'
+}
+
+// isSeparatorByte reports whether c matches [RegexSeparator]
+// (`[^ a-zA-Z0-9.%_-]`).
+func isSeparatorByte(c byte) (ok bool) {
+	return !((c >= 'a' && c <= 'z') ||
+		(c >= 'A' && c <= 'Z') ||
+		(c >= '0' && c <= '9') ||
+		c == ' ' || c == '.' || c == '%' || c == '_' || c == '-')
 }
 
 // shouldMatchHostname checks if we should match hostname and not the URL.  This
