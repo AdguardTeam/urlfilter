@@ -32,6 +32,10 @@ func TestShortcutIndex_Add(t *testing.T) {
 		text: testRuleTextNoShortcutsURL,
 	}, {
 		want: assert.True,
+		name: "exact_shortcut_length",
+		text: "||a.com^",
+	}, {
+		want: assert.True,
 		name: "success",
 		text: testRuleText,
 	}}
@@ -160,6 +164,19 @@ func TestShortcutIndex_AppendMatching(t *testing.T) {
 			assertMatch(t, idx, r, tc.wantID)
 		})
 	}
+
+	t.Run("trailing_exact_length", func(t *testing.T) {
+		t.Parallel()
+
+		sExact := newStorage(t, "||a.com^")
+		idxExact := lookup.NewShortcutIndex()
+		loadIndex(t, idxExact, sExact)
+
+		// "a.com" is at the very end of "http://a.com" (offset len-5), so both
+		// Add and AppendMatching must include the final 5-byte window.
+		r := rules.NewRequestForHostname("a.com")
+		assertMatch(t, idxExact, r, filterlist.NewStorageID(1, 0))
+	})
 }
 
 func BenchmarkShortcutIndex_AppendMatching(b *testing.B) {
