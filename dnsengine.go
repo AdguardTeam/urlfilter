@@ -31,18 +31,14 @@ type DNSEngine struct {
 	rulesCount uint64
 }
 
-// bytesPerRuleEst is the estimate of how many bytes a single rule generally
-// takes.  It is based on the AdGuard Base DNS list.
-const bytesPerRuleEst = 64
-
 // NewDNSEngine parses the specified filter lists and returns a *DNSEngine built
 // from them.  s must not be nil.
 func NewDNSEngine(s *filterlist.RuleStorage) (e *DNSEngine) {
-	numRulesEst := s.SizeEstimate() / bytesPerRuleEst
-
+	// Don't presize ruleIndex from the storage size: it only contains host
+	// rules, and most DNS blocklists contain none, so the map would stay empty.
 	e = &DNSEngine{
 		rulesStorage: s,
-		ruleIndex:    make(map[string][]filterlist.StorageID, numRulesEst),
+		ruleIndex:    map[string][]filterlist.StorageID{},
 		rulesCount:   0,
 		reqPool:      syncutil.NewPool(func() (v *rules.Request) { return &rules.Request{} }),
 		rulesPool:    syncutil.NewSlicePool[*rules.HostRule](1),
