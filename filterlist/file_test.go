@@ -1,7 +1,9 @@
 package filterlist_test
 
 import (
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/AdguardTeam/golibs/testutil"
@@ -60,6 +62,34 @@ func TestFile_RuleListScanner(t *testing.T) {
 
 	assert.Equal(t, testRuleCosmetic, f.Text())
 	assert.Equal(t, uftest.ListID1, f.GetFilterListID())
+}
+
+func TestFile_RetrieveRule_longAndEOF(t *testing.T) {
+	t.Parallel()
+
+	// Build a rule longer than the 4 KiB read buffer followed by a final rule
+	// with no trailing newline.
+	longRule := "||" + strings.Repeat("a", 5000) + ".example^"
+	eofRule := "||eof.example^"
+	content := longRule + "\n" + eofRule
+
+	p := filepath.Join(t.TempDir(), "rules.txt")
+	require.NoError(t, os.WriteFile(p, []byte(content), 0o600))
+
+	fl, err := filterlist.NewFile(&filterlist.FileConfig{
+		Path: p,
+		ID:   uftest.ListID1,
+	})
+	require.NoError(t, err)
+	testutil.CleanupAndRequireSuccess(t, fl.Close)
+
+	r1, err := fl.RetrieveRule(0)
+	require.NoError(t, err)
+	assert.Equal(t, longRule, r1.Text())
+
+	r2, err := fl.RetrieveRule(int64(len(longRule) + 1))
+	require.NoError(t, err)
+	assert.Equal(t, eofRule, r2.Text())
 }
 
 func BenchmarkFile_RetrieveRule(b *testing.B) {
