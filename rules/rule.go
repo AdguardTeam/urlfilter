@@ -37,13 +37,29 @@ func NewRule(line string, id ListID) (r Rule, err error) {
 		return NewCosmeticRule(line, id)
 	}
 
-	// TODO(a.garipov):  Optimize.
-	hr, err := NewHostRule(line, id)
-	if err == nil {
-		return hr, nil
+	if canBeHostRule(line) {
+		hr, hostErr := NewHostRule(line, id)
+		if hostErr == nil {
+			return hr, nil
+		}
 	}
 
 	return NewNetworkRule(line, id)
+}
+
+// canBeHostRule reports whether line can possibly parse as a [HostRule].  Valid
+// host rules begin with either an IP address (hex digit or ':') or a domain
+// name (ASCII alphanumeric or '_').  Skipping [NewHostRule] for lines starting
+// with Adblock syntax (e.g. "||", "@@", "/") avoids allocating a discarded
+// [*HostRule] and [*RuleSyntaxError] on every network rule.
+func canBeHostRule(line string) (ok bool) {
+	c := line[0]
+
+	return (c >= 'a' && c <= 'z') ||
+		(c >= 'A' && c <= 'Z') ||
+		(c >= '0' && c <= '9') ||
+		c == ':' ||
+		c == '_'
 }
 
 // isComment returns true if the line is a comment.
